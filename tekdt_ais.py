@@ -1,654 +1,817 @@
-# TekDT_AIS.py
+# tekdt_ais.py
 import sys
 import os
 import json
-import subprocess
 import requests
-import re
-from packaging.version import parse as parse_version
+import subprocess
+import webbrowser
+import shutil
+import zipfile
+import io
+from pathlib import Path
 
-from PyQt6.QtWidgets import (
-    QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QListWidget, QListWidgetItem, QPushButton, QLabel, QLineEdit,
-    QScrollArea, QFrame, QSizePolicy, QSpacerItem, QMessageBox
-)
-from PyQt6.QtGui import QIcon, QPixmap, QColor, QPalette, QEnterEvent, QFont
-from PyQt6.QtCore import (
-    Qt, QSize, QThread, pyqtSignal, QPropertyAnimation, QRect, QEasingCurve,
-    QPoint
-)
+from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
+                             QListWidget, QListWidgetItem, QLabel, QPushButton, QLineEdit,
+                             QFrame, QScrollArea, QGraphicsOpacityEffect, QToolTip,
+                             QMessageBox, QSizePolicy)
+from PyQt6.QtGui import QIcon, QPixmap, QColor, QPalette, QFont, QMovie
+from PyQt6.QtCore import (Qt, QSize, QThread, pyqtSignal, QObject, QPropertyAnimation,
+                          QEasingCurve, QTimer)
 
 # --- CÁC HẰNG SỐ VÀ CẤU HÌNH ---
 APP_NAME = "TekDT AIS"
 APP_VERSION = "1.0.0"
-CONFIG_FILE = "app_config.json"
+GITHUB_REPO_URL = "https://github.com/tekdt/tekdtais"
 REMOTE_APP_LIST_URL = "https://raw.githubusercontent.com/tekdt/tekdtais/main/app_list.json"
-SELF_UPDATE_URL = "https://api.github.com/repos/tekdt/tekdtais/releases/latest"
 
-# Đường dẫn
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-APPS_DIR = os.path.join(BASE_DIR, "Apps")
-IMAGES_DIR = os.path.join(BASE_DIR, "Images")
-TOOLS_DIR = os.path.join(BASE_DIR, "Tools")
-ARIA2_DIR = os.path.join(TOOLS_DIR, "aria2")
-ARIA2_EXEC = os.path.join(ARIA2_DIR, "aria2c.exe")
-SEVENZ_DIR = os.path.join(TOOLS_DIR, "7z")
-SEVENZ_EXEC = os.path.join(SEVENZ_DIR, "7za.exe")
+BASE_DIR = Path(__file__).resolve().parent
+CONFIG_FILE = BASE_DIR / "app_config.json"
+APPS_DIR = BASE_DIR / "Apps"
+TOOLS_DIR = BASE_DIR / "Tools"
+IMAGES_DIR = BASE_DIR / "Images"
+ARIA2_DIR = TOOLS_DIR / "aria2"
+SEVENZ_DIR = TOOLS_DIR / "7z"
+ARIA2_EXEC = ARIA2_DIR / "aria2c.exe"
+SEVENZ_EXEC = SEVENZ_DIR / "7za.exe"
 
-# --- LỚP QUẢN LÝ LOGIC (MODEL) ---
-class AppManager:
+ARIA2_API_URL = "https://api.github.com/repos/aria2/aria2/releases/latest"
+SEVENZIP_API_URL = "https://api.github.com/repos/ip7z/7zip/releases/latest"
+
+# --- NEW: Lớp quản lý và cập nhật công cụ ---
+class ToolManager(QObject):
+    progress_update = pyqtSignal(str)
+    finished = pyqtSignal(bool, str) # success, message
+
     def __init__(self):
-        self.config = self.load_config()
-        self.ensure_dirs()
-
-    def ensure_dirs(self):
-        """Đảm bảo các thư mục cần thiết tồn tại."""
-        os.makedirs(APPS_DIR, exist_ok=True)
-        os.makedirs(IMAGES_DIR, exist_ok=True)
-        os.makedirs(TOOLS_DIR, exist_ok=True)
-        os.makedirs(ARIA2_DIR, exist_ok=True)
-        os.makedirs(SEVENZ_DIR, exist_ok=True)
-
-    def load_config(self):
-        """Tải cấu hình từ file JSON."""
-        if not os.path.exists(CONFIG_FILE):
-            default_config = {"settings": {}, "app_items": {}}
-            self.save_config(default_config)
-            return default_config
-        try:
-            with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except (json.JSONDecodeError, FileNotFoundError):
-            return {"settings": {}, "app_items": {}}
-
-    def save_config(self, config_data=None):
-        """Lưu cấu hình vào file JSON."""
-        data_to_save = config_data if config_data else self.config
-        with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
-            json.dump(data_to_save, f, indent=2, ensure_ascii=False)
-
-    def check_internet(self):
-        """Kiểm tra kết nối Internet."""
-        try:
-            requests.get("https://www.google.com", timeout=5)
-            return True
-        except requests.ConnectionError:
-            return False
-
-    def get_remote_app_list(self):
-        """Lấy danh sách phần mềm từ Github."""
-        try:
-            response = requests.get(REMOTE_APP_LIST_URL, timeout=10)
-            response.raise_for_status()
-            return response.json()
-        except (requests.RequestException, json.JSONDecodeError):
-            return None
-            
-    def get_downloaded_apps(self):
-        """Lấy danh sách các thư mục ứng dụng đã được tải về."""
-        if not os.path.exists(APPS_DIR):
-            return []
-        return [d for d in os.listdir(APPS_DIR) if os.path.isdir(os.path.join(APPS_DIR, d))]
-
-
-# --- LỚP THỰC THI TÁC VỤ NỀN (INSTALLER/DOWNLOADER) ---
-class TaskWorker(QThread):
-    progress = pyqtSignal(str, str, str)  # app_key, status ("downloading", "installing", "success", "failed"), message
-    finished = pyqtSignal(int, int)  # success_count, fail_count
-
-    def __init__(self, apps_to_process, manager):
         super().__init__()
+        self.session = requests.Session()
+        # GitHub API cần User-Agent
+        self.session.headers.update({'User-Agent': 'TekDT-AIS-App'})
+
+    def run_checks(self):
+        try:
+            self.progress_update.emit("Kiểm tra kết nối internet...")
+            self.session.get("https://www.google.com", timeout=5)
+
+            self.progress_update.emit("Kiểm tra và cập nhật 7-Zip...")
+            self._check_7zip()
+
+            self.progress_update.emit("Kiểm tra và cập nhật aria2...")
+            self._check_aria2()
+            self.finished.emit(True, "Kiểm tra công cụ hoàn tất.")
+        except requests.ConnectionError:
+            if not ARIA2_EXEC.exists() or not SEVENZ_EXEC.exists():
+                self.finished.emit(False, "Thiếu công cụ và không có internet. Vui lòng kết nối mạng và khởi động lại.")
+            else:
+                self.finished.emit(True, "Không có internet, sử dụng công cụ có sẵn.")
+        except Exception as e:
+            self.finished.emit(False, f"Lỗi không xác định khi kiểm tra công cụ: {e}")
+
+    def _check_7zip(self):
+        tool_dir = SEVENZ_DIR
+        exec_file = SEVENZ_EXEC
+        tool_name = "7-Zip"
+        api_url = SEVENZIP_API_URL
+        asset_name = '7zr.exe'
+        tool_dir.mkdir(exist_ok=True)
+        version_file = tool_dir / ".version"
+        local_version = version_file.read_text().strip() if version_file.exists() else "0"
+        response = self.session.get(api_url)
+        response.raise_for_status()
+        latest_release = response.json()
+
+        remote_version = latest_release['tag_name']
+
+        if remote_version != local_version or not exec_file.exists():
+            self.progress_update.emit(f"Đang tìm {tool_name} phiên bản {remote_version}...")
+
+            download_url = ""
+            
+            for asset in latest_release['assets']:
+                if asset['name'] == asset_name:
+                    download_url = asset['browser_download_url']
+                    break
+
+            if not download_url:
+                raise Exception(f"Không tìm thấy file tải về '{asset_name}' cho {tool_name}")
+
+            self.progress_update.emit(f"Đang tải {tool_name} ({asset_name})...")
+
+            # Tải file thực thi
+            file_response = self.session.get(download_url)
+            file_response.raise_for_status()
+            file_content = file_response.content
+
+            for item in tool_dir.iterdir():
+                if item.is_file(): item.unlink()
+                elif item.is_dir(): shutil.rmtree(item)
+            
+            # Lưu trực tiếp file thực thi (7zr.exe) với tên là 7za.exe
+            self.progress_update.emit(f"Đang cài đặt {tool_name}...")
+            with open(exec_file, 'wb') as f:
+                f.write(file_content)
+
+            version_file.write_text(remote_version)
+            self.progress_update.emit(f"Đã cập nhật {tool_name} thành công!")
+        else:
+            self.progress_update.emit(f"{tool_name} đã là phiên bản mới nhất.")
+
+    def _check_aria2(self):
+        tool_dir = ARIA2_DIR
+        exec_file = ARIA2_EXEC
+        tool_name = "aria2"
+        api_url = ARIA2_API_URL
+        asset_keyword = 'win-32bit'
+        tool_dir.mkdir(exist_ok=True)
+        version_file = tool_dir / ".version"
+        local_version = version_file.read_text().strip() if version_file.exists() else "0"
+
+        response = self.session.get(api_url)
+        response.raise_for_status()
+        latest_release = response.json()
+        remote_version = latest_release['tag_name']
+
+        if remote_version != local_version or not exec_file.exists():
+            self.progress_update.emit(f"Đang tải {tool_name} phiên bản {remote_version}...")
+            
+            download_url = ""
+            for asset in latest_release['assets']:
+                if asset_keyword in asset['name'] and asset['name'].endswith('.zip'):
+                    download_url = asset['browser_download_url']
+                    break
+            
+            if not download_url:
+                raise Exception(f"Không tìm thấy file tải về phù hợp cho {tool_name}")
+                
+            # Tải file
+            file_response = self.session.get(download_url)
+            file_response.raise_for_status()
+            file_content = file_response.content
+            file_name = Path(download_url).name
+
+            # Giải nén
+            self.progress_update.emit(f"Đang giải nén {tool_name}...")
+            if tool_dir.exists():
+                shutil.rmtree(tool_dir)
+            
+            with zipfile.ZipFile(io.BytesIO(file_content)) as zf:
+                # Tên thư mục bên trong file zip thường là tên file không có .zip
+                extracted_folder_name = file_name.removesuffix('.zip')
+                zf.extractall(TOOLS_DIR)
+            (TOOLS_DIR / extracted_folder_name).rename(tool_dir)
+
+            version_file.write_text(remote_version)
+            self.progress_update.emit(f"Đã cập nhật {tool_name} thành công!")
+        else:
+            self.progress_update.emit(f"{tool_name} đã là phiên bản mới nhất.")
+
+
+# --- LỚP CHO TÁC VỤ NỀN (DOWNLOAD, INSTALL) ---
+class WorkerSignals(QObject):
+    finished = pyqtSignal()
+    progress = pyqtSignal(str, str, str)
+    error = pyqtSignal(str)
+
+class InstallWorker(QThread):
+    def __init__(self, apps_to_process, action="install"):
+        super().__init__()
+        self.signals = WorkerSignals()
         self.apps_to_process = apps_to_process
-        self.manager = manager
-        self.is_running = True
-        self.success_count = 0
-        self.fail_count = 0
+        self.action = action
+        self._is_stopped = False
 
     def run(self):
-        """Bắt đầu thực thi các tác vụ."""
-        for app_key, app_info in self.apps_to_process.items():
-            if not self.is_running:
-                break
-            
-            try:
-                # 1. Tải về (nếu cần)
-                app_path = os.path.join(APPS_DIR, app_key)
-                installer_filename = os.path.basename(app_info['download_link'])
-                installer_path = os.path.join(app_path, installer_filename)
+        try:
+            for app_key, app_info in self.apps_to_process.items():
+                if self._is_stopped:
+                    self.signals.progress.emit(app_key, "stopped", "Tác vụ đã bị dừng.")
+                    continue
+                
+                self.signals.progress.emit(app_key, "processing", f"Bắt đầu xử lý {app_info.get('display_name')}...")
+                
+                # Logic tải xuống
+                download_url = app_info.get('download_url')
+                file_name = Path(download_url).name
+                app_dir = APPS_DIR / app_key
+                app_dir.mkdir(exist_ok=True)
+                download_path = app_dir / file_name
 
-                if not os.path.exists(installer_path):
-                    self.progress.emit(app_key, "downloading", f"Đang tải {app_info['display_name']}...")
-                    os.makedirs(app_path, exist_ok=True)
-                    
-                    # Sử dụng aria2 để tải
-                    cmd = [
-                        ARIA2_EXEC,
-                        "--dir", app_path,
-                        "--out", installer_filename,
-                        "--max-connection-per-server=5",
+                if not download_path.exists():
+                    command = [
+                        str(ARIA2_EXEC),
+                        "--dir", str(app_dir),
+                        "--out", file_name,
+                        "--max-connection-per-server=16",
+                        "--split=16",
                         "--min-split-size=1M",
-                        "--continue=true",
-                        app_info['download_link']
+                        download_url
                     ]
-                    # Thêm headers nếu có
-                    if 'download_headers' in app_info and app_info['download_headers']:
-                        for key, value in app_info['download_headers'].items():
-                            cmd.append(f"--header={key}: {value}")
+                    # Thêm header nếu cần
+                    if 'referer' in app_info:
+                        command.extend(["--header", f"Referer: {app_info['referer']}"])
                     
-                    result = subprocess.run(cmd, capture_output=True, text=True, encoding='utf-8')
-                    if result.returncode != 0:
-                        self.progress.emit(app_key, "failed", f"Tải thất bại: {result.stderr}")
-                        self.fail_count += 1
+                    process = subprocess.run(command, capture_output=True, text=True, creationflags=subprocess.CREATE_NO_WINDOW)
+                    if process.returncode != 0:
+                        self.signals.progress.emit(app_key, "failed", f"Tải xuống thất bại: {process.stderr}")
                         continue
-
-                # Cập nhật app_config.json sau khi tải xong
-                if app_key not in self.manager.config['app_items']:
-                    self.manager.config['app_items'][app_key] = app_info
-                    self.manager.save_config()
-
-                # 2. Cài đặt (chỉ với type 'installer')
-                if app_info['type'] == 'installer':
-                    self.progress.emit(app_key, "installing", f"Đang cài đặt {app_info['display_name']}...")
+                
+                # Logic cài đặt
+                if self.action == "install" and app_info.get('type') == 'installer':
+                    install_params = app_info.get('install_params', '').split()
+                    install_command = [str(download_path)] + install_params
                     
-                    install_cmd = [installer_path]
-                    if 'install_params' in app_info and app_info['install_params']:
-                        install_cmd.extend(app_info['install_params'].split())
+                    process = subprocess.run(install_command, capture_output=True, text=True, creationflags=subprocess.CREATE_NO_WINDOW)
+                    if process.returncode != 0:
+                        # Một số trình cài đặt trả về mã khác 0 ngay cả khi thành công
+                        # Cần có logic kiểm tra phức tạp hơn nếu cần, ví dụ: kiểm tra file/registry
+                        print(f"Cài đặt {app_key} có thể có lỗi: {process.stderr}")
+                
+                self.signals.progress.emit(app_key, "success", "Hoàn thành!")
 
-                    # Chạy tiến trình cài đặt
-                    install_process = subprocess.Popen(install_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                    install_process.wait() # Đợi cho đến khi cài đặt xong
-
-                    if install_process.returncode == 0:
-                        self.progress.emit(app_key, "success", "Cài đặt thành công!")
-                        self.success_count += 1
-                    else:
-                        self.progress.emit(app_key, "failed", f"Cài đặt thất bại. Mã lỗi: {install_process.returncode}")
-                        self.fail_count += 1
-                else: # Portable app
-                    self.progress.emit(app_key, "success", "Sẵn sàng để chạy (Portable).")
-                    self.success_count += 1
-
-            except Exception as e:
-                self.progress.emit(app_key, "failed", f"Lỗi không xác định: {e}")
-                self.fail_count += 1
-
-        self.finished.emit(self.success_count, self.fail_count)
+        except Exception as e:
+            self.signals.error.emit(str(e))
+        finally:
+            self.signals.finished.emit()
 
     def stop(self):
-        """Gửi tín hiệu dừng tác vụ."""
-        self.is_running = False
+        self._is_stopped = True
 
 # --- WIDGET TÙY CHỈNH CHO MỖI PHẦN MỀM ---
-class AppWidgetItem(QWidget):
-    # Tín hiệu được phát ra khi nút được nhấn
-    add_clicked = pyqtSignal(str)
-    remove_clicked = pyqtSignal(str)
-    run_clicked = pyqtSignal(str)
-    download_clicked = pyqtSignal(str)
-
-    def __init__(self, app_key, app_info, status="available"):
-        super().__init__()
+class AppItemWidget(QWidget):
+    add_requested = pyqtSignal(str, dict)
+    remove_requested = pyqtSignal(str, dict)
+    def __init__(self, app_key, app_info, parent=None):
+        super().__init__(parent)
         self.app_key = app_key
         self.app_info = app_info
-        self.status = status # available, added, not_downloaded, update_available
-
-        self.setToolTip(app_info.get('description', 'Không có mô tả.'))
         
-        layout = QHBoxLayout()
-        layout.setContentsMargins(5, 5, 5, 5)
-
+        self.layout = QHBoxLayout(self)
+        self.layout.setContentsMargins(5, 5, 5, 5)
+        
         # Icon
         self.icon_label = QLabel()
-        icon_path = os.path.join(IMAGES_DIR, app_info.get('icon_file', 'default.png'))
-        if os.path.exists(icon_path):
-            self.icon_label.setPixmap(QPixmap(icon_path).scaled(32, 32, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
-        layout.addWidget(self.icon_label)
-
-        # Tên và phiên bản
-        v_layout = QVBoxLayout()
-        v_layout.setSpacing(0)
-        self.name_label = QLabel(app_info.get('display_name', app_key))
-        self.name_label.setFont(QFont("Segoe UI", 10, QFont.Weight.Bold))
-        v_layout.addWidget(self.name_label)
-
-        self.version_label = QLabel(f"Phiên bản: {app_info.get('version', 'N/A')}")
-        self.version_label.setFont(QFont("Segoe UI", 8))
-        v_layout.addWidget(self.version_label)
-        layout.addLayout(v_layout)
-
-        layout.addSpacerItem(QSpacerItem(40, 20, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum))
-
-        # Các nút hành động (ẩn mặc định)
-        self.action_button = QPushButton()
-        self.action_button.setFixedSize(70, 25)
-        self.action_button.hide()
-        layout.addWidget(self.action_button)
+        icon_path = APPS_DIR / app_key / app_info.get('icon_file', '')
+        default_icon_path = IMAGES_DIR / 'default_icon.png' # Cần tạo file này
         
-        self.setLayout(layout)
-        self.update_appearance()
+        pixmap_path = str(icon_path) if icon_path.exists() else str(default_icon_path)
+        if Path(pixmap_path).exists():
+             pixmap = QPixmap(pixmap_path).scaled(32, 32, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+             self.icon_label.setPixmap(pixmap)
+        else:
+            # Icon mặc định
+            self.icon_label.setFixedSize(32, 32)
+            self.icon_label.setText("?")
+        self.layout.addWidget(self.icon_label)
+        
+        # Thông tin
+        self.info_widget = QWidget()
+        self.info_layout = QVBoxLayout(self.info_widget)
+        self.info_layout.setContentsMargins(0, 0, 0, 0)
+        self.info_layout.setSpacing(0)
+        
+        self.name_label = QLabel(f"{app_info.get('display_name', 'N/A')}")
+        self.name_label.setStyleSheet("font-weight: bold;")
+        self.version_label = QLabel(f"Phiên bản: {app_info.get('version', 'N/A')}")
+        
+        self.info_layout.addWidget(self.name_label)
+        self.info_layout.addWidget(self.version_label)
+        self.layout.addWidget(self.info_widget, 1) # Cho phép mở rộng
+        
+        # Nút hành động (ẩn ban đầu)
+        self.action_button = QPushButton()
+        self.action_button.setFixedSize(60, 25)
+        self.action_button.hide()
+        self.layout.addWidget(self.action_button)
+        
+        # Dấu tick/X
+        self.status_label = QLabel()
+        self.status_label.setFixedSize(24,24)
+        self.layout.addWidget(self.status_label)
+        self.status_label.hide()
+        
+        self.setToolTip(app_info.get('description', 'Không có mô tả.'))
 
-    def update_appearance(self):
-        """Cập nhật giao diện dựa trên trạng thái."""
-        self.name_label.setStyleSheet("")
-        if self.status == "not_downloaded":
-            self.name_label.setStyleSheet("color: orange;")
-            self.action_button.setText("Tải")
-            self.action_button.setToolTip(f"Tải {self.app_info['display_name']} về máy")
-            self.action_button.clicked.connect(lambda: self.download_clicked.emit(self.app_key))
-        elif self.status == "update_available":
-            self.name_label.setStyleSheet("color: green;")
-            self.action_button.setText("Thêm")
-            self.action_button.setToolTip(f"Thêm {self.app_info['display_name']} vào danh sách cài đặt")
-            self.action_button.clicked.connect(lambda: self.add_clicked.emit(self.app_key))
-        elif self.status == "added":
-            palette = self.palette()
-            palette.setColor(QPalette.ColorRole.WindowText, Qt.GlobalColor.gray)
-            self.setPalette(palette)
-            self.action_button.hide()
-        elif self.app_info.get('type') == 'portable':
-             self.action_button.setText("Chạy")
-             self.action_button.setToolTip(f"Chạy {self.app_info['display_name']}")
-             self.action_button.clicked.connect(lambda: self.run_clicked.emit(self.app_key))
-        else: # available
-             self.action_button.setText("Thêm")
-             self.action_button.setToolTip(f"Thêm {self.app_info['display_name']} vào danh sách cài đặt")
-             self.action_button.clicked.connect(lambda: self.add_clicked.emit(self.app_key))
-
-    def enterEvent(self, event: QEnterEvent):
-        """Sự kiện khi rê chuột vào widget."""
-        if self.status != "added":
+    def enterEvent(self, event):
+        if self.action_button.isEnabled():
             self.action_button.show()
         super().enterEvent(event)
 
     def leaveEvent(self, event):
-        """Sự kiện khi rê chuột ra khỏi widget."""
         self.action_button.hide()
         super().leaveEvent(event)
         
-# --- CỬA SỔ CHÍNH (VIEW & CONTROLLER) ---
-class MainWindow(QMainWindow):
-    def __init__(self, manager):
+    def set_status(self, status):
+        # success, failed, processing
+        if status == "success":
+            self.status_label.setPixmap(QPixmap(str(IMAGES_DIR / 'success.png')).scaled(16,16)) # Cần có file này
+            self.name_label.setStyleSheet("color: #4CAF50; font-weight: bold;")
+            self.status_label.show()
+        elif status == "failed":
+            self.status_label.setPixmap(QPixmap(str(IMAGES_DIR / 'failed.png')).scaled(16,16)) # Cần có file này
+            self.name_label.setStyleSheet("color: #F44336; font-weight: bold;")
+            self.status_label.show()
+        elif status == "processing":
+            movie = QMovie(str(IMAGES_DIR / 'loading.gif')) # Cần có file này
+            self.status_label.setMovie(movie)
+            movie.start()
+            self.status_label.show()
+        else:
+            self.status_label.hide()
+            self.name_label.setStyleSheet("color: #FFFFFF; font-weight: bold;")
+
+
+# --- CỬA SỔ CHÍNH ---
+class TekDT_AIS(QMainWindow):
+    def __init__(self):
         super().__init__()
-        self.manager = manager
-        self.all_apps_data = {} # Dữ liệu từ remote hoặc local
-        self.selected_apps = {} # Dữ liệu các app trong khung bên phải
+        self.config = {}
+        self.remote_apps = {}
+        self.local_apps = {}
+        self.selected_for_install = []
+        self.install_worker = None
+        self.startup_label = None
 
-        self.setWindowTitle(f"{APP_NAME} v{APP_VERSION}")
+        self.setup_ui()
+        self.tool_manager_thread = QThread()
+        self.tool_manager = ToolManager()
+        self.tool_manager.moveToThread(self.tool_manager_thread)
+        self.tool_manager.finished.connect(self.on_tool_check_finished)
+        self.tool_manager_thread.started.connect(self.tool_manager.run_checks)
+        
+        self.show_startup_status("Đang khởi tạo...")
+        self.tool_manager_thread.start()
+
+    def show_startup_status(self, message):
+        if not self.startup_label:
+            self.startup_label = QLabel(message, self)
+            self.startup_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.startup_label.setStyleSheet("background-color: rgba(0, 0, 0, 0.7); color: white; font-size: 16pt; border-radius: 10px; padding: 20px;")
+            self.tool_manager.progress_update.connect(lambda msg: self.startup_label.setText(msg))
+        
+        self.startup_label.setText(message)
+        self.startup_label.adjustSize()
+        self.startup_label.move(int((self.width() - self.startup_label.width()) / 2), int((self.height() - self.startup_label.height()) / 2))
+        self.startup_label.show()
+        self.startup_label.raise_()
+
+    def on_tool_check_finished(self, success, message):
+        self.tool_manager_thread.quit()
+        self.tool_manager_thread.wait()
+        if self.startup_label:
+            self.startup_label.hide()
+
+        if success:
+            # Thông báo ngắn gọn trên thanh trạng thái thay vì popup
+            self.status_label.setText(message)
+            self.load_config_and_apps()
+        else:
+            QMessageBox.critical(self, "Lỗi nghiêm trọng", message)
+            self.close()
+
+    def setup_ui(self):
+        self.setWindowTitle(f"{APP_NAME} - v{APP_VERSION}")
         self.setGeometry(100, 100, 1200, 800)
+        self.setStyleSheet("""
+            QMainWindow {
+                background-color: #2c3e50;
+            }
+            QLabel {
+                color: #ecf0f1;
+                font-size: 10pt;
+            }
+            QListWidget {
+                background-color: #34495e;
+                border: 1px solid #2c3e50;
+                color: #ecf0f1;
+                font-size: 11pt;
+            }
+            QListWidget::item {
+                padding: 5px;
+                border-bottom: 1px solid #2c3e50;
+            }
+            QListWidget::item:hover {
+                background-color: #4a627a;
+            }
+            QPushButton {
+                background-color: #3498db;
+                color: white;
+                border: none;
+                padding: 8px 16px;
+                border-radius: 4px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #2980b9;
+            }
+            QPushButton:disabled {
+                background-color: #95a5a6;
+            }
+            QLineEdit {
+                background-color: #34495e;
+                border: 1px solid #2c3e50;
+                padding: 8px;
+                border-radius: 4px;
+                color: white;
+            }
+            QToolTip {
+                background-color: #34495e;
+                color: white;
+                border: 1px solid #3498db;
+            }
+        """)
 
-        self.init_ui()
-        self.load_data_and_populate_lists()
-
-    def init_ui(self):
-        """Khởi tạo giao diện người dùng."""
-        main_widget = QWidget()
-        self.setCentralWidget(main_widget)
-        main_layout = QHBoxLayout(main_widget)
-
-        # --- Khung bên trái: Danh sách tất cả phần mềm ---
-        left_panel = QFrame()
-        left_panel.setFrameShape(QFrame.Shape.StyledPanel)
+        # Main Layout
+        central_widget = QWidget()
+        self.setCentralWidget(central_widget)
+        main_layout = QVBoxLayout(central_widget)
+        
+        # Panels Layout
+        panels_layout = QHBoxLayout()
+        
+        # --- Left Panel (Available Apps) ---
+        left_panel = QWidget()
         left_layout = QVBoxLayout(left_panel)
-
-        search_layout = QHBoxLayout()
-        self.search_input = QLineEdit()
-        self.search_input.setPlaceholderText("Gõ để tìm kiếm (ít nhất 2 ký tự)...")
-        self.search_input.textChanged.connect(self.filter_apps)
-        search_layout.addWidget(self.search_input)
         
-        self.total_apps_label = QLabel("Tổng số: 0")
-        search_layout.addWidget(self.total_apps_label)
-        left_layout.addLayout(search_layout)
-
-        self.all_apps_list = QListWidget()
-        self.all_apps_list.setStyleSheet("QListWidget::item { border-bottom: 1px solid #ddd; }")
-        left_layout.addWidget(self.all_apps_list)
+        self.search_box = QLineEdit()
+        self.search_box.setPlaceholderText("Gõ để tìm kiếm (tối thiểu 2 ký tự)...")
+        self.search_box.textChanged.connect(self.filter_apps)
         
-        # --- Khung bên phải: Danh sách phần mềm đã chọn ---
-        right_panel = QFrame()
-        right_panel.setFrameShape(QFrame.Shape.StyledPanel)
-        right_panel.setFixedWidth(400)
+        self.available_count_label = QLabel("Tổng số phần mềm: 0")
+        
+        self.available_list_widget = QListWidget()
+        
+        left_layout.addWidget(self.search_box)
+        left_layout.addWidget(self.available_count_label)
+        left_layout.addWidget(self.available_list_widget)
+        
+        # --- Right Panel (Selected Apps) ---
+        right_panel = QWidget()
         right_layout = QVBoxLayout(right_panel)
-
-        self.selected_apps_label = QLabel("Đã chọn: 0")
-        right_layout.addWidget(self.selected_apps_label)
-
-        self.selected_apps_list = QListWidget()
-        right_layout.addWidget(self.selected_apps_list)
-
-        # --- Khu vực điều khiển dưới cùng ---
-        bottom_layout = QHBoxLayout()
-        self.start_button = QPushButton("Bắt đầu")
-        self.start_button.setIcon(QIcon.fromTheme("media-playback-start"))
+        
+        self.selected_count_label = QLabel("Đã chọn: 0")
+        
+        self.selected_list_widget = QListWidget()
+        
+        right_layout.addWidget(self.selected_count_label)
+        right_layout.addWidget(self.selected_list_widget)
+        
+        panels_layout.addWidget(left_panel)
+        panels_layout.addWidget(right_panel)
+        
+        # --- Bottom Panel (Controls) ---
+        bottom_panel = QWidget()
+        bottom_layout = QHBoxLayout(bottom_panel)
+        bottom_panel.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
+        
+        self.start_button = QPushButton("BẮT ĐẦU CÀI ĐẶT")
+        self.start_button.clicked.connect(self.start_installation)
         self.start_button.setMinimumHeight(40)
-        self.start_button.setEnabled(False)
-        self.start_button.clicked.connect(self.toggle_installation)
+
+        self.status_label = QLabel("Trạng thái: Sẵn sàng.")
         
-        self.status_label = QLabel("Sẵn sàng.")
-        bottom_layout.addWidget(self.status_label)
-        bottom_layout.addSpacerItem(QSpacerItem(40, 20, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum))
+        bottom_layout.addWidget(self.status_label, 1)
         bottom_layout.addWidget(self.start_button)
-        right_layout.addLayout(bottom_layout)
-
-        main_layout.addWidget(left_panel)
-        main_layout.addWidget(right_panel)
         
-        self.worker = None
-
-    def load_data_and_populate_lists(self):
-        """Tải dữ liệu và điền vào các danh sách."""
-        has_internet = self.manager.check_internet()
-        
-        if has_internet:
-            remote_data = self.manager.get_remote_app_list()
-            if remote_data:
-                self.all_apps_data = remote_data.get('app_items', {})
-                self.status_label.setText("Đã kết nối. Đang hiển thị danh sách mới nhất.")
-            else:
-                self.all_apps_data = self.manager.config.get('app_items', {})
-                self.status_label.setText("Lỗi khi tải danh sách. Hiển thị các phần mềm đã có.")
-        else:
-            self.all_apps_data = self.manager.config.get('app_items', {})
-            self.status_label.setText("Không có Internet. Chỉ hiển thị các phần mềm đã tải.")
+        main_layout.addLayout(panels_layout)
+        main_layout.addWidget(bottom_panel)
             
-        self.populate_all_apps_list()
-        self.load_selection_from_config()
-
-    def populate_all_apps_list(self, filter_text=""):
-        """Điền dữ liệu vào danh sách bên trái, có thể lọc."""
-        self.all_apps_list.clear()
-        
-        # Lọc ứng dụng nếu có filter_text
-        apps_to_display = {}
-        if len(filter_text) >= 2:
-            for key, info in self.all_apps_data.items():
-                if filter_text.lower() in info.get('display_name', '').lower() or \
-                   filter_text.lower() in info.get('description', '').lower() or \
-                   filter_text.lower() in info.get('category', '').lower():
-                    apps_to_display[key] = info
-        else:
-            apps_to_display = self.all_apps_data
-
-        # Nhóm theo danh mục
-        categories = {}
-        for key, info in apps_to_display.items():
-            category = info.get('category', 'Chưa phân loại')
-            if category not in categories:
-                categories[category] = []
-            categories[category].append((key, info))
-
-        # Sắp xếp danh mục theo alphabet và hiển thị
-        sorted_categories = sorted(categories.keys())
-        
-        item_count = 0
-        for category in sorted_categories:
-            # Thêm tiêu đề danh mục
-            category_item = QListWidgetItem(category.upper())
-            category_item.setFlags(Qt.ItemFlag.NoItemFlags)
-            category_item.setBackground(QColor("#f0f0f0"))
-            font = category_item.font()
-            font.setBold(True)
-            category_item.setFont(font)
-            self.all_apps_list.addItem(category_item)
-
-            # Thêm các app trong danh mục
-            for app_key, app_info in sorted(categories[category], key=lambda x: x[1]['display_name']):
-                self.add_app_to_list(self.all_apps_list, app_key, app_info)
-                item_count += 1
-                
-        self.total_apps_label.setText(f"Tổng số: {item_count}")
-
-    def add_app_to_list(self, list_widget, app_key, app_info):
-        """Thêm một widget ứng dụng vào một QListWidget."""
-        status = self.get_app_status(app_key, app_info)
-        
-        # Nếu đã có trong danh sách chọn, trạng thái là 'added'
-        if app_key in self.selected_apps:
-            status = "added"
-            
-        widget = AppWidgetItem(app_key, app_info, status)
-
-        # Kết nối tín hiệu từ widget tới các hàm xử lý
-        widget.add_clicked.connect(self.handle_add_app)
-        widget.download_clicked.connect(self.handle_download_app)
-        widget.run_clicked.connect(self.handle_run_app)
-        # widget.remove_clicked sẽ được kết nối khi thêm vào danh sách bên phải
-
-        list_item = QListWidgetItem(list_widget)
-        list_item.setSizeHint(widget.sizeHint())
-        list_widget.addItem(list_item)
-        list_widget.setItemWidget(list_item, widget)
-
-    def get_app_status(self, app_key, app_info):
-        """Xác định trạng thái của một ứng dụng."""
-        local_apps = self.manager.get_downloaded_apps()
-        local_config_apps = self.manager.config['app_items']
-
-        if app_key not in local_apps and app_key not in local_config_apps:
-            return "not_downloaded"
-            
-        if app_key in local_config_apps:
-            local_version = local_config_apps[app_key].get('version', '0')
-            remote_version = app_info.get('version', '0')
-            if parse_version(remote_version) > parse_version(local_version):
-                return "update_available"
-        
-        return "available"
-        
-    def handle_add_app(self, app_key):
-        """Xử lý khi người dùng nhấn nút 'Thêm'."""
-        app_info = self.all_apps_data.get(app_key)
-        if not app_info: return
-
-        # Kiểm tra cập nhật
-        status = self.get_app_status(app_key, app_info)
-        if status == "update_available":
-            reply = QMessageBox.question(self, 'Xác nhận cập nhật',
-                                         f"{app_info['display_name']} có phiên bản mới. Bạn có muốn tải về và cập nhật không?",
-                                         QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                                         QMessageBox.StandardButton.Yes)
-            if reply == QMessageBox.StandardButton.No:
-                 # Nếu không cập nhật, dùng thông tin cũ
-                 app_info = self.manager.config['app_items'][app_key]
-            # Nếu có, app_info đã là thông tin mới nhất từ remote
-
-        # Thêm vào danh sách chọn (bên phải)
-        self.selected_apps[app_key] = app_info
-        self.populate_selected_list()
-        
-        # Cập nhật lại trạng thái ở danh sách bên trái
-        self.update_app_item_status(app_key, "added")
-        self.update_start_button_state()
-        self.save_selection_to_config()
-
-    def handle_remove_app(self, app_key):
-        """Xử lý khi người dùng nhấn nút 'Bỏ'."""
-        if app_key in self.selected_apps:
-            del self.selected_apps[app_key]
-        
-        self.populate_selected_list()
-        
-        # Kích hoạt lại item ở danh sách bên trái
-        app_info = self.all_apps_data.get(app_key)
-        if app_info:
-            status = self.get_app_status(app_key, app_info)
-            self.update_app_item_status(app_key, status)
-        
-        self.update_start_button_state()
-        self.save_selection_to_config()
-
-    def handle_download_app(self, app_key):
-        # Tạm thời chỉ thêm vào danh sách cài đặt để worker xử lý cả tải và cài
-        self.handle_add_app(app_key)
-        QMessageBox.information(self, "Thông báo", f"Đã thêm {self.all_apps_data[app_key]['display_name']} vào danh sách. Nhấn 'Bắt đầu' để tải về và cài đặt.")
-        
-    def handle_run_app(self, app_key):
-        """Chạy một ứng dụng portable."""
-        app_info = self.all_apps_data.get(app_key)
-        if not app_info or app_info['type'] != 'portable':
-            return
-            
-        app_dir = os.path.join(APPS_DIR, app_key)
-        executable = os.path.join(app_dir, app_info['executable_name'])
-
-        if os.path.exists(executable):
+    def load_config_and_apps(self):
+        # Load local config
+        if CONFIG_FILE.exists():
             try:
-                # Chạy không đợi
-                subprocess.Popen([executable], cwd=app_dir)
-                self.status_label.setText(f"Đang chạy {app_info['display_name']}...")
-            except Exception as e:
-                QMessageBox.critical(self, "Lỗi", f"Không thể chạy {app_info['display_name']}: {e}")
+                with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                    if not content: # File trống
+                        self.config = {}
+                    else:
+                        self.config = json.loads(content)
+            except json.JSONDecodeError: # File hỏng
+                self.config = {}
         else:
-             QMessageBox.warning(self, "Không tìm thấy", f"Không tìm thấy file thực thi: {executable}. Vui lòng tải về trước.")
+            self.config = {}
 
+        # Luôn đảm bảo các khóa chính tồn tại
+        if 'settings' not in self.config:
+            self.config['settings'] = {}
+        if 'app_items' not in self.config:
+            self.config['app_items'] = {}
 
-    def populate_selected_list(self):
-        """Điền dữ liệu vào danh sách bên phải."""
-        self.selected_apps_list.clear()
-        for app_key, app_info in self.selected_apps.items():
-            widget = QWidget()
-            layout = QHBoxLayout(widget)
-            layout.setContentsMargins(5, 5, 5, 5)
+        self.local_apps = self.config.get("app_items", {})
+        # Đảm bảo selected_for_install là một danh sách
+        self.selected_for_install = self.config.get("settings", {}).get("selected_for_install", [])
+        if not isinstance(self.selected_for_install, list):
+            self.selected_for_install = []
 
-            label = QLabel(app_info['display_name'])
-            remove_button = QPushButton("Bỏ")
-            remove_button.setFixedSize(50, 25)
-            remove_button.clicked.connect(lambda _, k=app_key: self.handle_remove_app(k))
+        # Fetch remote app list
+        try:
+            response = requests.get(REMOTE_APP_LIST_URL, timeout=10)
+            response.raise_for_status()
+            self.remote_apps = response.json()
+        except requests.RequestException as e:
+            QMessageBox.critical(self, "Lỗi mạng", 
+                                 f"Không thể tải danh sách phần mềm từ máy chủ: {e}\n"
+                                 "Chương trình sẽ chỉ hiển thị các phần mềm đã tải.")
+            self.remote_apps = {"app_items": self.local_apps}
+        
+        self.populate_lists()
+        
+    def populate_lists(self):
+        self.available_list_widget.clear()
+        self.selected_list_widget.clear()
+        
+        all_apps = self.remote_apps.get("app_items", {})
+        
+        # Nhóm theo danh mục
+        categories = sorted(list(set(app.get('category', 'Chưa phân loại') for app in all_apps.values())))
+        
+        for category in categories:
+            # Add category header
+            cat_item = QListWidgetItem(category.upper())
+            cat_item.setFlags(cat_item.flags() & ~Qt.ItemFlag.ItemIsSelectable)
+            font = QFont()
+            font.setBold(True)
+            cat_item.setFont(font)
+            cat_item.setForeground(QColor("#3498db"))
+            self.available_list_widget.addItem(cat_item)
+
+            # Add apps in this category
+            for key, info in all_apps.items():
+                if info.get('category', 'Chưa phân loại') == category:
+                    if key in self.selected_for_install:
+                        self.add_app_to_list(self.selected_list_widget, key, info)
+                    else:
+                        self.add_app_to_list(self.available_list_widget, key, info)
+        for key in list(self.selected_for_install): # Use list copy for safe removal
+             if key in all_apps:
+                 self.move_app_to_selection(key, all_apps[key])
+             else: # App no longer exists remotely, remove it
+                 self.selected_for_install.remove(key)
+
+        self.update_counts()
+
+    def add_app_to_list(self, list_widget, key, info):
+        item_widget = AppItemWidget(key, info)
+        
+        # Tùy chỉnh trạng thái
+        item_widget.add_requested.connect(self.move_app_to_selection)
+        item_widget.remove_requested.connect(self.remove_app_from_selection)
+        is_local = key in self.local_apps
+        is_selected = key in self.selected_for_install
+        
+        if info.get('type') == 'portable' and is_local:
+            item_widget.action_button.setText("Chạy")
+            item_widget.action_button.setToolTip(f"Chạy {info['display_name']}")
+            item_widget.action_button.clicked.connect(lambda _, k=key: self.run_portable(k))
+        elif not is_local:
+            item_widget.action_button.setText("Tải")
+            item_widget.action_button.setToolTip(f"Tải {info['display_name']} về")
+            item_widget.name_label.setStyleSheet("color: #e67e22;") # Orange
+            item_widget.action_button.clicked.connect(lambda _, k=key, i=info: self.download_app(k, i))
+        else: # Is local and installer
+            item_widget.action_button.setText("Thêm")
+            item_widget.action_button.setToolTip(f"Thêm {info['display_name']} vào danh sách")
+            # Emit signal on click
+            item_widget.action_button.clicked.connect(lambda: item_widget.add_requested.emit(key, info))
             
-            layout.addWidget(label)
-            layout.addStretch()
-            layout.addWidget(remove_button)
+            local_ver = self.local_apps.get(key, {}).get('version', '0')
+            remote_ver = info.get('version', '0')
+            if remote_ver > local_ver:
+                 item_widget.name_label.setStyleSheet("color: #2ecc71;") # Green
 
-            list_item = QListWidgetItem(self.selected_apps_list)
-            list_item.setSizeHint(widget.sizeHint())
-            self.selected_apps_list.addItem(list_item)
-            self.selected_apps_list.setItemWidget(list_item, widget)
-            
-        self.selected_apps_label.setText(f"Đã chọn: {len(self.selected_apps)}")
+        list_item = QListWidgetItem()
+        list_item.setSizeHint(item_widget.sizeHint())
+        list_item.setData(Qt.ItemDataRole.UserRole, key) # Store key for searching
+        
+        list_widget.addItem(list_item)
+        list_widget.setItemWidget(list_item, item_widget)
 
-    def update_app_item_status(self, app_key_to_update, new_status):
-        """Cập nhật trạng thái của một item trong danh sách bên trái."""
-        for i in range(self.all_apps_list.count()):
-            item = self.all_apps_list.item(i)
-            widget = self.all_apps_list.itemWidget(item)
-            if isinstance(widget, AppWidgetItem) and widget.app_key == app_key_to_update:
-                widget.status = new_status
-                widget.update_appearance()
+    def move_app_to_selection(self, key, info):
+        # 1. Find and hide/disable in the available list
+        self.update_available_item_state(key, is_selected=True)
+
+        # 2. Add to the selected list
+        item_widget = AppItemWidget(key, info)
+        item_widget.action_button.setText("Bỏ")
+        item_widget.action_button.setToolTip(f"Bỏ {info['display_name']} khỏi danh sách")
+        item_widget.action_button.clicked.connect(lambda: item_widget.remove_requested.emit(key, info))
+        item_widget.remove_requested.connect(self.remove_app_from_selection)
+        
+        list_item = QListWidgetItem()
+        list_item.setSizeHint(item_widget.sizeHint())
+        list_item.setData(Qt.ItemDataRole.UserRole, key)
+        self.selected_list_widget.addItem(list_item)
+        self.selected_list_widget.setItemWidget(list_item, item_widget)
+        
+        # 3. Update config
+        if key not in self.selected_for_install:
+            self.selected_for_install.append(key)
+        self.save_config()
+        self.update_counts()
+
+    def remove_app_from_selection(self, key, info):
+        # 1. Find and remove from selected list
+        for i in range(self.selected_list_widget.count()):
+            item = self.selected_list_widget.item(i)
+            widget = self.selected_list_widget.itemWidget(item)
+            if hasattr(widget, 'app_key') and widget.app_key == key:
+                self.selected_list_widget.takeItem(i)
                 break
 
+        # 2. Re-enable in the available list
+        self.update_available_item_state(key, is_selected=False)
+        
+        # 3. Update config
+        if key in self.selected_for_install:
+            self.selected_for_install.remove(key)
+        self.save_config()
+        self.update_counts()
+
+    def move_app(self, key, info, destination_list):
+        source_list = self.sender().parent().parent() # Hacky way to find source list
+
+        # Find and remove from source
+        for i in range(source_list.count()):
+            item = source_list.item(i)
+            widget = source_list.itemWidget(item)
+            if hasattr(widget, 'app_key') and widget.app_key == key:
+                source_list.takeItem(i)
+                break
+        
+        # Add to destination
+        self.add_app_to_list(destination_list, key, info)
+        
+        # Update selected list and config
+        if destination_list == self.selected_list_widget:
+            self.selected_for_install.append(key)
+            # Find in available list and disable it
+            self.update_available_item_state(key, is_selected=True)
+        else:
+            self.selected_for_install.remove(key)
+            # Find in available list and enable it
+            self.update_available_item_state(key, is_selected=False)
+
+        self.save_config()
+        self.update_counts()
+        
+    def update_available_item_state(self, key, is_selected):
+        for i in range(self.available_list_widget.count()):
+            item = self.available_list_widget.item(i)
+            widget = self.available_list_widget.itemWidget(item)
+            if hasattr(widget, 'app_key') and widget.app_key == key:
+                widget.action_button.setDisabled(is_selected)
+                op = QGraphicsOpacityEffect(widget)
+                op.setOpacity(0.5 if is_selected else 1.0)
+                widget.setGraphicsEffect(op)
+                break
+                
+    def run_portable(self, key):
+        app_info = self.local_apps.get(key)
+        if app_info:
+            executable_path = APPS_DIR / key / app_info.get('executable')
+            if executable_path.exists():
+                subprocess.Popen([str(executable_path)])
+            else:
+                QMessageBox.warning(self, "Lỗi", f"Không tìm thấy file thực thi: {executable_path}")
+                
+    def download_app(self, key, info):
+        # Placeholder for a single download task
+        QMessageBox.information(self, "Thông báo", f"Bắt đầu tải {info['display_name']}.\n"
+                                "Tính năng này sẽ được triển khai trong Worker.")
+        # In a real scenario, this would also use the InstallWorker
+        
     def filter_apps(self, text):
-        """Lọc danh sách ứng dụng dựa trên text input."""
-        self.populate_all_apps_list(filter_text=text)
+        text = text.lower().strip()
+        if len(text) < 2:
+            for i in range(self.available_list_widget.count()):
+                self.available_list_widget.item(i).setHidden(False)
+            return
 
-    def update_start_button_state(self):
-        """Cập nhật trạng thái của nút Bắt đầu."""
-        self.start_button.setEnabled(len(self.selected_apps) > 0)
-        
-    def toggle_installation(self):
-        """Bắt đầu hoặc dừng quá trình cài đặt."""
-        if self.worker and self.worker.isRunning():
-            # Dừng worker
-            self.worker.stop()
-            self.start_button.setText("Đang dừng...")
-            self.start_button.setEnabled(False)
-            QMessageBox.information(self, "Đang dừng", "Đang chờ tác vụ hiện tại hoàn tất. Các tác vụ còn lại trong hàng đợi sẽ bị hủy.")
-        else:
-            # Bắt đầu worker
-            self.start_button.setText("Dừng")
-            self.status_label.setText("Bắt đầu quá trình...")
+        for i in range(self.available_list_widget.count()):
+            item = self.available_list_widget.item(i)
+            widget = self.available_list_widget.itemWidget(item)
             
-            apps_to_process = self.selected_apps.copy()
-            self.worker = TaskWorker(apps_to_process, self.manager)
-            self.worker.progress.connect(self.update_installation_progress)
-            self.worker.finished.connect(self.on_installation_finished)
-            self.worker.start()
+            # Keep category headers visible
+            if not hasattr(widget, 'app_key'):
+                item.setHidden(False)
+                continue
+                
+            app_info = widget.app_info
+            display_name = app_info.get('display_name', '').lower()
+            
+            if text in display_name:
+                item.setHidden(False)
+            else:
+                item.setHidden(True)
+                
+    def start_installation(self):
+        if self.install_worker and self.install_worker.isRunning():
+            reply = QMessageBox.question(self, "Dừng tác vụ", 
+                                         "Bạn có chắc muốn dừng quá trình cài đặt không? "
+                                         "Tác vụ đang chạy sẽ được hoàn tất.",
+                                         QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+            if reply == QMessageBox.StandardButton.Yes:
+                self.install_worker.stop()
+                self.start_button.setText("ĐANG DỪNG...")
+                self.start_button.setDisabled(True)
+            return
 
-    def update_installation_progress(self, app_key, status, message):
-        """Cập nhật giao diện khi có tiến trình từ worker."""
-        self.status_label.setText(f"{self.all_apps_data[app_key]['display_name']}: {message}")
+        apps_to_install = {}
+        for key in self.selected_for_install:
+            if key in self.remote_apps['app_items']:
+                 apps_to_install[key] = self.remote_apps['app_items'][key]
         
-        for i in range(self.selected_apps_list.count()):
-            item = self.selected_apps_list.item(i)
-            widget = self.selected_apps_list.itemWidget(item)
-            
-            # Tìm widget tương ứng
-            label = widget.findChild(QLabel)
-            if label and label.text() == self.selected_apps[app_key]['display_name']:
-                if status == "success":
-                    widget.setStyleSheet("background-color: #d4edda;") # Greenish
-                    label.setText(f"{label.text()} ✔")
-                elif status == "failed":
-                    widget.setStyleSheet("background-color: #f8d7da;") # Reddish
-                    label.setText(f"{label.text()} ❌")
+        if not apps_to_install:
+            QMessageBox.information(self, "Thông báo", "Vui lòng thêm ít nhất một phần mềm để cài đặt.")
+            return
+
+        self.start_button.setText("DỪNG")
+        self.install_worker = InstallWorker(apps_to_install, action="install")
+        self.install_worker.signals.progress.connect(self.update_install_progress)
+        self.install_worker.signals.finished.connect(self.on_installation_finished)
+        self.install_worker.signals.error.connect(lambda e: QMessageBox.critical(self, "Lỗi Worker", str(e)))
+        self.install_worker.start()
+
+    def update_install_progress(self, app_key, status, message):
+        self.status_label.setText(f"[{app_key}] {status}: {message}")
+        for i in range(self.selected_list_widget.count()):
+            item = self.selected_list_widget.item(i)
+            widget = self.selected_list_widget.itemWidget(item)
+            if hasattr(widget, 'app_key') and widget.app_key == app_key:
+                widget.set_status(status)
                 break
-                
-    def on_installation_finished(self, success_count, fail_count):
-        """Xử lý khi worker hoàn thành tất cả các tác vụ."""
-        self.start_button.setText("Bắt đầu")
-        self.start_button.setEnabled(len(self.selected_apps) > 0)
-        self.status_label.setText(f"Hoàn tất! Thành công: {success_count}, Thất bại: {fail_count}")
-        self.worker = None
+    
+    def on_installation_finished(self):
+        self.status_label.setText("Hoàn tất! Sẵn sàng cho tác vụ tiếp theo.")
+        self.start_button.setText("BẮT ĐẦU CÀI ĐẶT")
+        self.start_button.setDisabled(False)
+        self.install_worker = None
+        # Reload apps to reflect newly installed ones
+        QTimer.singleShot(1000, self.load_config_and_apps)
 
-    def save_selection_to_config(self):
-        """Lưu danh sách đã chọn vào file config."""
-        self.manager.config['settings']['selected_apps_for_install'] = list(self.selected_apps.keys())
-        self.manager.save_config()
+    def update_counts(self):
+        remote_count = len(self.remote_apps.get("app_items", {}))
+        selected_count = self.selected_list_widget.count()
+        
+        self.available_count_label.setText(f"Tổng số phần mềm: {remote_count}")
+        self.selected_count_label.setText(f"Đã chọn: {selected_count}")
 
-    def load_selection_from_config(self):
-        """Tải danh sách đã chọn từ file config khi mở lại."""
-        selected_keys = self.manager.config.get('settings', {}).get('selected_apps_for_install', [])
-        for key in selected_keys:
-            if key in self.all_apps_data:
-                self.handle_add_app(key)
-                
+    def save_config(self):
+        try:
+            with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
+                json.dump(self.config, f, indent=2, ensure_ascii=False)
+        except IOError as e:
+            print(f"Không thể lưu cấu hình: {e}")
+            
     def closeEvent(self, event):
-        """Lưu cấu hình cửa sổ khi đóng."""
-        self.manager.config['settings']['window_size'] = [self.size().width(), self.size().height()]
-        self.save_selection_to_config()
+        self.save_config()
         super().closeEvent(event)
-
-
-# --- HÀM MAIN VÀ XỬ LÝ DÒNG LỆNH ---
-def handle_cli(manager):
-    """Xử lý các tham số dòng lệnh."""
-    args = sys.argv[1:]
+        
+# --- LOGIC DÒNG LỆNH (CLI) ---
+def handle_cli(args):
+    print(f"{APP_NAME} - CLI Mode")
+    # Đây là một khung sườn, logic chi tiết cần được phát triển thêm
     if not args:
-        return False # Không có tham số, chạy GUI
+        print_cli_help()
+        return
 
-    # TODO: Triển khai logic cho /install, /update, /autoinstall, /help
-    # Đây là một ví dụ đơn giản
-    print("Chế độ dòng lệnh đang được phát triển.")
-    print(f"Tham số nhận được: {args}")
+    command = args[0].lower()
     
-    if "/help" in args:
-        print("Hướng dẫn sử dụng dòng lệnh TekDT AIS:")
-        print("  /install [app1|app2|...]  : Cài đặt các ứng dụng. Mặc định cài các app 'auto_install'.")
-        print("  /update [app1|app2|...]   : Cập nhật các ứng dụng. Mặc định cập nhật tất cả.")
-        print("  /autoinstall:true <app>    : Bật tự động cài đặt cho một ứng dụng.")
-        print("  /autoinstall:false <app>   : Tắt tự động cài đặt cho một ứng dụng.")
-        print("  /help                     : Hiển thị trợ giúp này.")
-        
-    # Xử lý các lệnh khác...
+    if command == '/help':
+        print_cli_help()
+    elif command == '/install':
+        print("Chức năng /install chưa được triển khai đầy đủ.")
+        # Logic: Load config, find apps with auto_install:true, run worker
+    elif command == '/update':
+        print("Chức năng /update chưa được triển khai đầy đủ.")
+        # Logic: Fetch remote list, compare versions, run worker for updates
+    else:
+        print(f"Lệnh không hợp lệ: {command}")
+        print_cli_help()
 
-    return True # Đã xử lý, không chạy GUI
-
-def main():
-    """Hàm chính của chương trình."""
-    manager = AppManager()
-
-    if handle_cli(manager):
-        sys.exit(0)
-
-    app = QApplication(sys.argv)
-    window = MainWindow(manager)
-    
-    # Khôi phục kích thước cửa sổ
-    win_size = manager.config.get('settings', {}).get('window_size')
-    if win_size:
-        window.resize(win_size[0], win_size[1])
-        
-    window.show()
-    sys.exit(app.exec())
+def print_cli_help():
+    print("Sử dụng TekDT AIS qua dòng lệnh:")
+    print("  /help                     Hiển thị trợ giúp này.")
+    print("  /install                  Cài đặt tất cả các phần mềm có 'auto_install' là true.")
+    print("  /install app1|app2        Cài đặt các phần mềm được chỉ định.")
+    print("  /update                   Kiểm tra và cập nhật tất cả phần mềm đã cài.")
+    print("  /update app1|app2         Cập nhật các phần mềm được chỉ định.")
+    print("  /autoinstall:true|false app1   Đặt trạng thái tự động cài đặt cho phần mềm.")
 
 if __name__ == '__main__':
-    main()
+    # Kiểm tra xem có chạy từ dòng lệnh hay không
+    cli_args = [arg for arg in sys.argv[1:] if arg.startswith('/')]
+    
+    if cli_args:
+        handle_cli(cli_args)
+        sys.exit(0)
+    else:
+        app = QApplication(sys.argv)
+        # Tạo file icon mặc định nếu chưa có
+        default_icon = IMAGES_DIR / 'default_icon.png'
+        if not default_icon.exists():
+            pixmap = QPixmap(32, 32)
+            pixmap.fill(Qt.GlobalColor.gray)
+            pixmap.save(str(default_icon))
+        main_win = TekDT_AIS()
+        main_win.show()
+        sys.exit(app.exec())
