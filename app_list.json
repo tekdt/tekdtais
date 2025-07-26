@@ -1,1 +1,44 @@
-
+{
+  "app_items": {
+    "googlechrome": {
+      "display_name": "Google Chrome",
+      "version": "127.0.865.123",
+      "category": "Trình duyệt Web",
+      "description": "Trình duyệt web nhanh, an toàn và miễn phí được xây dựng cho web hiện đại.",
+      "type": "installer",
+      "download_url": "https://dl.google.com/chrome/install/standalonesetup64.exe",
+      "install_params": "/silent /install",
+      "icon_file": "chrome_icon.png"
+    },
+    "vlc": {
+      "display_name": "VLC Media Player",
+      "version": "3.0.21",
+      "category": "Media",
+      "description": "Trình phát đa phương tiện miễn phí, mã nguồn mở, có thể phát hầu hết các định dạng.",
+      "type": "installer",
+      "download_url": "https://get.videolan.org/vlc/3.0.21/win64/vlc-3.0.21-win64.exe",
+      "install_params": "/L=1066 /S",
+      "icon_file": "vlc_icon.png"
+    },
+    "rufus": {
+      "display_name": "Rufus Portable",
+      "version": "4.5",
+      "category": "Tiện ích hệ thống",
+      "description": "Công cụ giúp định dạng và tạo ổ đĩa USB có khả năng khởi động.",
+      "type": "portable",
+      "download_url": "https://github.com/pbatard/rufus/releases/download/v4.5/rufus-4.5p.exe",
+      "executable": "rufus-4.5p.exe",
+      "icon_file": "rufus_icon.png"
+    },
+    "notepadplusplus": {
+      "display_name": "Notepad++",
+      "version": "8.6.9",
+      "category": "Lập trình",
+      "description": "Trình soạn thảo mã nguồn và thay thế Notepad hỗ trợ nhiều ngôn ngữ.",
+      "type": "installer",
+      "download_url": "https://github.com/notepad-plus-plus/notepad-plus-plus/releases/download/v8.6.9/npp.8.6.9.Installer.x64.exe",
+      "install_params": "/S",
+      "icon_file": "npp_icon.png"
+    }
+  }
+}
