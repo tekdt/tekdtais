@@ -23,7 +23,7 @@ from PyQt6.QtCore import (Qt, QSize, QThread, pyqtSignal, QObject, QPropertyAnim
 APP_NAME = "TekDT AIS"
 APP_VERSION = "1.0.0"
 GITHUB_REPO_URL = "https://github.com/tekdt/tekdtais"
-REMOTE_APP_LIST_URL = "https://raw.githubusercontent.com/tekdt/tekdtais/refs/heads/main/app_list.json?token=GHSAT0AAAAAADFXD6645ST3LNMN62HYN2LO2EERFAQ"
+REMOTE_APP_LIST_URL = "https://raw.githubusercontent.com/tekdt/tekdtais/refs/heads/main/app_list.json"
 
 BASE_DIR = Path(__file__).resolve().parent
 CONFIG_FILE = BASE_DIR / "app_config.json"
@@ -225,12 +225,13 @@ class InstallWorker(QThread):
                 if icon_url and not icon_path.exists():
                     self.signals.progress.emit(app_key, "processing", f"Đang tải biểu tượng cho {app_info.get('display_name')}...")
                     try:
-                        icon_response = self.session.get(icon_url)
+                        icon_response = self.session.get(icon_url, timeout=10)
                         icon_response.raise_for_status()
                         with open(icon_path, 'wb') as f:
                             f.write(icon_response.content)
                     except requests.RequestException as e:
                         self.signals.progress.emit(app_key, "warning", f"Không thể tải biểu tượng: {e}")
+                        icon_filename = 'default_icon.png'
                 
                 # Update local app config
                 local_app_info = app_info.copy()
@@ -242,14 +243,20 @@ class InstallWorker(QThread):
                     json.dump(config, f, indent=2, ensure_ascii=False)
                 # Logic cài đặt
                 if self.action == "install" and app_info.get('type') == 'installer':
+                    if not download_path.exists():
+                        self.signals.progress.emit(app_key, "failed", f"File cài đặt không tồn tại: {download_path}")
+                        continue
                     install_params = app_info.get('install_params', '').split()
                     install_command = [str(download_path)] + install_params
                     
-                    process = subprocess.run(install_command, capture_output=True, text=True, creationflags=subprocess.CREATE_NO_WINDOW)
-                    if process.returncode != 0:
-                        # Một số trình cài đặt trả về mã khác 0 ngay cả khi thành công
-                        # Cần có logic kiểm tra phức tạp hơn nếu cần, ví dụ: kiểm tra file/registry
-                        print(f"Cài đặt {app_key} có thể có lỗi: {process.stderr}")
+                    try:
+                        process = subprocess.run(install_command, capture_output=True, text=True, creationflags=subprocess.CREATE_NO_WINDOW)
+                        if process.returncode != 0:
+                            self.signals.progress.emit(app_key, "failed", f"Cài đặt {app_key} thất bại: {process.stderr}")
+                            continue
+                    except Exception as e:
+                        self.signals.progress.emit(app_key, "failed", f"Lỗi khi cài đặt {app_key}: {str(e)}")
+                        continue
                 
                 self.signals.progress.emit(app_key, "success", "Hoàn thành!")
 
@@ -275,24 +282,36 @@ class AppItemWidget(QWidget):
         
         # Icon
         self.icon_label = QLabel()
-        icon_path = APPS_DIR / app_key / app_info.get('icon_file', '')
-        default_icon_path = IMAGES_DIR / 'default_icon.png' # Cần tạo file này
+        icon_path = APPS_DIR / app_key / app_info.get('icon_file', '') if app_info.get('icon_file') else ''
+        default_icon_path = IMAGES_DIR / 'default_icon.png'
         
-        pixmap_path = str(icon_path) if icon_path.exists() else str(default_icon_path)
-        if Path(pixmap_path).exists():
-             pixmap = QPixmap(pixmap_path).scaled(32, 32, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
-             self.icon_label.setPixmap(pixmap)
+        if icon_path and Path(icon_path).exists():
+            icon = QIcon(str(icon_path))
+            if not icon.isNull():
+                pixmap = icon.pixmap(32, 32)
+                self.icon_label.setPixmap(pixmap)
+            else:
+                self.icon_label.setFixedSize(32, 32)
+                self.icon_label.setText("?")
+                self.icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                self.icon_label.setStyleSheet("color: #ecf0f1; background-color: #34495e; border: 1px solid #3498db;")
         else:
-            # Icon mặc định
-            self.icon_label.setFixedSize(32, 32)
-            self.icon_label.setText("?")
+            icon = QIcon(str(default_icon_path))
+            if not icon.isNull():
+                pixmap = icon.pixmap(32, 32)
+                self.icon_label.setPixmap(pixmap)
+            else:
+                self.icon_label.setFixedSize(32, 32)
+                self.icon_label.setText("?")
+                self.icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                self.icon_label.setStyleSheet("color: #ecf0f1; background-color: #34495e; border: 1px solid #3498db;")
         self.layout.addWidget(self.icon_label)
         
         # Thông tin
         self.info_widget = QWidget()
         self.info_layout = QVBoxLayout(self.info_widget)
         self.info_layout.setContentsMargins(0, 0, 0, 0)
-        self.info_layout.setSpacing(0)
+        self.info_layout.setSpacing(5)
         
         self.name_label = QLabel(f"{app_info.get('display_name', 'N/A')}")
         self.name_label.setStyleSheet("font-weight: bold;")
@@ -304,7 +323,7 @@ class AppItemWidget(QWidget):
         
         # Nút hành động (ẩn ban đầu)
         self.action_button = QPushButton()
-        self.action_button.setFixedSize(60, 25)
+        self.action_button.setFixedSize(80, 30)
         self.action_button.hide()
         self.layout.addWidget(self.action_button)
         
@@ -328,15 +347,15 @@ class AppItemWidget(QWidget):
     def set_status(self, status):
         # success, failed, processing
         if status == "success":
-            self.status_label.setPixmap(QPixmap(str(IMAGES_DIR / 'success.png')).scaled(16,16)) # Cần có file này
+            self.status_label.setPixmap(QPixmap(str(IMAGES_DIR / 'success.png')).scaled(16, 16))
             self.name_label.setStyleSheet("color: #4CAF50; font-weight: bold;")
             self.status_label.show()
         elif status == "failed":
-            self.status_label.setPixmap(QPixmap(str(IMAGES_DIR / 'failed.png')).scaled(16,16)) # Cần có file này
+            self.status_label.setPixmap(QPixmap(str(IMAGES_DIR / 'failed.png')).scaled(16, 16))
             self.name_label.setStyleSheet("color: #F44336; font-weight: bold;")
             self.status_label.show()
         elif status == "processing":
-            movie = QMovie(str(IMAGES_DIR / 'loading.gif')) # Cần có file này
+            movie = QMovie(str(IMAGES_DIR / 'loading.gif'))
             self.status_label.setMovie(movie)
             movie.start()
             self.status_label.show()
@@ -355,7 +374,9 @@ class TekDT_AIS(QMainWindow):
         self.selected_for_install = []
         self.install_worker = None
         self.startup_label = None
-        self.system_arch = platform.architecture()[0]  # '32bit' or '64bit'
+        self.system_arch = platform.architecture()[0]
+        self.session = requests.Session()
+        self.session.headers.update({'User-Agent': 'TekDT-AIS-App'})
 
         self.setup_ui()
         self.tool_manager_thread = QThread()
@@ -523,6 +544,23 @@ class TekDT_AIS(QMainWindow):
             self.config['app_items'] = {}
 
         self.local_apps = self.config.get("app_items", {})
+        # Clean up invalid local apps
+        for key in list(self.local_apps.keys()):
+            app_info = self.local_apps[key]
+            app_dir = APPS_DIR / key
+            if app_info.get('type') == 'portable':
+                executable_path = app_dir / app_info.get('executable', '') if app_info.get('executable') else None
+                if not executable_path or not executable_path.exists():
+                    del self.local_apps[key]
+                    self.config['app_items'].pop(key, None)
+            else:
+                download_url = app_info.get('download_url', '')
+                file_name = app_info.get('output_filename', Path(download_url).name if download_url else '')
+                installer_path = app_dir / file_name if file_name else None
+                if not installer_path or not installer_path.exists():
+                    del self.local_apps[key]
+                    self.config['app_items'].pop(key, None)
+        self.save_config()
         # Đảm bảo selected_for_install là một danh sách
         self.selected_for_install = self.config.get("settings", {}).get("selected_for_install", [])
         if not isinstance(self.selected_for_install, list):
@@ -530,7 +568,7 @@ class TekDT_AIS(QMainWindow):
 
         # Fetch remote app list
         try:
-            response = requests.get(REMOTE_APP_LIST_URL, timeout=10)
+            response = self.session.get(REMOTE_APP_LIST_URL, timeout=10)
             response.raise_for_status()
             self.remote_apps = response.json()
         except requests.RequestException as e:
@@ -547,8 +585,38 @@ class TekDT_AIS(QMainWindow):
         
         all_apps = self.remote_apps.get("app_items", {})
         
-        # Nhóm theo danh mục
-        categories = sorted(list(set(app.get('category', 'Chưa phân loại') for app in all_apps.values())))
+        # Filter apps based on system architecture
+        compatible_apps = {}
+        for key, app_info in all_apps.items():
+            compatible_os_arch = app_info.get('compatible_os_arch', 'both')
+            if (self.system_arch == '64bit' and compatible_os_arch in ['64bit', 'both']) or \
+               (self.system_arch == '32bit' and compatible_os_arch == '32bit'):
+                compatible_apps[key] = app_info
+        
+        # Download icons for apps not yet installed if online
+        try:
+            self.session.get("https://www.google.com", timeout=5)
+            for key, app_info in compatible_apps.items():
+                if key not in self.local_apps:
+                    icon_url = app_info.get('icon_url')
+                    if icon_url:
+                        icon_filename = Path(icon_url).name
+                        icon_path = APPS_DIR / key / icon_filename
+                        app_dir = APPS_DIR / key
+                        app_dir.mkdir(exist_ok=True)
+                        if not icon_path.exists():
+                            try:
+                                icon_response = self.session.get(icon_url, timeout=5)
+                                icon_response.raise_for_status()
+                                with open(icon_path, 'wb') as f:
+                                    f.write(icon_response.content)
+                                compatible_apps[key]['icon_file'] = icon_filename
+                            except requests.RequestException:
+                                compatible_apps[key]['icon_file'] = 'default_icon.png'
+        except requests.ConnectionError:
+            pass
+
+        categories = sorted(list(set(app.get('category', 'Chưa phân loại') for app in compatible_apps.values())))
         
         for category in categories:
             # Add category header
@@ -561,27 +629,41 @@ class TekDT_AIS(QMainWindow):
             self.available_list_widget.addItem(cat_item)
 
             # Add apps in this category
-            for key, info in all_apps.items():
+            for key, info in compatible_apps.items():
                 if info.get('category', 'Chưa phân loại') == category:
                     if key in self.selected_for_install:
                         self.add_app_to_list(self.selected_list_widget, key, info)
                     else:
                         self.add_app_to_list(self.available_list_widget, key, info)
-        for key in list(self.selected_for_install): # Use list copy for safe removal
-             if key in all_apps:
-                 self.move_app_to_selection(key, all_apps[key])
-             else: # App no longer exists remotely, remove it
-                 self.selected_for_install.remove(key)
+        for key in list(self.selected_for_install):
+            if key in compatible_apps:
+                self.move_app_to_selection(key, compatible_apps[key])
+            else:
+                self.selected_for_install.remove(key)
 
         self.update_counts()
 
     def add_app_to_list(self, list_widget, key, info):
+        is_local = key in self.local_apps
+        if is_local:
+            app_dir = APPS_DIR / key
+            if info.get('type') == 'portable':
+                executable_path = app_dir / info.get('executable', '') if info.get('executable') else None
+                is_local = executable_path and executable_path.exists()
+            else:
+                download_url = info.get('download_url', '')
+                file_name = info.get('output_filename', Path(download_url).name if download_url else '')
+                installer_path = app_dir / file_name if file_name else None
+                is_local = installer_path and installer_path.exists()
+            if not is_local:
+                self.local_apps.pop(key, None)
+                self.config['app_items'].pop(key, None)
+                self.save_config()
         item_widget = AppItemWidget(key, info)
         
         # Tùy chỉnh trạng thái
         item_widget.add_requested.connect(self.move_app_to_selection)
         item_widget.remove_requested.connect(self.remove_app_from_selection)
-        is_local = key in self.local_apps
         is_selected = key in self.selected_for_install
         
         if info.get('type') == 'portable' and is_local:
@@ -596,13 +678,18 @@ class TekDT_AIS(QMainWindow):
         else: # Is local and installer
             item_widget.action_button.setText("Thêm")
             item_widget.action_button.setToolTip(f"Thêm {info['display_name']} vào danh sách")
-            # Emit signal on click
-            item_widget.action_button.clicked.connect(lambda: item_widget.add_requested.emit(key, info))
             
             local_ver = self.local_apps.get(key, {}).get('version', '0')
             remote_ver = info.get('version', '0')
             if remote_ver > local_ver:
-                 item_widget.name_label.setStyleSheet("color: #2ecc71;") # Green
+                item_widget.name_label.setStyleSheet("color: #2ecc71;")
+                item_widget.action_button.clicked.connect(
+                    lambda: self.confirm_update(key, info, local_ver, remote_ver)
+                )
+            else:
+                item_widget.action_button.clicked.connect(
+                    lambda: item_widget.add_requested.emit(key, info)
+                )
 
         list_item = QListWidgetItem()
         list_item.setSizeHint(item_widget.sizeHint())
@@ -611,6 +698,17 @@ class TekDT_AIS(QMainWindow):
         list_widget.addItem(list_item)
         list_widget.setItemWidget(list_item, item_widget)
 
+    def confirm_update(self, key, info, local_ver, remote_ver):
+        reply = QMessageBox.question(
+            self, "Cập nhật phần mềm",
+            f"Phiên bản mới hơn của {info['display_name']} ({remote_ver}) đã có. "
+            f"Phiên bản hiện tại: {local_ver}. Bạn có muốn cập nhật không?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+        if reply == QMessageBox.StandardButton.Yes:
+            self.download_app(key, info)
+        else:
+            self.move_app_to_selection(key, info)
     def move_app_to_selection(self, key, info):
         # 1. Find and hide/disable in the available list
         self.update_available_item_state(key, is_selected=True)
@@ -651,33 +749,6 @@ class TekDT_AIS(QMainWindow):
             self.selected_for_install.remove(key)
         self.save_config()
         self.update_counts()
-
-    def move_app(self, key, info, destination_list):
-        source_list = self.sender().parent().parent() # Hacky way to find source list
-
-        # Find and remove from source
-        for i in range(source_list.count()):
-            item = source_list.item(i)
-            widget = source_list.itemWidget(item)
-            if hasattr(widget, 'app_key') and widget.app_key == key:
-                source_list.takeItem(i)
-                break
-        
-        # Add to destination
-        self.add_app_to_list(destination_list, key, info)
-        
-        # Update selected list and config
-        if destination_list == self.selected_list_widget:
-            self.selected_for_install.append(key)
-            # Find in available list and disable it
-            self.update_available_item_state(key, is_selected=True)
-        else:
-            self.selected_for_install.remove(key)
-            # Find in available list and enable it
-            self.update_available_item_state(key, is_selected=False)
-
-        self.save_config()
-        self.update_counts()
         
     def update_available_item_state(self, key, is_selected):
         for i in range(self.available_list_widget.count()):
@@ -698,8 +769,19 @@ class TekDT_AIS(QMainWindow):
                 subprocess.Popen([str(executable_path)])
             else:
                 QMessageBox.warning(self, "Lỗi", f"Không tìm thấy file thực thi: {executable_path}")
+                self.local_apps.pop(key, None)
+                self.config['app_items'].pop(key, None)
+                self.save_config()
+                self.populate_lists()
                 
     def download_app(self, key, info):
+        reply = QMessageBox.question(
+            self, "Xác nhận tải xuống",
+            f"Bạn có muốn tải {info['display_name']} (Phiên bản {info['version']}) không?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+        if reply == QMessageBox.StandardButton.No:
+            return
         apps_to_install = {key: info}
         self.start_button.setText("DỪNG")
         self.install_worker = InstallWorker(apps_to_install, action="install")
@@ -747,7 +829,19 @@ class TekDT_AIS(QMainWindow):
         apps_to_install = {}
         for key in self.selected_for_install:
             if key in self.remote_apps['app_items']:
-                 apps_to_install[key] = self.remote_apps['app_items'][key]
+                app_info = self.remote_apps['app_items'][key]
+                app_dir = APPS_DIR / key
+                if app_info.get('type') == 'portable':
+                    executable_path = app_dir / app_info.get('executable', '') if app_info.get('executable') else None
+                    if executable_path and executable_path.exists():
+                        continue
+                else:
+                    download_url = app_info.get('download_url', '')
+                    file_name = app_info.get('output_filename', Path(download_url).name if download_url else '')
+                    installer_path = app_dir / file_name if file_name else None
+                    if installer_path and installer_path.exists():
+                        continue
+                apps_to_install[key] = app_info
         
         if not apps_to_install:
             QMessageBox.information(self, "Thông báo", "Vui lòng thêm ít nhất một phần mềm để cài đặt.")
@@ -793,6 +887,13 @@ class TekDT_AIS(QMainWindow):
             print(f"Không thể lưu cấu hình: {e}")
             
     def closeEvent(self, event):
+        # Stop and wait for threads to finish
+        if self.install_worker and self.install_worker.isRunning():
+            self.install_worker.stop()
+            self.install_worker.wait(5000)  # Wait up to 5 seconds
+        if self.tool_manager_thread.isRunning():
+            self.tool_manager_thread.quit()
+            self.tool_manager_thread.wait(5000)  # Wait up to 5 seconds
         self.save_config()
         super().closeEvent(event)
         
@@ -809,8 +910,66 @@ def handle_cli(args):
     if command == '/help':
         print_cli_help()
     elif command == '/install':
-        print("Chức năng /install chưa được triển khai đầy đủ.")
-        # Logic: Load config, find apps with auto_install:true, run worker
+        config = {}
+        if CONFIG_FILE.exists():
+            with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+                config = json.load(f)
+        local_apps = config.get('app_items', {})
+        session = requests.Session()
+        session.headers.update({'User-Agent': 'TekDT-AIS-App'})
+        try:
+            response = session.get(REMOTE_APP_LIST_URL, timeout=10)
+            response.raise_for_status()
+            remote_apps = response.json().get('app_items', {})
+        except requests.RequestException:
+            print("Không thể tải danh sách phần mềm từ máy chủ.")
+            return
+
+        apps_to_install = {}
+        if len(args) > 1:
+            app_keys = args[1].split('|')
+            for key in app_keys:
+                if key in remote_apps:
+                    app_info = remote_apps[key]
+                    app_dir = APPS_DIR / key
+                    if app_info.get('type') == 'portable':
+                        executable_path = app_dir / app_info.get('executable', '') if app_info.get('executable') else None
+                        if executable_path and executable_path.exists():
+                            print(f"{app_info['display_name']} đã được cài đặt.")
+                            continue
+                    else:
+                        download_url = app_info.get('download_url', '')
+                        file_name = app_info.get('output_filename', Path(download_url).name if download_url else '')
+                        installer_path = app_dir / file_name if file_name else None
+                        if installer_path and installer_path.exists():
+                            print(f"{app_info['display_name']} đã được cài đặt.")
+                            continue
+                    apps_to_install[key] = app_info
+        else:
+            for key, app_info in remote_apps.items():
+                if app_info.get('auto_install', False):
+                    app_dir = APPS_DIR / key
+                    if app_info.get('type') == 'portable':
+                        executable_path = app_dir / app_info.get('executable', '') if app_info.get('executable') else None
+                        if executable_path and executable_path.exists():
+                            continue
+                    else:
+                        download_url = app_info.get('download_url', '')
+                        file_name = app_info.get('output_filename', Path(download_url).name if download_url else '')
+                        installer_path = app_dir / file_name if file_name else None
+                        if installer_path and installer_path.exists():
+                            continue
+                    apps_to_install[key] = app_info
+
+        if not apps_to_install:
+            print("Không có phần mềm nào cần cài đặt.")
+            return
+
+        worker = InstallWorker(apps_to_install, action="install")
+        worker.signals.progress.connect(lambda k, s, m: print(f"[{k}] {s}: {m}"))
+        worker.signals.error.connect(lambda e: print(f"Lỗi: {e}"))
+        worker.start()
+        worker.wait()
     elif command == '/update':
         print("Chức năng /update chưa được triển khai đầy đủ.")
         # Logic: Fetch remote list, compare versions, run worker for updates
