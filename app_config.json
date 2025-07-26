@@ -1,6 +1,9 @@
 {
   "settings": {
-    "window_size": [1200, 800],
+    "window_size": [
+      1200,
+      800
+    ],
     "selected_apps_for_install": [
       "7zip"
     ]
@@ -19,26 +22,32 @@
       "homepage": "https://www.7-zip.org/",
       "icon_file": "7zip.png",
       "install_params": "/S",
-      "compatible_os": ["Windows 10", "Windows 11"],
+      "compatible_os": [
+        "Windows 10",
+        "Windows 11"
+      ],
       "type": "installer",
       "download_headers": {}
     },
     "notepad++": {
-        "full_name": "Notepad++",
-        "display_name": "Notepad++",
-        "version": "8.6.8",
-        "download_link": "https://github.com/notepad-plus-plus/notepad-plus-plus/releases/download/v8.6.8/npp.8.6.8.portable.x64.zip",
-        "executable_name": "notepad++.exe",
-        "architecture": "x64",
-        "description": "Trình soạn thảo mã nguồn và văn bản mạnh mẽ, thay thế Notepad.",
-        "auto_install": false,
-        "category": "Soạn thảo văn bản",
-        "homepage": "https://notepad-plus-plus.org/",
-        "icon_file": "npp.png",
-        "install_params": "",
-        "compatible_os": ["Windows 10", "Windows 11"],
-        "type": "portable",
-        "download_headers": {}
+      "full_name": "Notepad++",
+      "display_name": "Notepad++",
+      "version": "8.6.8",
+      "download_link": "https://github.com/notepad-plus-plus/notepad-plus-plus/releases/download/v8.6.8/npp.8.6.8.portable.x64.zip",
+      "executable_name": "notepad++.exe",
+      "architecture": "x64",
+      "description": "Trình soạn thảo mã nguồn và văn bản mạnh mẽ, thay thế Notepad.",
+      "auto_install": false,
+      "category": "Soạn thảo văn bản",
+      "homepage": "https://notepad-plus-plus.org/",
+      "icon_file": "npp.png",
+      "install_params": "",
+      "compatible_os": [
+        "Windows 10",
+        "Windows 11"
+      ],
+      "type": "portable",
+      "download_headers": {}
     }
   }
 }
