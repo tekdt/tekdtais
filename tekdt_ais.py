@@ -9,6 +9,7 @@ import shutil
 import zipfile
 import io
 from pathlib import Path
+import platform
 
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
                              QListWidget, QListWidgetItem, QLabel, QPushButton, QLineEdit,
@@ -179,6 +180,8 @@ class InstallWorker(QThread):
         self.apps_to_process = apps_to_process
         self.action = action
         self._is_stopped = False
+        self.session = requests.Session()
+        self.session.headers.update({'User-Agent': 'TekDT-AIS-App'})
 
     def run(self):
         try:
@@ -191,7 +194,7 @@ class InstallWorker(QThread):
                 
                 # Logic tải xuống
                 download_url = app_info.get('download_url')
-                file_name = Path(download_url).name
+                file_name = app_info.get('output_filename', Path(download_url).name)
                 app_dir = APPS_DIR / app_key
                 app_dir.mkdir(exist_ok=True)
                 download_path = app_dir / file_name
@@ -215,6 +218,28 @@ class InstallWorker(QThread):
                         self.signals.progress.emit(app_key, "failed", f"Tải xuống thất bại: {process.stderr}")
                         continue
                 
+                # Download icon
+                icon_url = app_info.get('icon_url')
+                icon_filename = Path(icon_url).name if icon_url else 'default_icon.png'
+                icon_path = app_dir / icon_filename
+                if icon_url and not icon_path.exists():
+                    self.signals.progress.emit(app_key, "processing", f"Đang tải biểu tượng cho {app_info.get('display_name')}...")
+                    try:
+                        icon_response = self.session.get(icon_url)
+                        icon_response.raise_for_status()
+                        with open(icon_path, 'wb') as f:
+                            f.write(icon_response.content)
+                    except requests.RequestException as e:
+                        self.signals.progress.emit(app_key, "warning", f"Không thể tải biểu tượng: {e}")
+                
+                # Update local app config
+                local_app_info = app_info.copy()
+                local_app_info['icon_file'] = icon_filename
+                with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+                    config = json.load(f)
+                config['app_items'][app_key] = local_app_info
+                with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
+                    json.dump(config, f, indent=2, ensure_ascii=False)
                 # Logic cài đặt
                 if self.action == "install" and app_info.get('type') == 'installer':
                     install_params = app_info.get('install_params', '').split()
@@ -330,6 +355,7 @@ class TekDT_AIS(QMainWindow):
         self.selected_for_install = []
         self.install_worker = None
         self.startup_label = None
+        self.system_arch = platform.architecture()[0]  # '32bit' or '64bit'
 
         self.setup_ui()
         self.tool_manager_thread = QThread()
@@ -674,10 +700,13 @@ class TekDT_AIS(QMainWindow):
                 QMessageBox.warning(self, "Lỗi", f"Không tìm thấy file thực thi: {executable_path}")
                 
     def download_app(self, key, info):
-        # Placeholder for a single download task
-        QMessageBox.information(self, "Thông báo", f"Bắt đầu tải {info['display_name']}.\n"
-                                "Tính năng này sẽ được triển khai trong Worker.")
-        # In a real scenario, this would also use the InstallWorker
+        apps_to_install = {key: info}
+        self.start_button.setText("DỪNG")
+        self.install_worker = InstallWorker(apps_to_install, action="install")
+        self.install_worker.signals.progress.connect(self.update_install_progress)
+        self.install_worker.signals.finished.connect(self.on_installation_finished)
+        self.install_worker.signals.error.connect(lambda e: QMessageBox.critical(self, "Lỗi Worker", str(e)))
+        self.install_worker.start()
         
     def filter_apps(self, text):
         text = text.lower().strip()
@@ -756,6 +785,7 @@ class TekDT_AIS(QMainWindow):
         self.selected_count_label.setText(f"Đã chọn: {selected_count}")
 
     def save_config(self):
+        self.config['settings']['selected_for_install'] = self.selected_for_install
         try:
             with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
                 json.dump(self.config, f, indent=2, ensure_ascii=False)
