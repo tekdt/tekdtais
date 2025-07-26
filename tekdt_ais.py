@@ -23,7 +23,7 @@ from PyQt6.QtCore import (Qt, QSize, QThread, pyqtSignal, QObject, QPropertyAnim
 APP_NAME = "TekDT AIS"
 APP_VERSION = "1.0.0"
 GITHUB_REPO_URL = "https://github.com/tekdt/tekdtais"
-REMOTE_APP_LIST_URL = "https://raw.githubusercontent.com/tekdt/tekdtais/main/app_list.json"
+REMOTE_APP_LIST_URL = "https://raw.githubusercontent.com/tekdt/tekdtais/refs/heads/main/app_list.json?token=GHSAT0AAAAAADFXD6645ST3LNMN62HYN2LO2EERFAQ"
 
 BASE_DIR = Path(__file__).resolve().parent
 CONFIG_FILE = BASE_DIR / "app_config.json"

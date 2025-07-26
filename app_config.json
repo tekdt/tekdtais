@@ -1,4 +1,33 @@
 {
-  "settings": {},
-  "app_items": {}
+  "settings": {
+    "selected_for_install": []
+  },
+  "app_items": {
+    "notepadplusplus64": {
+      "display_name": "Notepad++ 64bit",
+      "version": "8.8.3",
+      "category": "Lập trình",
+      "description": "Trình soạn thảo mã nguồn và thay thế Notepad hỗ trợ nhiều ngôn ngữ.",
+      "type": "installer",
+      "architecture": "64bit",
+      "compatible_os_arch": "64bit",
+      "download_url": "https://github.com/notepad-plus-plus/notepad-plus-plus/releases/download/v8.8.3/npp.8.8.3.Installer.x64.exe",
+      "install_params": "/S",
+      "icon_url": "https://raw.githubusercontent.com/tekdt/tekdtais/main/icons/npp_icon.png",
+      "icon_file": "npp_icon.png"
+    },
+    "notepadplusplus32": {
+      "display_name": "Notepad++ 32bit",
+      "version": "8.8.3",
+      "category": "Lập trình",
+      "description": "Trình soạn thảo mã nguồn và thay thế Notepad hỗ trợ nhiều ngôn ngữ.",
+      "type": "installer",
+      "architecture": "32bit",
+      "compatible_os_arch": "both",
+      "download_url": "https://github.com/notepad-plus-plus/notepad-plus-plus/releases/download/v8.8.3/npp.8.8.3.Installer.exe",
+      "install_params": "/S",
+      "icon_url": "https://raw.githubusercontent.com/tekdt/tekdtais/main/icons/npp_icon.png",
+      "icon_file": "npp_icon.png"
+    }
+  }
 }
