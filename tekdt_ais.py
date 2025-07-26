@@ -10,6 +10,7 @@ import zipfile
 import io
 from pathlib import Path
 import platform
+import re
 
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
                              QListWidget, QListWidgetItem, QLabel, QPushButton, QLineEdit,
@@ -41,7 +42,7 @@ SEVENZIP_API_URL = "https://api.github.com/repos/ip7z/7zip/releases/latest"
 # --- NEW: Lớp quản lý và cập nhật công cụ ---
 class ToolManager(QObject):
     progress_update = pyqtSignal(str)
-    finished = pyqtSignal(bool, str) # success, message
+    finished = pyqtSignal(bool, str)
 
     def __init__(self):
         super().__init__()
@@ -172,6 +173,7 @@ class WorkerSignals(QObject):
     finished = pyqtSignal()
     progress = pyqtSignal(str, str, str)
     error = pyqtSignal(str)
+    progress_percentage = pyqtSignal(str, float)  # New signal for download progress
 
 class InstallWorker(QThread):
     def __init__(self, apps_to_process, action="install"):
@@ -207,16 +209,42 @@ class InstallWorker(QThread):
                         "--max-connection-per-server=16",
                         "--split=16",
                         "--min-split-size=1M",
+                        "--show-console-readout=false",
+                        "--summary-interval=1",
                         download_url
                     ]
-                    # Thêm header nếu cần
                     if 'referer' in app_info:
                         command.extend(["--header", f"Referer: {app_info['referer']}"])
                     
-                    process = subprocess.run(command, capture_output=True, text=True, creationflags=subprocess.CREATE_NO_WINDOW)
+                    process = subprocess.Popen(
+                        command,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                        text=True,
+                        creationflags=subprocess.CREATE_NO_WINDOW
+                    )
+                    percentage_pattern = re.compile(r'\[.*?\((\d+)%\)')
+                    while process.poll() is None:
+                        if self._is_stopped:
+                            process.terminate()
+                            self.signals.progress.emit(app_key, "stopped", "Tải xuống đã bị dừng.")
+                            break
+                        line = process.stdout.readline()
+                        if line:
+                            match = percentage_pattern.search(line)
+                            if match:
+                                try:
+                                    percentage = float(match.group(1))
+                                    self.signals.progress_percentage.emit(app_key, percentage)
+                                except ValueError:
+                                    continue  # Bỏ qua giá trị không hợp lệ
+                    process.wait()
                     if process.returncode != 0:
-                        self.signals.progress.emit(app_key, "failed", f"Tải xuống thất bại: {process.stderr}")
+                        stderr = process.stderr.read()
+                        self.signals.progress.emit(app_key, "failed", f"Tải xuống thất bại: {stderr}")
                         continue
+                    else:
+                        self.signals.progress_percentage.emit(app_key, 100.0)
                 
                 # Download icon
                 icon_url = app_info.get('icon_url')
@@ -241,6 +269,7 @@ class InstallWorker(QThread):
                 config['app_items'][app_key] = local_app_info
                 with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
                     json.dump(config, f, indent=2, ensure_ascii=False)
+                
                 # Logic cài đặt
                 if self.action == "install" and app_info.get('type') == 'installer':
                     if not download_path.exists():
@@ -282,7 +311,8 @@ class AppItemWidget(QWidget):
         
         # Icon
         self.icon_label = QLabel()
-        icon_path = APPS_DIR / app_key / app_info.get('icon_file', '') if app_info.get('icon_file') else ''
+        icon_file = app_info.get('icon_file', '')
+        icon_path = APPS_DIR / app_key / icon_file if icon_file else ''
         default_icon_path = IMAGES_DIR / 'default_icon.png'
         
         if icon_path and Path(icon_path).exists():
@@ -319,9 +349,9 @@ class AppItemWidget(QWidget):
         
         self.info_layout.addWidget(self.name_label)
         self.info_layout.addWidget(self.version_label)
-        self.layout.addWidget(self.info_widget, 1) # Cho phép mở rộng
+        self.layout.addWidget(self.info_widget, 1)
         
-        # Nút hành động (ẩn ban đầu)
+        # Nút hành động
         self.action_button = QPushButton()
         self.action_button.setFixedSize(80, 30)
         self.action_button.hide()
@@ -329,7 +359,7 @@ class AppItemWidget(QWidget):
         
         # Dấu tick/X
         self.status_label = QLabel()
-        self.status_label.setFixedSize(24,24)
+        self.status_label.setFixedSize(24, 24)
         self.layout.addWidget(self.status_label)
         self.status_label.hide()
         
@@ -345,14 +375,20 @@ class AppItemWidget(QWidget):
         super().leaveEvent(event)
         
     def set_status(self, status):
-        # success, failed, processing
         if status == "success":
             self.status_label.setPixmap(QPixmap(str(IMAGES_DIR / 'success.png')).scaled(16, 16))
             self.name_label.setStyleSheet("color: #4CAF50; font-weight: bold;")
+            self.action_button.setText("Thêm")  # Đổi chữ nút thành "Thêm"
+            self.action_button.setStyleSheet(
+                "background-color: #4CAF50; color: white; border: none; padding: 8px 16px; border-radius: 4px; font-weight: bold;"
+            )
             self.status_label.show()
         elif status == "failed":
             self.status_label.setPixmap(QPixmap(str(IMAGES_DIR / 'failed.png')).scaled(16, 16))
             self.name_label.setStyleSheet("color: #F44336; font-weight: bold;")
+            self.action_button.setStyleSheet(
+                "background-color: #3498db; color: white; border: none; padding: 8px 16px; border-radius: 4px; font-weight: bold;"
+            )
             self.status_label.show()
         elif status == "processing":
             movie = QMovie(str(IMAGES_DIR / 'loading.gif'))
@@ -362,7 +398,31 @@ class AppItemWidget(QWidget):
         else:
             self.status_label.hide()
             self.name_label.setStyleSheet("color: #FFFFFF; font-weight: bold;")
+            self.action_button.setStyleSheet(
+                "background-color: #3498db; color: white; border: none; padding: 8px 16px; border-radius: 4px; font-weight: bold;"
+            )
 
+    def update_download_progress(self, percentage):
+        if self.action_button.text() == "Tải":
+            # Interpolate between orange (#e67e22) and green (#4CAF50)
+            orange = QColor(230, 126, 34)
+            green = QColor(76, 175, 80)
+            try:
+                percentage = float(percentage)  # Ép kiểu percentage thành float
+                if percentage < 0 or percentage > 100:
+                    percentage = max(0.0, min(100.0, percentage))  # Giới hạn giá trị
+                r = int(orange.red() + (green.red() - orange.red()) * (percentage / 100))
+                g = int(orange.green() + (green.green() - orange.green()) * (percentage / 100))
+                b = int(orange.blue() + (green.blue() - orange.blue()) * (percentage / 100))
+                color = f"#{r:02x}{g:02x}{b:02x}"
+                self.action_button.setStyleSheet(
+                    f"background-color: {color}; color: white; border: none; padding: 8px 16px; border-radius: 4px; font-weight: bold;"
+                )
+            except (ValueError, TypeError):
+                # Nếu percentage không hợp lệ, giữ màu cam mặc định
+                self.action_button.setStyleSheet(
+                    "background-color: #e67e22; color: white; border: none; padding: 8px 16px; border-radius: 4px; font-weight: bold;"
+                )
 
 # --- CỬA SỔ CHÍNH ---
 class TekDT_AIS(QMainWindow):
@@ -378,6 +438,11 @@ class TekDT_AIS(QMainWindow):
         self.session = requests.Session()
         self.session.headers.update({'User-Agent': 'TekDT-AIS-App'})
 
+        # Thiết lập biểu tượng cửa sổ
+        icon_path = BASE_DIR / "logo.ico"
+        if icon_path.exists():
+            self.setWindowIcon(QIcon(str(icon_path)))
+
         self.setup_ui()
         self.tool_manager_thread = QThread()
         self.tool_manager = ToolManager()
@@ -392,7 +457,11 @@ class TekDT_AIS(QMainWindow):
         if not self.startup_label:
             self.startup_label = QLabel(message, self)
             self.startup_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.startup_label.setStyleSheet("background-color: rgba(0, 0, 0, 0.7); color: white; font-size: 16pt; border-radius: 10px; padding: 20px;")
+            
+            self.startup_label.setStyleSheet("background-color: rgba(0, 0, 0, 0.7); color: white; font-size: 14pt; border-radius: 10px; padding: 20px;")
+            self.startup_label.setWordWrap(True)
+            self.startup_label.setMinimumWidth(400)
+            self.startup_label.setMinimumHeight(100)
             self.tool_manager.progress_update.connect(lambda msg: self.startup_label.setText(msg))
         
         self.startup_label.setText(message)
@@ -548,6 +617,11 @@ class TekDT_AIS(QMainWindow):
         for key in list(self.local_apps.keys()):
             app_info = self.local_apps[key]
             app_dir = APPS_DIR / key
+            icon_file = app_info.get('icon_file', '')
+            icon_path = app_dir / icon_file if icon_file else None
+            if icon_path and not icon_path.exists():
+                app_info['icon_file'] = 'default_icon.png'
+                self.config['app_items'][key] = app_info
             if app_info.get('type') == 'portable':
                 executable_path = app_dir / app_info.get('executable', '') if app_info.get('executable') else None
                 if not executable_path or not executable_path.exists():
@@ -577,6 +651,13 @@ class TekDT_AIS(QMainWindow):
                                  "Chương trình sẽ chỉ hiển thị các phần mềm đã tải.")
             self.remote_apps = {"app_items": self.local_apps}
         
+        # Merge local app info with remote app info
+        for key, app_info in self.local_apps.items():
+            if key in self.remote_apps.get("app_items", {}):
+                self.remote_apps["app_items"][key].update({
+                    'icon_file': app_info.get('icon_file', 'default_icon.png')
+                })
+        
         self.populate_lists()
         
     def populate_lists(self):
@@ -597,7 +678,7 @@ class TekDT_AIS(QMainWindow):
         try:
             self.session.get("https://www.google.com", timeout=5)
             for key, app_info in compatible_apps.items():
-                if key not in self.local_apps:
+                if key not in self.local_apps or not (APPS_DIR / key / app_info.get('icon_file', '')).exists():
                     icon_url = app_info.get('icon_url')
                     if icon_url:
                         icon_filename = Path(icon_url).name
@@ -674,7 +755,8 @@ class TekDT_AIS(QMainWindow):
             item_widget.action_button.setText("Tải")
             item_widget.action_button.setToolTip(f"Tải {info['display_name']} về")
             item_widget.name_label.setStyleSheet("color: #e67e22;") # Orange
-            item_widget.action_button.clicked.connect(lambda _, k=key, i=info: self.download_app(k, i))
+            item_widget.action_button.setStyleSheet("background-color: #e67e22; color: white; border: none; padding: 8px 16px; border-radius: 4px; font-weight: bold;")
+            item_widget.action_button.clicked.connect(lambda _, k=key, i=info: self.download_app(k, i, item_widget))
         else: # Is local and installer
             item_widget.action_button.setText("Thêm")
             item_widget.action_button.setToolTip(f"Thêm {info['display_name']} vào danh sách")
@@ -774,7 +856,7 @@ class TekDT_AIS(QMainWindow):
                 self.save_config()
                 self.populate_lists()
                 
-    def download_app(self, key, info):
+    def download_app(self, key, info, item_widget=None):
         reply = QMessageBox.question(
             self, "Xác nhận tải xuống",
             f"Bạn có muốn tải {info['display_name']} (Phiên bản {info['version']}) không?",
@@ -788,6 +870,8 @@ class TekDT_AIS(QMainWindow):
         self.install_worker.signals.progress.connect(self.update_install_progress)
         self.install_worker.signals.finished.connect(self.on_installation_finished)
         self.install_worker.signals.error.connect(lambda e: QMessageBox.critical(self, "Lỗi Worker", str(e)))
+        if item_widget:
+            self.install_worker.signals.progress_percentage.connect(item_widget.update_download_progress)
         self.install_worker.start()
         
     def filter_apps(self, text):
