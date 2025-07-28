@@ -11,7 +11,6 @@ import io
 from pathlib import Path
 import platform
 import re
-from pathlib import Path
 
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
                              QListWidget, QListWidgetItem, QLabel, QPushButton, QLineEdit,
