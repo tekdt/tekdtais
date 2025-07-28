@@ -1,7 +1,7 @@
 {
   "app_items": {
     "googlechrome64": {
-      "display_name": "Google Chrome",
+      "display_name": "Google Chrome 64bit",
       "version": "138.0.7204.169",
       "category": "Trình duyệt Web",
       "description": "Trình duyệt web nhanh, an toàn và miễn phí được xây dựng cho web hiện đại.",
@@ -14,7 +14,7 @@
       "icon_url": "https://www.google.com/chrome/static/images/chrome-logo-m100.svg"
     },
     "googlechrome32": {
-      "display_name": "Google Chrome",
+      "display_name": "Google Chrome 32bit",
       "version": "138.0.7204.169",
       "category": "Trình duyệt Web",
       "description": "Trình duyệt web nhanh, an toàn và miễn phí được xây dựng cho web hiện đại.",
