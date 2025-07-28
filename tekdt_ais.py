@@ -26,23 +26,42 @@ APP_VERSION = "1.0.0"
 GITHUB_REPO_URL = "https://github.com/tekdt/tekdtais"
 REMOTE_APP_LIST_URL = "https://raw.githubusercontent.com/tekdt/tekdtais/refs/heads/main/app_list.json"
 
-# Determine the base directory dynamically
+# Determine the resource directory (for bundled files) and working directory (for storage)
 if getattr(sys, 'frozen', False):
     # Running as compiled EXE
-    BASE_DIR = Path(sys._MEIPASS)
+    RESOURCE_DIR = Path(sys._MEIPASS)  # Temporary directory for bundled resources
+    BASE_DIR = Path(sys.executable).parent  # Directory containing the EXE
 else:
     # Running as Python script
-    BASE_DIR = Path(__file__).resolve().parent
+    RESOURCE_DIR = BASE_DIR = Path(__file__).resolve().parent
 
-BASE_DIR = Path(__file__).resolve().parent
 CONFIG_FILE = BASE_DIR / "app_config.json"
 APPS_DIR = BASE_DIR / "Apps"
 TOOLS_DIR = BASE_DIR / "Tools"
 IMAGES_DIR = BASE_DIR / "Images"
 ARIA2_DIR = TOOLS_DIR / "aria2"
 SEVENZ_DIR = TOOLS_DIR / "7z"
-ARIA2_EXEC = ARIA2_DIR / "aria2c.exe"
-SEVENZ_EXEC = SEVENZ_DIR / "7za.exe"
+ARIA2_EXEC = (RESOURCE_DIR / "Tools/aria2/aria2c.exe") if getattr(sys, 'frozen', False) else ARIA2_DIR / "aria2c.exe"
+SEVENZ_EXEC = (RESOURCE_DIR / "Tools/7z/7za.exe") if getattr(sys, 'frozen', False) else SEVENZ_DIR / "7za.exe"
+
+# Create storage directories if they don't exist
+for dir_path in [APPS_DIR, TOOLS_DIR, IMAGES_DIR, ARIA2_DIR, SEVENZ_DIR]:
+    dir_path.mkdir(parents=True, exist_ok=True)
+
+# Copy bundled tools to the working directory if not already present
+if getattr(sys, 'frozen', False):
+    for tool_exec in [ARIA2_EXEC, SEVENZ_EXEC]:
+        dest_path = BASE_DIR / tool_exec.relative_to(RESOURCE_DIR)
+        if not dest_path.exists():
+            try:
+                if tool_exec.exists():
+                    dest_path.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(tool_exec, dest_path)
+                    print(f"Copied {tool_exec} to {dest_path}")
+                else:
+                    print(f"Warning: {tool_exec} not found in bundled resources")
+            except (OSError, shutil.Error) as e:
+                print(f"Error copying {tool_exec} to {dest_path}: {e}")
 
 ARIA2_API_URL = "https://api.github.com/repos/aria2/aria2/releases/latest"
 SEVENZIP_API_URL = "https://api.github.com/repos/ip7z/7zip/releases/latest"
@@ -79,7 +98,7 @@ class ToolManager(QObject):
 
     def _check_7zip(self):
         tool_dir = SEVENZ_DIR
-        exec_file = SEVENZ_EXEC
+        exec_file = BASE_DIR / "Tools/7z/7za.exe"
         tool_name = "7-Zip"
         api_url = SEVENZIP_API_URL
         asset_name = '7zr.exe'
@@ -128,7 +147,7 @@ class ToolManager(QObject):
 
     def _check_aria2(self):
         tool_dir = ARIA2_DIR
-        exec_file = ARIA2_EXEC
+        exec_file = BASE_DIR / "Tools/aria2/aria2c.exe"
         tool_name = "aria2"
         api_url = ARIA2_API_URL
         asset_keyword = 'win-32bit'
@@ -1263,7 +1282,7 @@ if __name__ == '__main__':
     cli_args = [arg for arg in sys.argv[1:] if arg.startswith('/')]
     flags = [arg for arg in sys.argv[1:] if arg.startswith('--')]
     
-    embed_mode = '/embed' in flags
+    embed_mode = '--embed' in flags
     
     # Ưu tiên chế độ GUI (thường hoặc nhúng) nếu không có lệnh CLI cụ thể
     if cli_args and not embed_mode:
@@ -1273,8 +1292,8 @@ if __name__ == '__main__':
         app = QApplication(sys.argv)
         # Tạo file icon mặc định nếu chưa có
         default_icon = IMAGES_DIR / 'default_icon.png'
+        default_icon.parent.mkdir(parents=True, exist_ok=True)
         if not default_icon.exists():
-            default_icon.parent.mkdir(parents=True, exist_ok=True)
             pixmap = QPixmap(32, 32)
             pixmap.fill(Qt.GlobalColor.gray)
             pixmap.save(str(default_icon))
