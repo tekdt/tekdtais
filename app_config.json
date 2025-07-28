@@ -27,6 +27,16 @@
       "icon_file": "largeVLC.png"
     },
     "rufus64": {
+      "display_name": "Rufus 64bit",
+      "version": "4.9",
+      "category": "Tiện ích hệ thống",
+      "description": "Công cụ giúp định dạng và tạo ổ đĩa USB có khả năng khởi động.",
+      "type": "portable",
+      "architecture": "64bit",
+      "compatible_os_arch": "64bit",
+      "download_url": "https://github.com/pbatard/rufus/releases/download/v4.9/rufus-4.9.exe",
+      "executable": "rufus-4.9.exe",
+      "icon_url": "https://rufus.ie/pics/rufus-128.png",
       "icon_file": "rufus-128.png"
     },
     "rufus32": {
