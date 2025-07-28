@@ -1,6 +1,9 @@
 {
   "settings": {
-    "selected_for_install": []
+    "selected_for_install": [
+      "vlc64",
+      "googlechrome64"
+    ]
   },
   "app_items": {
     "googlechrome64": {

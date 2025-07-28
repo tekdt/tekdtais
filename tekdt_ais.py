@@ -241,9 +241,14 @@ class InstallWorker(QThread):
                 if self._is_stopped:
                     self.signals.progress.emit(app_key, "stopped", "Tác vụ đã bị dừng.")
                     continue
-                
+                    
                 self.signals.progress.emit(app_key, "processing", f"Chuẩn bị tải {app_info.get('display_name')}...")
                 
+                # Kiểm tra thông tin ứng dụng
+                if not app_info.get('download_url'):
+                    self.signals.progress.emit(app_key, "failed", f"Không có URL tải xuống cho {app_info.get('display_name')}.")
+                    continue
+                    
                 # Logic tải xuống
                 download_url = app_info.get('download_url')
                 file_name = app_info.get('output_filename', Path(download_url).name)
@@ -289,11 +294,11 @@ class InstallWorker(QThread):
                                     print(f"Progress for {app_key}: {percentage}%")
                                     self.signals.progress_percentage.emit(app_key, percentage)
                                 except ValueError:
-                                    continue  # Bỏ qua giá trị không hợp lệ
+                                    continue
                     process.wait()
                     if process.returncode != 0:
                         stderr = process.stderr.read()
-                        self.signals.progress.emit(app_key, "failed", f"Tải {app_info.get('display_name')} thất bại.")
+                        self.signals.progress.emit(app_key, "failed", f"Tải {app_info.get('display_name')} thất bại: {stderr}")
                         continue
                 else:
                     self.signals.progress_percentage.emit(app_key, 100.0)
@@ -323,32 +328,39 @@ class InstallWorker(QThread):
                     json.dump(config, f, indent=2, ensure_ascii=False)
                 
                 # Logic cài đặt
-                if self.action == "install" and app_info.get('type') == 'installer' and download_path.exists():
-                    self.signals.progress.emit(app_key, "processing", f"Đang cài đặt {app_info.get('display_name')}...")
-                    if not download_path.exists():
-                        self.signals.progress.emit(app_key, "failed", f"File cài đặt không tồn tại: {download_path}")
-                        continue
-                    install_params = app_info.get('install_params', '').split()
-                    install_command = [str(download_path)] + install_params
-                    
-                    try:
-                        process = subprocess.run(install_command, capture_output=True, text=True, creationflags=subprocess.CREATE_NO_WINDOW)
-                        if process.returncode != 0:
-                            self.signals.progress.emit(app_key, "failed", f"Cài đặt {app_key} thất bại: {process.stderr}")
+                if self.action == "install":
+                    if app_info.get('type') == 'installer' and download_path.exists():
+                        self.signals.progress.emit(app_key, "processing", f"Đang cài đặt {app_info.get('display_name')}...")
+                        install_params = app_info.get('install_params', '')
+                        if not install_params:
+                            self.signals.progress.emit(app_key, "failed", f"Không có tham số cài đặt cho {app_info.get('display_name')}.")
                             continue
-                    except Exception as e:
-                        self.signals.progress.emit(app_key, "failed", f"Lỗi khi cài đặt {app_key}: {str(e)}")
-                        continue
-                
-                self.signals.progress.emit(app_key, "success", f"Đã cài đặt {app_info.get('display_name')} thành công!")
+                        install_command = [str(download_path)] + install_params.split()
+                        
+                        try:
+                            process = subprocess.run(
+                                install_command,
+                                capture_output=True,
+                                text=True,
+                                creationflags=subprocess.CREATE_NO_WINDOW
+                            )
+                            if process.returncode == 0:
+                                self.signals.progress.emit(app_key, "success", f"Đã cài đặt {app_info.get('display_name')} thành công!")
+                            else:
+                                self.signals.progress.emit(app_key, "failed", f"Cài đặt {app_info.get('display_name')} thất bại: {process.stderr}")
+                        except Exception as e:
+                            self.signals.progress.emit(app_key, "failed", f"Lỗi khi cài đặt {app_info.get('display_name')}: {str(e)}")
+                    elif app_info.get('type') == 'portable' and download_path.exists():
+                        self.signals.progress.emit(app_key, "success", f"Đã tải {app_info.get('display_name')} (portable) thành công!")
+                    else:
+                        self.signals.progress.emit(app_key, "failed", f"Không thể cài đặt {app_info.get('display_name')}: Thiếu tệp hoặc loại ứng dụng không hợp lệ.")
+                else:
+                    self.signals.progress.emit(app_key, "success", f"Đã tải {app_info.get('display_name')} thành công!")
 
         except Exception as e:
             self.signals.error.emit(str(e))
         finally:
             self.signals.finished.emit()
-
-    def stop(self):
-        self._is_stopped = True
 
 # --- WIDGET TÙY CHỈNH CHO MỖI PHẦN MỀM ---
 class AppItemWidget(QWidget):
@@ -362,13 +374,19 @@ class AppItemWidget(QWidget):
         self.embed_mode = embed_mode
         self._current_progress = 0.0
         self.setMouseTracking(True)
-        self.setMinimumHeight(70)
-        self.layout = QHBoxLayout(self)
-        self.layout.setContentsMargins(5, 15, 5, 15)
+        self.setMinimumHeight(60)  # Giảm chiều cao tối thiểu để nội dung gọn hơn
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         
+        # Layout chính
+        self.layout = QHBoxLayout(self)
+        self.layout.setContentsMargins(0, 0, 0, 0)  # Loại bỏ lề hoàn toàn
+        self.layout.setSpacing(8)  # Giảm khoảng cách giữa các thành phần
+        self.layout.setAlignment(Qt.AlignmentFlag.AlignVCenter)  # Căn giữa theo chiều dọc
+
         # Icon
         self.icon_label = QLabel()
         self.icon_label.setFixedSize(48, 48)
+        self.icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         icon_file = app_info.get('icon_file', '')
         icon_path = APPS_DIR / app_key / icon_file if icon_file else ''
         default_icon_path = resource_path('Images/default_icon.png')
@@ -379,15 +397,15 @@ class AppItemWidget(QWidget):
             self.icon_label.setPixmap(icon.pixmap(48, 48))
         else:
             self.icon_label.setText("?")
-            self.icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             self.icon_label.setStyleSheet("color: #ecf0f1; background-color: #34495e; border: 1px solid #3498db;")
         self.layout.addWidget(self.icon_label)
         
         # Thông tin
         self.info_widget = QWidget()
         self.info_layout = QVBoxLayout(self.info_widget)
-        self.info_layout.setContentsMargins(10, 0, 0, 0)
-        self.info_layout.setSpacing(8)
+        self.info_layout.setContentsMargins(8, 0, 0, 0)  # Chỉ giữ lề trái để tạo khoảng cách với icon
+        self.info_layout.setSpacing(2)  # Giảm khoảng cách giữa các nhãn
+        self.info_layout.setAlignment(Qt.AlignmentFlag.AlignVCenter)  # Căn giữa theo chiều dọc
         
         self.name_label = QLabel(f"{app_info.get('display_name', 'N/A')}")
         self.name_label.setStyleSheet("font-weight: bold; font-size: 12pt;")
@@ -1036,12 +1054,18 @@ class TekDT_AIS(QMainWindow):
             if item is None: continue
             widget = self.available_list_widget.itemWidget(item)
             if hasattr(widget, 'app_key') and widget.app_key == key:
-                widget.action_button.setDisabled(is_selected)
                 if is_selected:
+                    widget.action_button.setDisabled(True)
                     widget.action_button.setStyleSheet(
                         "background-color: #95a5a6; color: white; border: none; padding: 8px 16px; border-radius: 4px; font-weight: bold;"
                     )
-                break
+                else:
+                    widget.action_button.setDisabled(False)
+                    widget.action_button.setText("Thêm")
+                    widget.action_button.setToolTip(f"Thêm {widget.app_info['display_name']} vào danh sách")
+                    widget.action_button.setStyleSheet(
+                        "background-color: #4CAF50; color: white; border: none; padding: 8px 16px; border-radius: 4px; font-weight: bold;"
+                    )
                 break
                 
     def run_portable(self, key):
