@@ -192,7 +192,7 @@ class InstallWorker(QThread):
                     self.signals.progress.emit(app_key, "stopped", "Tác vụ đã bị dừng.")
                     continue
                 
-                self.signals.progress.emit(app_key, "processing", f"Bắt đầu xử lý {app_info.get('display_name')}...")
+                self.signals.progress.emit(app_key, "processing", f"Chuẩn bị tải {app_info.get('display_name')}...")
                 
                 # Logic tải xuống
                 download_url = app_info.get('download_url')
@@ -224,6 +224,7 @@ class InstallWorker(QThread):
                         creationflags=subprocess.CREATE_NO_WINDOW
                     )
                     percentage_pattern = re.compile(r'\[.*?\((\d+)%\)')
+                    self.signals.progress.emit(app_key, "processing", f"Đang tải {app_info.get('display_name')}...")
                     while process.poll() is None:
                         if self._is_stopped:
                             process.terminate()
@@ -235,13 +236,14 @@ class InstallWorker(QThread):
                             if match:
                                 try:
                                     percentage = float(match.group(1))
+                                    print(f"Progress for {app_key}: {percentage}%")
                                     self.signals.progress_percentage.emit(app_key, percentage)
                                 except ValueError:
                                     continue  # Bỏ qua giá trị không hợp lệ
                     process.wait()
                     if process.returncode != 0:
                         stderr = process.stderr.read()
-                        self.signals.progress.emit(app_key, "failed", f"Tải xuống thất bại: {stderr}")
+                        self.signals.progress.emit(app_key, "failed", f"Tải {app_info.get('display_name')} thất bại.")
                         continue
                     else:
                         self.signals.progress_percentage.emit(app_key, 100.0)
@@ -271,7 +273,8 @@ class InstallWorker(QThread):
                     json.dump(config, f, indent=2, ensure_ascii=False)
                 
                 # Logic cài đặt
-                if self.action == "install" and app_info.get('type') == 'installer':
+                if self.action == "install" and app_info.get('type') == 'installer' and download_path.exists():
+                    self.signals.progress.emit(app_key, "processing", f"Đang cài đặt {app_info.get('display_name')}...")
                     if not download_path.exists():
                         self.signals.progress.emit(app_key, "failed", f"File cài đặt không tồn tại: {download_path}")
                         continue
@@ -287,7 +290,7 @@ class InstallWorker(QThread):
                         self.signals.progress.emit(app_key, "failed", f"Lỗi khi cài đặt {app_key}: {str(e)}")
                         continue
                 
-                self.signals.progress.emit(app_key, "success", "Hoàn thành!")
+                self.signals.progress.emit(app_key, "success", f"Đã cài đặt {app_info.get('display_name')} thành công!")
 
         except Exception as e:
             self.signals.error.emit(str(e))
@@ -305,7 +308,8 @@ class AppItemWidget(QWidget):
         super().__init__(parent)
         self.app_key = app_key
         self.app_info = app_info
-        
+        self._current_progress = 0.0  # Khởi tạo tiến độ
+        self.setMouseTracking(True)  # Bật theo dõi chuột cho tooltip
         self.layout = QHBoxLayout(self)
         self.layout.setContentsMargins(5, 5, 5, 5)
         
@@ -354,7 +358,6 @@ class AppItemWidget(QWidget):
         # Nút hành động
         self.action_button = QPushButton()
         self.action_button.setFixedSize(80, 30)
-        self.action_button.hide()
         self.layout.addWidget(self.action_button)
         
         # Dấu tick/X
@@ -363,66 +366,104 @@ class AppItemWidget(QWidget):
         self.layout.addWidget(self.status_label)
         self.status_label.hide()
         
+        # Lớp phủ tiến độ
+        self.progress_overlay = QWidget(self)
+        self.progress_overlay.setStyleSheet(
+            "background-color: rgba(76, 175, 80, 100);"  # Xanh lá mờ
+        )
+        self.progress_overlay.setGeometry(0, 0, 0, self.height())  # Khởi tạo với chiều rộng 0
+        self.progress_overlay.hide()
+        self.progress_overlay.setAutoFillBackground(True)
+        
         self.setToolTip(app_info.get('description', 'Không có mô tả.'))
 
     def enterEvent(self, event):
-        if self.action_button.isEnabled():
-            self.action_button.show()
+        # if self.action_button.isEnabled():
+            # self.action_button.show()
         super().enterEvent(event)
 
     def leaveEvent(self, event):
-        self.action_button.hide()
+        # self.action_button.hide()
         super().leaveEvent(event)
+    
+    def resizeEvent(self, event):
+        # Chỉ cập nhật lớp phủ nếu đang có tiến độ tải
+        if hasattr(self, '_current_progress') and self._current_progress > 0:
+            overlay_width = int(self.width() * (self._current_progress / 100.0))
+            self.progress_overlay.setGeometry(0, 0, overlay_width, self.height())
+            self.progress_overlay.show()
+            self.progress_overlay.raise_()
+        else:
+            self.progress_overlay.hide()
+        super().resizeEvent(event)
         
     def set_status(self, status):
         if status == "success":
             self.status_label.setPixmap(QPixmap(str(IMAGES_DIR / 'success.png')).scaled(16, 16))
             self.name_label.setStyleSheet("color: #4CAF50; font-weight: bold;")
-            self.action_button.setText("Thêm")  # Đổi chữ nút thành "Thêm"
+            self.action_button.setText("Thêm")
             self.action_button.setStyleSheet(
                 "background-color: #4CAF50; color: white; border: none; padding: 8px 16px; border-radius: 4px; font-weight: bold;"
             )
+            self.action_button.setEnabled(True)
+            self._current_progress = 0.0  # Đặt lại tiến độ
+            self.progress_overlay.hide()
             self.status_label.show()
         elif status == "failed":
             self.status_label.setPixmap(QPixmap(str(IMAGES_DIR / 'failed.png')).scaled(16, 16))
             self.name_label.setStyleSheet("color: #F44336; font-weight: bold;")
+            self.action_button.setText("Tải")
             self.action_button.setStyleSheet(
-                "background-color: #3498db; color: white; border: none; padding: 8px 16px; border-radius: 4px; font-weight: bold;"
+                "background-color: #e67e22; color: white; border: none; padding: 8px 16px; border-radius: 4px; font-weight: bold;"
             )
+            self.action_button.setEnabled(True)
+            self._current_progress = 0.0  # Đặt lại tiến độ
+            self.progress_overlay.hide()
             self.status_label.show()
         elif status == "processing":
             movie = QMovie(str(IMAGES_DIR / 'loading.gif'))
             self.status_label.setMovie(movie)
             movie.start()
+            self.action_button.setEnabled(False)  # Vô hiệu nút khi tải
             self.status_label.show()
         else:
             self.status_label.hide()
             self.name_label.setStyleSheet("color: #FFFFFF; font-weight: bold;")
+            self.action_button.setText("Tải")
             self.action_button.setStyleSheet(
-                "background-color: #3498db; color: white; border: none; padding: 8px 16px; border-radius: 4px; font-weight: bold;"
+                "background-color: #e67e22; color: white; border: none; padding: 8px 16px; border-radius: 4px; font-weight: bold;"
             )
+            self.action_button.setEnabled(True)
+            self._current_progress = 0.0  # Đặt lại tiến độ
+            self.progress_overlay.hide()
 
-    def update_download_progress(self, percentage):
-        if self.action_button.text() == "Tải":
-            # Interpolate between orange (#e67e22) and green (#4CAF50)
-            orange = QColor(230, 126, 34)
-            green = QColor(76, 175, 80)
-            try:
-                percentage = float(percentage)  # Ép kiểu percentage thành float
-                if percentage < 0 or percentage > 100:
-                    percentage = max(0.0, min(100.0, percentage))  # Giới hạn giá trị
-                r = int(orange.red() + (green.red() - orange.red()) * (percentage / 100))
-                g = int(orange.green() + (green.green() - orange.green()) * (percentage / 100))
-                b = int(orange.blue() + (green.blue() - orange.blue()) * (percentage / 100))
-                color = f"#{r:02x}{g:02x}{b:02x}"
-                self.action_button.setStyleSheet(
-                    f"background-color: {color}; color: white; border: none; padding: 8px 16px; border-radius: 4px; font-weight: bold;"
-                )
-            except (ValueError, TypeError):
-                # Nếu percentage không hợp lệ, giữ màu cam mặc định
-                self.action_button.setStyleSheet(
-                    "background-color: #e67e22; color: white; border: none; padding: 8px 16px; border-radius: 4px; font-weight: bold;"
-                )
+    def update_download_progress(self, app_key, percentage):
+        # Đảm bảo widget này chỉ cập nhật tiến trình của đúng ứng dụng
+        if app_key != self.app_key:
+            return
+        try:
+            # Giá trị percentage đã là float, nhưng vẫn kiểm tra để đảm bảo an toàn
+            percentage = float(percentage)
+            if not (0 <= percentage <= 100):
+                percentage = max(0.0, min(100.0, percentage))
+            
+            self._current_progress = percentage
+            overlay_width = int(self.width() * (percentage / 100.0))
+            
+            # Cập nhật hình dạng của lớp phủ
+            self.progress_overlay.setGeometry(0, 0, overlay_width, self.height())
+            
+            # Chỉ hiển thị lớp phủ nếu có tiến trình
+            if percentage > 0:
+                self.progress_overlay.show()
+                self.progress_overlay.raise_()
+            else:
+                self.progress_overlay.hide()
+            
+            self.update()
+        except (ValueError, TypeError) as e:
+            print(f"Lỗi trong update_download_progress cho {self.app_key}: {e}")
+            self.progress_overlay.hide()
 
 # --- CỬA SỔ CHÍNH ---
 class TekDT_AIS(QMainWindow):
@@ -590,51 +631,27 @@ class TekDT_AIS(QMainWindow):
         
         main_layout.addLayout(panels_layout)
         main_layout.addWidget(bottom_panel)
-            
+
     def load_config_and_apps(self):
         # Load local config
         if CONFIG_FILE.exists():
             try:
                 with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
                     content = f.read()
-                    if not content: # File trống
-                        self.config = {}
-                    else:
-                        self.config = json.loads(content)
-            except json.JSONDecodeError: # File hỏng
+                    self.config = json.loads(content) if content else {}
+            except json.JSONDecodeError:
                 self.config = {}
         else:
             self.config = {}
 
         # Luôn đảm bảo các khóa chính tồn tại
-        if 'settings' not in self.config:
-            self.config['settings'] = {}
-        if 'app_items' not in self.config:
-            self.config['app_items'] = {}
+        self.config.setdefault('settings', {})
+        self.config.setdefault('app_items', {})
 
         self.local_apps = self.config.get("app_items", {})
-        # Clean up invalid local apps
-        for key in list(self.local_apps.keys()):
-            app_info = self.local_apps[key]
-            app_dir = APPS_DIR / key
-            icon_file = app_info.get('icon_file', '')
-            icon_path = app_dir / icon_file if icon_file else None
-            if icon_path and not icon_path.exists():
-                app_info['icon_file'] = 'default_icon.png'
-                self.config['app_items'][key] = app_info
-            if app_info.get('type') == 'portable':
-                executable_path = app_dir / app_info.get('executable', '') if app_info.get('executable') else None
-                if not executable_path or not executable_path.exists():
-                    del self.local_apps[key]
-                    self.config['app_items'].pop(key, None)
-            else:
-                download_url = app_info.get('download_url', '')
-                file_name = app_info.get('output_filename', Path(download_url).name if download_url else '')
-                installer_path = app_dir / file_name if file_name else None
-                if not installer_path or not installer_path.exists():
-                    del self.local_apps[key]
-                    self.config['app_items'].pop(key, None)
-        self.save_config()
+        
+        self.save_config() # Lưu lại cấu trúc có thể đã được sửa
+        
         # Đảm bảo selected_for_install là một danh sách
         self.selected_for_install = self.config.get("settings", {}).get("selected_for_install", [])
         if not isinstance(self.selected_for_install, list):
@@ -642,21 +659,24 @@ class TekDT_AIS(QMainWindow):
 
         # Fetch remote app list
         try:
+            self.status_label.setText("Đang tải danh sách phần mềm từ máy chủ...")
             response = self.session.get(REMOTE_APP_LIST_URL, timeout=10)
             response.raise_for_status()
             self.remote_apps = response.json()
+            self.status_label.setText("Tải danh sách thành công. Sẵn sàng.")
         except requests.RequestException as e:
-            QMessageBox.critical(self, "Lỗi mạng", 
+            QMessageBox.warning(self, "Lỗi mạng",
                                  f"Không thể tải danh sách phần mềm từ máy chủ: {e}\n"
-                                 "Chương trình sẽ chỉ hiển thị các phần mềm đã tải.")
+                                 "Chương trình sẽ chỉ hiển thị các phần mềm đã có thông tin cục bộ.")
             self.remote_apps = {"app_items": self.local_apps}
+            self.status_label.setText("Lỗi mạng. Hiển thị các phần mềm đã biết.")
         
-        # Merge local app info with remote app info
-        for key, app_info in self.local_apps.items():
+        # Hợp nhất thông tin local (chủ yếu là icon) vào danh sách remote
+        for key, local_info in self.local_apps.items():
             if key in self.remote_apps.get("app_items", {}):
-                self.remote_apps["app_items"][key].update({
-                    'icon_file': app_info.get('icon_file', 'default_icon.png')
-                })
+                # Ưu tiên giữ lại thông tin về file icon đã có
+                if 'icon_file' in local_info:
+                    self.remote_apps["app_items"][key].update(local_info)
         
         self.populate_lists()
         
@@ -666,41 +686,66 @@ class TekDT_AIS(QMainWindow):
         
         all_apps = self.remote_apps.get("app_items", {})
         
-        # Filter apps based on system architecture
+        # Lọc ứng dụng dựa trên cấu trúc hệ thống
         compatible_apps = {}
         for key, app_info in all_apps.items():
             compatible_os_arch = app_info.get('compatible_os_arch', 'both')
             if (self.system_arch == '64bit' and compatible_os_arch in ['64bit', 'both']) or \
-               (self.system_arch == '32bit' and compatible_os_arch == '32bit'):
+                (self.system_arch == '32bit' and compatible_os_arch in ['32bit', 'both']):
                 compatible_apps[key] = app_info
         
-        # Download icons for apps not yet installed if online
+        # Cập nhật trước thông tin icon đã có từ local_apps vào compatible_apps
+        for key, local_info in self.local_apps.items():
+            if key in compatible_apps:
+                compatible_apps[key].update(local_info)
+
+        # Biến cờ để kiểm tra xem có cần lưu lại config hay không
+        config_needs_saving = False
+        
+        # Tải icon cho các ứng dụng chưa có nếu có mạng
         try:
             self.session.get("https://www.google.com", timeout=5)
             for key, app_info in compatible_apps.items():
-                if key not in self.local_apps or not (APPS_DIR / key / app_info.get('icon_file', '')).exists():
-                    icon_url = app_info.get('icon_url')
-                    if icon_url:
-                        icon_filename = Path(icon_url).name
-                        icon_path = APPS_DIR / key / icon_filename
-                        app_dir = APPS_DIR / key
-                        app_dir.mkdir(exist_ok=True)
-                        if not icon_path.exists():
-                            try:
-                                icon_response = self.session.get(icon_url, timeout=5)
-                                icon_response.raise_for_status()
-                                with open(icon_path, 'wb') as f:
-                                    f.write(icon_response.content)
-                                compatible_apps[key]['icon_file'] = icon_filename
-                            except requests.RequestException:
-                                compatible_apps[key]['icon_file'] = 'default_icon.png'
-        except requests.ConnectionError:
-            pass
+                # Chỉ tải nếu chưa có thông tin icon_file hoặc file icon không tồn tại
+                icon_file = app_info.get('icon_file')
+                icon_url = app_info.get('icon_url')
+                if not icon_url: continue # Bỏ qua nếu không có url icon
 
+                icon_filename = Path(icon_url).name
+                app_dir = APPS_DIR / key
+                icon_path = app_dir / icon_filename
+
+                if not icon_file or not icon_path.exists():
+                    try:
+                        app_dir.mkdir(exist_ok=True)
+                        icon_response = self.session.get(icon_url, timeout=5)
+                        icon_response.raise_for_status()
+                        with open(icon_path, 'wb') as f:
+                            f.write(icon_response.content)
+                        
+                        # === PHẦN SỬA LỖI QUAN TRỌNG NHẤT ===
+                        # 1. Cập nhật thông tin icon vào danh sách đang xử lý
+                        compatible_apps[key]['icon_file'] = icon_filename
+                        # 2. Cập nhật thông tin vào đối tượng config chính của chương trình
+                        self.config['app_items'].setdefault(key, {})
+                        self.config['app_items'][key]['icon_file'] = icon_filename
+                        # 3. Đánh dấu rằng chúng ta cần lưu file config
+                        config_needs_saving = True
+                        # =======================================
+
+                    except requests.RequestException:
+                        compatible_apps[key]['icon_file'] = 'default_icon.png'
+        except requests.ConnectionError:
+            pass # Bỏ qua việc tải icon nếu không có mạng
+
+        # Lưu file config một lần duy nhất nếu có sự thay đổi
+        if config_needs_saving:
+            self.save_config()
+
+        # Bắt đầu dựng giao diện
         categories = sorted(list(set(app.get('category', 'Chưa phân loại') for app in compatible_apps.values())))
         
         for category in categories:
-            # Add category header
             cat_item = QListWidgetItem(category.upper())
             cat_item.setFlags(cat_item.flags() & ~Qt.ItemFlag.ItemIsSelectable)
             font = QFont()
@@ -709,13 +754,14 @@ class TekDT_AIS(QMainWindow):
             cat_item.setForeground(QColor("#3498db"))
             self.available_list_widget.addItem(cat_item)
 
-            # Add apps in this category
             for key, info in compatible_apps.items():
                 if info.get('category', 'Chưa phân loại') == category:
                     if key in self.selected_for_install:
-                        self.add_app_to_list(self.selected_list_widget, key, info)
-                    else:
-                        self.add_app_to_list(self.available_list_widget, key, info)
+                        # Sẽ được xử lý ở bước tiếp theo
+                        continue
+                    self.add_app_to_list(self.available_list_widget, key, info)
+
+        # Đưa các app đã chọn vào đúng danh sách
         for key in list(self.selected_for_install):
             if key in compatible_apps:
                 self.move_app_to_selection(key, compatible_apps[key])
@@ -725,57 +771,62 @@ class TekDT_AIS(QMainWindow):
         self.update_counts()
 
     def add_app_to_list(self, list_widget, key, info):
-        is_local = key in self.local_apps
-        if is_local:
-            app_dir = APPS_DIR / key
-            if info.get('type') == 'portable':
-                executable_path = app_dir / info.get('executable', '') if info.get('executable') else None
-                is_local = executable_path and executable_path.exists()
-            else:
-                download_url = info.get('download_url', '')
-                file_name = info.get('output_filename', Path(download_url).name if download_url else '')
-                installer_path = app_dir / file_name if file_name else None
-                is_local = installer_path and installer_path.exists()
-            if not is_local:
-                self.local_apps.pop(key, None)
-                self.config['app_items'].pop(key, None)
-                self.save_config()
+        # 1. Hợp nhất thông tin cục bộ vào `info` để đảm bảo có 'icon_file'
+        if key in self.local_apps:
+            info.update(self.local_apps[key])
+
+        # 2. Tạo widget NGAY LẬP TỨC với thông tin đã hợp nhất.
+        #    Lúc này, `AppItemWidget` sẽ nhận được đường dẫn icon chính xác.
         item_widget = AppItemWidget(key, info)
-        
-        # Tùy chỉnh trạng thái
         item_widget.add_requested.connect(self.move_app_to_selection)
         item_widget.remove_requested.connect(self.remove_app_from_selection)
-        is_selected = key in self.selected_for_install
-        
-        if info.get('type') == 'portable' and is_local:
+
+        # 3. Kiểm tra xem phần mềm đã được tải về hoàn toàn chưa (một cách phi phá hủy)
+        is_fully_downloaded = False
+        app_dir = APPS_DIR / key
+        if info.get('type') == 'portable':
+            executable = info.get('executable')
+            if executable and (app_dir / executable).exists():
+                is_fully_downloaded = True
+        else:  # 'installer'
+            download_url = info.get('download_url', '')
+            file_name = info.get('output_filename', Path(download_url).name if download_url else '')
+            if file_name and (app_dir / file_name).exists():
+                is_fully_downloaded = True
+
+        # 4. Thiết lập trạng thái cho nút bấm dựa trên kết quả kiểm tra
+        if info.get('type') == 'portable' and is_fully_downloaded:
             item_widget.action_button.setText("Chạy")
             item_widget.action_button.setToolTip(f"Chạy {info['display_name']}")
+            item_widget.action_button.setStyleSheet("background-color: #3498db; color: white; border: none; padding: 8px 16px; border-radius: 4px; font-weight: bold;")
             item_widget.action_button.clicked.connect(lambda _, k=key: self.run_portable(k))
-        elif not is_local:
+        elif not is_fully_downloaded:
             item_widget.action_button.setText("Tải")
             item_widget.action_button.setToolTip(f"Tải {info['display_name']} về")
-            item_widget.name_label.setStyleSheet("color: #e67e22;") # Orange
+            item_widget.name_label.setStyleSheet("color: #e67e22; font-weight: bold;")
             item_widget.action_button.setStyleSheet("background-color: #e67e22; color: white; border: none; padding: 8px 16px; border-radius: 4px; font-weight: bold;")
-            item_widget.action_button.clicked.connect(lambda _, k=key, i=info: self.download_app(k, i, item_widget))
-        else: # Is local and installer
+            item_widget.action_button.clicked.connect(lambda _, k=key, i=info, w=item_widget: self.download_app(k, i, w))
+        else:  # Đã tải xong và là dạng installer
             item_widget.action_button.setText("Thêm")
             item_widget.action_button.setToolTip(f"Thêm {info['display_name']} vào danh sách")
+            item_widget.action_button.setStyleSheet("background-color: #4CAF50; color: white; border: none; padding: 8px 16px; border-radius: 4px; font-weight: bold;")
             
             local_ver = self.local_apps.get(key, {}).get('version', '0')
             remote_ver = info.get('version', '0')
+            
+            # Kiểm tra phiên bản để quyết định hành động là cập nhật hay thêm
             if remote_ver > local_ver:
-                item_widget.name_label.setStyleSheet("color: #2ecc71;")
-                item_widget.action_button.clicked.connect(
-                    lambda: self.confirm_update(key, info, local_ver, remote_ver)
-                )
+                item_widget.name_label.setStyleSheet("color: #2ecc71; font-weight: bold;") # Màu xanh lá cho bản cập nhật
+                item_widget.setToolTip(f"Có bản cập nhật: {remote_ver}. Phiên bản hiện tại: {local_ver}")
+                item_widget.action_button.setText("Cập nhật")
+                item_widget.action_button.clicked.connect(lambda _, k=key, i=info, w=item_widget: self.confirm_update(k, i, w, local_ver, remote_ver))
             else:
-                item_widget.action_button.clicked.connect(
-                    lambda: item_widget.add_requested.emit(key, info)
-                )
+                item_widget.action_button.clicked.connect(lambda: item_widget.add_requested.emit(key, info))
 
+        # 5. Thêm widget đã hoàn thiện vào danh sách
         list_item = QListWidgetItem()
         list_item.setSizeHint(item_widget.sizeHint())
-        list_item.setData(Qt.ItemDataRole.UserRole, key) # Store key for searching
+        list_item.setData(Qt.ItemDataRole.UserRole, key)
         
         list_widget.addItem(list_item)
         list_widget.setItemWidget(list_item, item_widget)
@@ -872,6 +923,7 @@ class TekDT_AIS(QMainWindow):
         self.install_worker.signals.error.connect(lambda e: QMessageBox.critical(self, "Lỗi Worker", str(e)))
         if item_widget:
             self.install_worker.signals.progress_percentage.connect(item_widget.update_download_progress)
+            print(f"Connected progress_percentage signal for {key}")  # Thêm dòng này để kiểm tra
         self.install_worker.start()
         
     def filter_apps(self, text):
@@ -939,13 +991,29 @@ class TekDT_AIS(QMainWindow):
         self.install_worker.start()
 
     def update_install_progress(self, app_key, status, message):
-        self.status_label.setText(f"[{app_key}] {status}: {message}")
+        # Tìm widget tương ứng trong cả danh sách có sẵn và danh sách đã chọn
+        target_widget = None
         for i in range(self.selected_list_widget.count()):
             item = self.selected_list_widget.item(i)
             widget = self.selected_list_widget.itemWidget(item)
             if hasattr(widget, 'app_key') and widget.app_key == app_key:
-                widget.set_status(status)
+                target_widget = widget
                 break
+                
+        if not target_widget:
+            for i in range(self.available_list_widget.count()):
+                item = self.available_list_widget.item(i)
+                widget = self.available_list_widget.itemWidget(item)
+                if hasattr(widget, 'app_key') and widget.app_key == app_key:
+                    target_widget = widget
+                    break
+
+        if target_widget:
+            # Cập nhật thông báo trạng thái chính
+            display_name = target_widget.app_info.get('display_name', app_key)
+            self.status_label.setText(f"{display_name}: {message}")
+            # Cập nhật trạng thái trên widget của từng phần mềm
+            target_widget.set_status(status)
     
     def on_installation_finished(self):
         self.status_label.setText("Hoàn tất! Sẵn sàng cho tác vụ tiếp theo.")

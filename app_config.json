@@ -2,5 +2,36 @@
   "settings": {
     "selected_for_install": []
   },
-  "app_items": {}
+  "app_items": {
+    "googlechrome64": {
+      "icon_file": "chrome-logo-m100.svg"
+    },
+    "googlechrome32": {
+      "icon_file": "chrome-logo-m100.svg"
+    },
+    "vlc64": {
+      "icon_file": "largeVLC.png"
+    },
+    "vlc32": {
+      "icon_file": "largeVLC.png"
+    },
+    "rufus64": {
+      "icon_file": "rufus-128.png"
+    },
+    "rufus32": {
+      "icon_file": "rufus-128.png"
+    },
+    "notepadplusplus64": {
+      "icon_file": "logo.svg"
+    },
+    "notepadplusplus32": {
+      "icon_file": "logo.svg"
+    },
+    "firefox64": {
+      "icon_file": "logo.eb1324e44442.svg"
+    },
+    "firefox32": {
+      "icon_file": "logo.eb1324e44442.svg"
+    }
+  }
 }
