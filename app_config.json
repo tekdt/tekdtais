@@ -4,6 +4,17 @@
   },
   "app_items": {
     "googlechrome64": {
+      "display_name": "Google Chrome",
+      "version": "138.0.7204.169",
+      "category": "Trình duyệt Web",
+      "description": "Trình duyệt web nhanh, an toàn và miễn phí được xây dựng cho web hiện đại.",
+      "type": "installer",
+      "architecture": "64bit",
+      "compatible_os_arch": "64bit",
+      "download_url": "https://dl.google.com/chrome/install/standalonesetup64.exe",
+      "install_params": "/silent /install",
+      "executable": "standalonesetup64.exe",
+      "icon_url": "https://www.google.com/chrome/static/images/chrome-logo-m100.svg",
       "icon_file": "chrome-logo-m100.svg"
     },
     "googlechrome32": {
