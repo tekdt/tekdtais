@@ -362,6 +362,7 @@ class AppItemWidget(QWidget):
         self.embed_mode = embed_mode
         self._current_progress = 0.0
         self.setMouseTracking(True)
+        self.setMinimumHeight(60)
         self.layout = QHBoxLayout(self)
         self.layout.setContentsMargins(5, 5, 5, 5)
         
@@ -1117,12 +1118,12 @@ class TekDT_AIS(QMainWindow):
         for key in self.selected_for_install:
             if key in self.remote_apps['app_items']:
                 app_info = self.remote_apps['app_items'][key]
-                app_dir = APPS_DIR / key
-                download_url = app_info.get('download_url', '')
-                file_name = app_info.get('output_filename', Path(download_url).name if download_url else '')
-                installer_path = app_dir / file_name if file_name else None
-                if installer_path and installer_path.exists():
-                    continue
+                # app_dir = APPS_DIR / key
+                # download_url = app_info.get('download_url', '')
+                # file_name = app_info.get('output_filename', Path(download_url).name if download_url else '')
+                # installer_path = app_dir / file_name if file_name else None
+                # if installer_path and installer_path.exists():
+                    # continue
                 apps_to_install[key] = app_info
         
         if not apps_to_install:
@@ -1313,6 +1314,28 @@ if __name__ == '__main__':
         sys.exit(0)
     else:
         app = QApplication(sys.argv)
+        app.setStyleSheet("""
+            QMessageBox {
+                background-color: #2c3e50;
+            }
+            QMessageBox QLabel {
+                color: #ecf0f1;
+                font-size: 10pt;
+            }
+            QMessageBox QPushButton {
+                background-color: #3498db;
+                color: white;
+                border: none;
+                padding: 8px 16px;
+                border-radius: 4px;
+                font-weight: bold;
+                min-width: 70px; 
+                min-height: 25px;
+            }
+            QMessageBox QPushButton:hover {
+                background-color: #2980b9;
+            }
+        """)
         default_icon = IMAGES_DIR_DATA / 'default_icon.png'
         if not default_icon.exists():
             default_icon.parent.mkdir(parents=True, exist_ok=True)
