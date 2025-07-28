@@ -11,6 +11,7 @@ import io
 from pathlib import Path
 import platform
 import re
+from pathlib import Path
 
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
                              QListWidget, QListWidgetItem, QLabel, QPushButton, QLineEdit,
@@ -25,6 +26,14 @@ APP_NAME = "TekDT AIS"
 APP_VERSION = "1.0.0"
 GITHUB_REPO_URL = "https://github.com/tekdt/tekdtais"
 REMOTE_APP_LIST_URL = "https://raw.githubusercontent.com/tekdt/tekdtais/refs/heads/main/app_list.json"
+
+# Determine the base directory dynamically
+if getattr(sys, 'frozen', False):
+    # Running as compiled EXE
+    BASE_DIR = Path(sys._MEIPASS)
+else:
+    # Running as Python script
+    BASE_DIR = Path(__file__).resolve().parent
 
 BASE_DIR = Path(__file__).resolve().parent
 CONFIG_FILE = BASE_DIR / "app_config.json"
@@ -75,7 +84,7 @@ class ToolManager(QObject):
         tool_name = "7-Zip"
         api_url = SEVENZIP_API_URL
         asset_name = '7zr.exe'
-        tool_dir.mkdir(exist_ok=True)
+        tool_dir.mkdir(exist_ok=True, parents=True)
         version_file = tool_dir / ".version"
         local_version = version_file.read_text().strip() if version_file.exists() else "0"
         response = self.session.get(api_url)
@@ -124,7 +133,7 @@ class ToolManager(QObject):
         tool_name = "aria2"
         api_url = ARIA2_API_URL
         asset_keyword = 'win-32bit'
-        tool_dir.mkdir(exist_ok=True)
+        tool_dir.mkdir(exist_ok=True, parents=True)
         version_file = tool_dir / ".version"
         local_version = version_file.read_text().strip() if version_file.exists() else "0"
 
@@ -1255,7 +1264,7 @@ if __name__ == '__main__':
     cli_args = [arg for arg in sys.argv[1:] if arg.startswith('/')]
     flags = [arg for arg in sys.argv[1:] if arg.startswith('--')]
     
-    embed_mode = '--embed' in flags
+    embed_mode = '/embed' in flags
     
     # Ưu tiên chế độ GUI (thường hoặc nhúng) nếu không có lệnh CLI cụ thể
     if cli_args and not embed_mode:
