@@ -21,6 +21,17 @@
       "icon_file": "chrome-logo-m100.svg"
     },
     "vlc64": {
+      "display_name": "VLC Media Player 64bit",
+      "version": "3.0.21",
+      "category": "Media",
+      "description": "Trình phát đa phương tiện miễn phí, mã nguồn mở, có thể phát hầu hết các định dạng.",
+      "type": "installer",
+      "architecture": "64bit",
+      "compatible_os_arch": "64bit",
+      "download_url": "https://get.videolan.org/vlc/3.0.21/win64/vlc-3.0.21-win64.exe",
+      "install_params": "/L=1066 /S",
+      "executable": "vlc-3.0.21-win64.exe",
+      "icon_url": "https://images.videolan.org/images/largeVLC.png",
       "icon_file": "largeVLC.png"
     },
     "vlc32": {

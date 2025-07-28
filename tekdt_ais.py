@@ -223,7 +223,7 @@ class WorkerSignals(QObject):
     finished = pyqtSignal()
     progress = pyqtSignal(str, str, str)
     error = pyqtSignal(str)
-    progress_percentage = pyqtSignal(str, float)  # New signal for download progress
+    progress_percentage = pyqtSignal(str, float)
 
 class InstallWorker(QThread):
     def __init__(self, apps_to_process, action="install"):
@@ -362,12 +362,13 @@ class AppItemWidget(QWidget):
         self.embed_mode = embed_mode
         self._current_progress = 0.0
         self.setMouseTracking(True)
-        self.setMinimumHeight(60)
+        self.setMinimumHeight(70)
         self.layout = QHBoxLayout(self)
-        self.layout.setContentsMargins(5, 5, 5, 5)
+        self.layout.setContentsMargins(5, 15, 5, 15)
         
         # Icon
         self.icon_label = QLabel()
+        self.icon_label.setFixedSize(48, 48)
         icon_file = app_info.get('icon_file', '')
         icon_path = APPS_DIR / app_key / icon_file if icon_file else ''
         default_icon_path = resource_path('Images/default_icon.png')
@@ -375,9 +376,8 @@ class AppItemWidget(QWidget):
         pixmap_path = str(icon_path) if icon_path and Path(icon_path).exists() else str(default_icon_path)
         icon = QIcon(pixmap_path)
         if not icon.isNull():
-            self.icon_label.setPixmap(icon.pixmap(32, 32))
+            self.icon_label.setPixmap(icon.pixmap(48, 48))
         else:
-            self.icon_label.setFixedSize(32, 32)
             self.icon_label.setText("?")
             self.icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             self.icon_label.setStyleSheet("color: #ecf0f1; background-color: #34495e; border: 1px solid #3498db;")
@@ -386,12 +386,13 @@ class AppItemWidget(QWidget):
         # Thông tin
         self.info_widget = QWidget()
         self.info_layout = QVBoxLayout(self.info_widget)
-        self.info_layout.setContentsMargins(0, 0, 0, 0)
-        self.info_layout.setSpacing(5)
+        self.info_layout.setContentsMargins(10, 0, 0, 0)
+        self.info_layout.setSpacing(8)
         
         self.name_label = QLabel(f"{app_info.get('display_name', 'N/A')}")
-        self.name_label.setStyleSheet("font-weight: bold;")
+        self.name_label.setStyleSheet("font-weight: bold; font-size: 12pt;")
         self.version_label = QLabel(f"Phiên bản: {app_info.get('version', 'N/A')}")
+        self.version_label.setStyleSheet("color: #bdc3c7; font-size: 10pt;")
         
         self.info_layout.addWidget(self.name_label)
         self.info_layout.addWidget(self.version_label)
@@ -399,7 +400,7 @@ class AppItemWidget(QWidget):
         
         # Nút hành động
         self.action_button = QPushButton()
-        self.action_button.setFixedSize(80, 30)
+        self.action_button.setFixedSize(100, 36)
         self.action_button.clicked.connect(self._on_action_button_clicked)
         self.layout.addWidget(self.action_button)
         
@@ -448,12 +449,9 @@ class AppItemWidget(QWidget):
             ) # Màu xanh
         self.action_button.setEnabled(True)
     def enterEvent(self, event):
-        # if self.action_button.isEnabled():
-            # self.action_button.show()
         super().enterEvent(event)
 
     def leaveEvent(self, event):
-        # self.action_button.hide()
         super().leaveEvent(event)
     
     def resizeEvent(self, event):
@@ -634,6 +632,9 @@ class TekDT_AIS(QMainWindow):
             }
             QPushButton:hover {
                 background-color: #2980b9;
+            }
+            QPushButton:disabled {
+                background-color: #95a5a6;
             }
             QLineEdit {
                 background-color: #34495e;
@@ -896,11 +897,7 @@ class TekDT_AIS(QMainWindow):
 
             for key, info in compatible_apps.items():
                 if info.get('category', 'Chưa phân loại') == category:
-                    if not self.embed_mode and key in self.selected_for_install:
-                        # Sẽ được xử lý ở bước tiếp theo
-                        continue
                     self.add_app_to_list(self.available_list_widget, key, info)
-
 
         if not self.embed_mode:
             for key in list(self.selected_for_install):
@@ -965,7 +962,7 @@ class TekDT_AIS(QMainWindow):
 
         # 5. Thêm widget đã hoàn thiện vào danh sách
         list_item = QListWidgetItem()
-        list_item.setSizeHint(item_widget.sizeHint())
+        list_item.setSizeHint(QSize(0, 70))
         list_item.setData(Qt.ItemDataRole.UserRole, key)
         
         list_widget.addItem(list_item)
@@ -989,30 +986,33 @@ class TekDT_AIS(QMainWindow):
         else:
             self.move_app_to_selection(key, info)
     def move_app_to_selection(self, key, info):
-        # 1. Find and hide/disable in the available list
+        # 1. Tìm và vô hiệu hóa trong danh sách bên trái
         self.update_available_item_state(key, is_selected=True)
 
-        # 2. Add to the selected list
+        # 2. Thêm vào danh sách bên phải
         item_widget = AppItemWidget(key, info)
         item_widget.action_button.setText("Bỏ")
         item_widget.action_button.setToolTip(f"Bỏ {info['display_name']} khỏi danh sách")
+        item_widget.action_button.setStyleSheet(
+            "background-color: #e74c3c; color: white; border: none; padding: 8px 16px; border-radius: 4px; font-weight: bold;"
+        )
         item_widget.action_button.clicked.connect(lambda: item_widget.remove_requested.emit(key, info))
         item_widget.remove_requested.connect(self.remove_app_from_selection)
         
         list_item = QListWidgetItem()
-        list_item.setSizeHint(item_widget.sizeHint())
+        list_item.setSizeHint(QSize(0, 70))
         list_item.setData(Qt.ItemDataRole.UserRole, key)
         self.selected_list_widget.addItem(list_item)
         self.selected_list_widget.setItemWidget(list_item, item_widget)
         
-        # 3. Update config
+        # 3. Cập nhật cấu hình
         if key not in self.selected_for_install:
             self.selected_for_install.append(key)
         self.save_config()
         self.update_counts()
 
     def remove_app_from_selection(self, key, info):
-        # 1. Find and remove from selected list
+        # 1. Tìm và xóa khỏi danh sách bên phải
         for i in range(self.selected_list_widget.count()):
             item = self.selected_list_widget.item(i)
             if item is None: continue
@@ -1021,10 +1021,10 @@ class TekDT_AIS(QMainWindow):
                 self.selected_list_widget.takeItem(i)
                 break
 
-        # 2. Re-enable in the available list
+        # 2. Kích hoạt lại trong danh sách bên trái
         self.update_available_item_state(key, is_selected=False)
         
-        # 3. Update config
+        # 3. Cập nhật cấu hình
         if key in self.selected_for_install:
             self.selected_for_install.remove(key)
         self.save_config()
@@ -1037,9 +1037,11 @@ class TekDT_AIS(QMainWindow):
             widget = self.available_list_widget.itemWidget(item)
             if hasattr(widget, 'app_key') and widget.app_key == key:
                 widget.action_button.setDisabled(is_selected)
-                op = QGraphicsOpacityEffect(widget)
-                op.setOpacity(0.5 if is_selected else 1.0)
-                widget.setGraphicsEffect(op)
+                if is_selected:
+                    widget.action_button.setStyleSheet(
+                        "background-color: #95a5a6; color: white; border: none; padding: 8px 16px; border-radius: 4px; font-weight: bold;"
+                    )
+                break
                 break
                 
     def run_portable(self, key):
@@ -1072,7 +1074,7 @@ class TekDT_AIS(QMainWindow):
         self.install_worker.signals.error.connect(lambda e: QMessageBox.critical(self, "Lỗi Worker", str(e)))
         if item_widget:
             self.install_worker.signals.progress_percentage.connect(item_widget.update_download_progress)
-            print(f"Connected progress_percentage signal for {key}")  # Thêm dòng này để kiểm tra
+            print(f"Connected progress_percentage signal for {key}")
         self.install_worker.start()
         
     def filter_apps(self, text):
@@ -1116,15 +1118,8 @@ class TekDT_AIS(QMainWindow):
 
         apps_to_install = {}
         for key in self.selected_for_install:
-            if key in self.remote_apps['app_items']:
-                app_info = self.remote_apps['app_items'][key]
-                # app_dir = APPS_DIR / key
-                # download_url = app_info.get('download_url', '')
-                # file_name = app_info.get('output_filename', Path(download_url).name if download_url else '')
-                # installer_path = app_dir / file_name if file_name else None
-                # if installer_path and installer_path.exists():
-                    # continue
-                apps_to_install[key] = app_info
+            if key in self.remote_apps.get('app_items', {}):
+                apps_to_install[key] = self.remote_apps['app_items'][key]
         
         if not apps_to_install:
             QMessageBox.information(self, "Thông báo", "Vui lòng thêm ít nhất một phần mềm để cài đặt.")
@@ -1135,6 +1130,14 @@ class TekDT_AIS(QMainWindow):
         self.install_worker.signals.progress.connect(self.update_install_progress)
         self.install_worker.signals.finished.connect(self.on_installation_finished)
         self.install_worker.signals.error.connect(lambda e: QMessageBox.critical(self, "Lỗi Worker", str(e)))
+        # Kết nối tín hiệu tiến độ tải xuống cho tất cả các widget liên quan
+        for key in apps_to_install:
+            for i in range(self.selected_list_widget.count()):
+                item = self.selected_list_widget.item(i)
+                widget = self.selected_list_widget.itemWidget(item)
+                if hasattr(widget, 'app_key') and widget.app_key == key:
+                    self.install_worker.signals.progress_percentage.connect(widget.update_download_progress)
+                    break
         self.install_worker.start()
 
     def update_install_progress(self, app_key, status, message):
@@ -1180,15 +1183,20 @@ class TekDT_AIS(QMainWindow):
         else:
             print(status_text)
         self.install_worker = None
-        # Reload apps to reflect newly installed ones
-        QTimer.singleShot(1000, self.load_config_and_apps)
+        QTimer.singleShot(500, self.load_config_and_apps)
 
     def update_counts(self):
         if self.embed_mode: return
-        remote_count = len(self.remote_apps.get("app_items", {}))
+        # Đếm số lượng ứng dụng tương thích thay vì tất cả
+        compatible_count = 0
+        for i in range(self.available_list_widget.count()):
+            item = self.available_list_widget.item(i)
+            widget = self.available_list_widget.itemWidget(item)
+            if hasattr(widget, 'app_key'):
+                compatible_count += 1
         selected_count = self.selected_list_widget.count()
         
-        self.available_count_label.setText(f"Tổng số phần mềm: {remote_count}")
+        self.available_count_label.setText(f"Tổng số phần mềm: {compatible_count}")
         self.selected_count_label.setText(f"Đã chọn: {selected_count}")
 
     def save_config(self):
