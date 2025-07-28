@@ -26,45 +26,68 @@ APP_VERSION = "1.0.0"
 GITHUB_REPO_URL = "https://github.com/tekdt/tekdtais"
 REMOTE_APP_LIST_URL = "https://raw.githubusercontent.com/tekdt/tekdtais/refs/heads/main/app_list.json"
 
-# Determine the resource directory (for bundled files) and working directory (for storage)
-if getattr(sys, 'frozen', False):
-    # Running as compiled EXE
-    RESOURCE_DIR = Path(sys._MEIPASS)  # Temporary directory for bundled resources
-    BASE_DIR = Path(sys.executable).parent  # Directory containing the EXE
-else:
-    # Running as Python script
-    RESOURCE_DIR = BASE_DIR = Path(__file__).resolve().parent
+# 1. APP_DATA_DIR: Thư mục LÀM VIỆC chính, nơi lưu trữ dữ liệu bền vững (Apps, Tools, Config).
+#    - Khi chạy EXE, nó sẽ là thư mục chứa file .exe.
+#    - Khi chạy script, nó là thư mục chứa file .py.
+# 2. RESOURCE_DIR: Thư mục chứa tài nguyên được ĐÓNG GÓI vào file EXE.
+#    - Khi chạy EXE, nó là thư mục tạm `_MEIPASS`.
+#    - Khi chạy script, nó cũng là thư mục chứa file .py.
+def resource_path(relative_path):
+    """ Lấy đường dẫn tuyệt đối đến tài nguyên, hoạt động cho cả script và EXE. """
+    try:
+        # PyInstaller tạo một thư mục tạm và lưu đường dẫn trong _MEIPASS
+        base_path = sys._MEIPASS
+    except Exception:
+        # _MEIPASS không tồn tại khi chạy ở dạng script
+        base_path = os.path.abspath(".")
 
-CONFIG_FILE = BASE_DIR / "app_config.json"
-APPS_DIR = BASE_DIR / "Apps"
-TOOLS_DIR = BASE_DIR / "Tools"
-IMAGES_DIR = BASE_DIR / "Images"
+    return str(Path(base_path) / relative_path)
+# Xác định thư mục làm việc chính (nơi chứa file .exe hoặc .py)
+if getattr(sys, 'frozen', False):
+    # Chạy dưới dạng file EXE đã biên dịch
+    APP_DATA_DIR = Path(sys.executable).parent
+else:
+    # Chạy dưới dạng file script Python
+    APP_DATA_DIR = Path(__file__).resolve().parent
+
+CONFIG_FILE = APP_DATA_DIR / "app_config.json"
+APPS_DIR = APP_DATA_DIR / "Apps"
+TOOLS_DIR = APP_DATA_DIR / "Tools"
+IMAGES_DIR_DATA = APP_DATA_DIR / "Images"
 ARIA2_DIR = TOOLS_DIR / "aria2"
 SEVENZ_DIR = TOOLS_DIR / "7z"
-ARIA2_EXEC = (RESOURCE_DIR / "Tools/aria2/aria2c.exe") if getattr(sys, 'frozen', False) else ARIA2_DIR / "aria2c.exe"
-SEVENZ_EXEC = (RESOURCE_DIR / "Tools/7z/7za.exe") if getattr(sys, 'frozen', False) else SEVENZ_DIR / "7za.exe"
-
-# Create storage directories if they don't exist
-for dir_path in [APPS_DIR, TOOLS_DIR, IMAGES_DIR, ARIA2_DIR, SEVENZ_DIR]:
-    dir_path.mkdir(parents=True, exist_ok=True)
-
-# Copy bundled tools to the working directory if not already present
-if getattr(sys, 'frozen', False):
-    for tool_exec in [ARIA2_EXEC, SEVENZ_EXEC]:
-        dest_path = BASE_DIR / tool_exec.relative_to(RESOURCE_DIR)
-        if not dest_path.exists():
-            try:
-                if tool_exec.exists():
-                    dest_path.parent.mkdir(parents=True, exist_ok=True)
-                    shutil.copy2(tool_exec, dest_path)
-                    print(f"Copied {tool_exec} to {dest_path}")
-                else:
-                    print(f"Warning: {tool_exec} not found in bundled resources")
-            except (OSError, shutil.Error) as e:
-                print(f"Error copying {tool_exec} to {dest_path}: {e}")
-
+ARIA2_EXEC = ARIA2_DIR / "aria2c.exe"
+SEVENZ_EXEC = SEVENZ_DIR / "7za.exe"
 ARIA2_API_URL = "https://api.github.com/repos/aria2/aria2/releases/latest"
 SEVENZIP_API_URL = "https://api.github.com/repos/ip7z/7zip/releases/latest"
+
+# Create storage directories if they don't exist
+def initialize_directories_and_tools():
+    """ Tạo các thư mục cần thiết và sao chép công cụ từ gói EXE (nếu cần) """
+    # Tạo các thư mục lưu trữ bền vững
+    for dir_path in [APPS_DIR, TOOLS_DIR, IMAGES_DIR_DATA, ARIA2_DIR, SEVENZ_DIR]:
+        dir_path.mkdir(parents=True, exist_ok=True)
+
+    # Nếu chạy dưới dạng EXE, kiểm tra và sao chép các công cụ đi kèm vào thư mục Tools
+    if getattr(sys, 'frozen', False):
+        bundled_tools = {
+            resource_path("Tools/aria2/aria2c.exe"): ARIA2_EXEC,
+            resource_path("Tools/7z/7za.exe"): SEVENZ_EXEC
+        }
+        for src_path_str, dest_path in bundled_tools.items():
+            src_path = Path(src_path_str)
+            # Chỉ sao chép nếu file đích chưa tồn tại và file nguồn (trong _MEIPASS) tồn tại
+            if not dest_path.exists() and src_path.exists():
+                try:
+                    dest_path.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(src_path, dest_path)
+                    print(f"Copied bundled tool to {dest_path}")
+                except (OSError, shutil.Error) as e:
+                    print(f"Error copying bundled tool {src_path} to {dest_path}: {e}")
+
+# Chạy hàm khởi tạo ngay lập tức
+initialize_directories_and_tools()
+
 
 # --- NEW: Lớp quản lý và cập nhật công cụ ---
 class ToolManager(QObject):
@@ -98,7 +121,7 @@ class ToolManager(QObject):
 
     def _check_7zip(self):
         tool_dir = SEVENZ_DIR
-        exec_file = BASE_DIR / "Tools/7z/7za.exe"
+        exec_file = SEVENZ_EXEC
         tool_name = "7-Zip"
         api_url = SEVENZIP_API_URL
         asset_name = '7zr.exe'
@@ -147,7 +170,7 @@ class ToolManager(QObject):
 
     def _check_aria2(self):
         tool_dir = ARIA2_DIR
-        exec_file = BASE_DIR / "Tools/aria2/aria2c.exe"
+        exec_file = ARIA2_EXEC
         tool_name = "aria2"
         api_url = ARIA2_API_URL
         asset_keyword = 'win-32bit'
@@ -187,7 +210,7 @@ class ToolManager(QObject):
                 # Tên thư mục bên trong file zip thường là tên file không có .zip
                 extracted_folder_name = file_name.removesuffix('.zip')
                 zf.extractall(TOOLS_DIR)
-            (TOOLS_DIR / extracted_folder_name).rename(tool_dir)
+                (TOOLS_DIR / extracted_folder_name).rename(tool_dir)
 
             version_file.write_text(remote_version)
             self.progress_update.emit(f"Đã cập nhật {tool_name} thành công!")
@@ -272,8 +295,8 @@ class InstallWorker(QThread):
                         stderr = process.stderr.read()
                         self.signals.progress.emit(app_key, "failed", f"Tải {app_info.get('display_name')} thất bại.")
                         continue
-                    else:
-                        self.signals.progress_percentage.emit(app_key, 100.0)
+                else:
+                    self.signals.progress_percentage.emit(app_key, 100.0)
                 
                 # Download icon
                 icon_url = app_info.get('icon_url')
@@ -346,7 +369,7 @@ class AppItemWidget(QWidget):
         self.icon_label = QLabel()
         icon_file = app_info.get('icon_file', '')
         icon_path = APPS_DIR / app_key / icon_file if icon_file else ''
-        default_icon_path = IMAGES_DIR / 'default_icon.png'
+        default_icon_path = resource_path('Images/default_icon.png')
         
         pixmap_path = str(icon_path) if icon_path and Path(icon_path).exists() else str(default_icon_path)
         icon = QIcon(pixmap_path)
@@ -445,7 +468,7 @@ class AppItemWidget(QWidget):
         
     def set_status(self, status):
         if status == "success":
-            self.status_label.setPixmap(QPixmap(str(IMAGES_DIR / 'success.png')).scaled(16, 16))
+            self.status_label.setPixmap(QPixmap(resource_path('Images/success.png')).scaled(16, 16))
             self.name_label.setStyleSheet("color: #4CAF50; font-weight: bold;")
             self.action_button.setText("Thêm")
             self.action_button.setStyleSheet(
@@ -456,7 +479,7 @@ class AppItemWidget(QWidget):
             self.progress_overlay.hide()
             self.status_label.show()
         elif status == "failed":
-            self.status_label.setPixmap(QPixmap(str(IMAGES_DIR / 'failed.png')).scaled(16, 16))
+            self.status_label.setPixmap(QPixmap(resource_path('Images/failed.png')).scaled(16, 16))
             self.name_label.setStyleSheet("color: #F44336; font-weight: bold;")
             self.action_button.setText("Tải")
             self.action_button.setStyleSheet(
@@ -467,7 +490,7 @@ class AppItemWidget(QWidget):
             self.progress_overlay.hide()
             self.status_label.show()
         elif status == "processing":
-            movie = QMovie(str(IMAGES_DIR / 'loading.gif'))
+            movie = QMovie(resource_path('Images/loading.gif'))
             self.status_label.setMovie(movie)
             movie.start()
             self.action_button.setEnabled(False)
@@ -527,9 +550,9 @@ class TekDT_AIS(QMainWindow):
         self.session.headers.update({'User-Agent': 'TekDT-AIS-App'})
 
         # Thiết lập biểu tượng cửa sổ
-        icon_path = BASE_DIR / "logo.ico"
-        if icon_path.exists():
-            self.setWindowIcon(QIcon(str(icon_path)))
+        icon_path = resource_path("logo.ico")
+        if Path(icon_path).exists():
+            self.setWindowIcon(QIcon(icon_path))
 
         if self.embed_mode:
             self.setup_embed_ui()
@@ -1080,7 +1103,7 @@ class TekDT_AIS(QMainWindow):
                 
     def start_installation(self):
         if self.install_worker and self.install_worker.isRunning():
-            reply = QMessageBox.question(self, "Dừng tác vụ", 
+            reply = QMessageBox.question(self, "Dừng tác vụ",
                                          "Bạn có chắc muốn dừng quá trình cài đặt không? "
                                          "Tác vụ đang chạy sẽ được hoàn tất.",
                                          QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
@@ -1143,7 +1166,7 @@ class TekDT_AIS(QMainWindow):
             if hasattr(self, 'status_label') and self.status_label:
                 self.status_label.setText(status_text)
             else:
-                print(status_text) # Fallback cho embed mode
+                print(status_text)
             # Cập nhật trạng thái trên widget của từng phần mềm
             target_widget.set_status(status)
     
@@ -1160,7 +1183,7 @@ class TekDT_AIS(QMainWindow):
         QTimer.singleShot(1000, self.load_config_and_apps)
 
     def update_counts(self):
-        if self.embed_mode: return # Không có các label đếm trong embed mode
+        if self.embed_mode: return
         remote_count = len(self.remote_apps.get("app_items", {}))
         selected_count = self.selected_list_widget.count()
         
@@ -1180,10 +1203,10 @@ class TekDT_AIS(QMainWindow):
         # Stop and wait for threads to finish
         if self.install_worker and self.install_worker.isRunning():
             self.install_worker.stop()
-            self.install_worker.wait(5000)  # Wait up to 5 seconds
+            self.install_worker.wait(5000)
         if self.tool_manager_thread.isRunning():
             self.tool_manager_thread.quit()
-            self.tool_manager_thread.wait(5000)  # Wait up to 5 seconds
+            self.tool_manager_thread.wait(5000)
         self.save_config()
         super().closeEvent(event)
         
@@ -1290,10 +1313,9 @@ if __name__ == '__main__':
         sys.exit(0)
     else:
         app = QApplication(sys.argv)
-        # Tạo file icon mặc định nếu chưa có
-        default_icon = IMAGES_DIR / 'default_icon.png'
-        default_icon.parent.mkdir(parents=True, exist_ok=True)
+        default_icon = IMAGES_DIR_DATA / 'default_icon.png'
         if not default_icon.exists():
+            default_icon.parent.mkdir(parents=True, exist_ok=True)
             pixmap = QPixmap(32, 32)
             pixmap.fill(Qt.GlobalColor.gray)
             pixmap.save(str(default_icon))
