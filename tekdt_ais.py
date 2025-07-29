@@ -605,7 +605,7 @@ class TekDT_AIS(QMainWindow):
         self.load_config_and_apps()
 
     def setup_embed_ui(self):
-        self.setWindowTitle(f"{APP_NAME} - Embed Mode")
+        self.setWindowTitle(f"{APP_NAME}")
         # Kích thước mặc định, có thể được ghi đè bởi chương trình cha
         self.setGeometry(100, 100, 500, 700)
         # Thiết lập để cửa sổ có thể được nhúng
