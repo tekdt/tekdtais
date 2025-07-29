@@ -587,6 +587,51 @@ class TekDT_AIS(QMainWindow):
         self.show_startup_status("Đang khởi tạo...")
         self.tool_manager_thread.start()
 
+    def show_styled_message_box(self, icon, title, text, detailed_text="", buttons=QMessageBox.StandardButton.Ok):
+        msg_box = QMessageBox(self)
+        msg_box.setWindowIcon(QIcon(resource_path("logo.ico")))
+        msg_box.setIcon(icon)
+        msg_box.setWindowTitle(title)
+        msg_box.setText(text)
+        if detailed_text:
+            msg_box.setInformativeText(detailed_text)
+        
+        msg_box.setStandardButtons(buttons)
+
+        # Áp dụng stylesheet
+        stylesheet = """
+            QMessageBox {
+                background-color: #2c3e50;
+            }
+            QMessageBox QLabel#qt_msgbox_label { /* Title Label */
+                color: #ecf0f1;
+                font-size: 12pt;
+                font-weight: bold;
+            }
+            QMessageBox QLabel#qt_msgbox_informativetext { /* Detailed Text Label */
+                color: #bdc3c7;
+                font-size: 10pt;
+            }
+            QMessageBox QPushButton {
+                background-color: #3498db;
+                color: white;
+                border: none;
+                padding: 8px 24px;
+                border-radius: 4px;
+                font-weight: bold;
+                min-width: 80px;
+            }
+            QMessageBox QPushButton:hover {
+                background-color: #2980b9;
+            }
+            QMessageBox QPushButton:pressed {
+                background-color: #1f618d;
+            }
+        """
+        msg_box.setStyleSheet(stylesheet)
+        
+        return msg_box.exec()
+
     def show_startup_status(self, message):
         if not self.startup_label:
             self.startup_label = QLabel(message, self)
@@ -611,8 +656,7 @@ class TekDT_AIS(QMainWindow):
             self.startup_label.hide()
 
         if not success:
-            # Chỉ hiển thị cảnh báo, không thoát chương trình
-            QMessageBox.warning(self, "Cảnh báo", message)
+            self.show_styled_message_box(QMessageBox.Icon.Warning, "Cảnh báo", message)
             # Thoát chương trình nếu không có công cụ
             if not (ARIA2_EXEC.exists() and SEVENZ_EXEC.exists()):
                 QApplication.quit()
@@ -652,18 +696,20 @@ class TekDT_AIS(QMainWindow):
         main_layout.addWidget(self.search_box)
         main_layout.addWidget(self.available_list_widget)
 
-    # THAY THẾ TOÀN BỘ HÀM handle_cli_args HIỆN TẠI BẰNG HÀM MỚI NÀY
     def handle_cli_args(self, args):
         if not args:
             return
-
         self.load_config_and_apps()
+        if not self.remote_apps.get('app_items'):
+            self.show_styled_message_box(QMessageBox.Icon.Critical, "Lỗi", "Không thể tải danh sách phần mềm. Không thể tiếp tục tác vụ dòng lệnh.")
+            QApplication.quit()
+            return
 
-        apps_to_install = {}
-        apps_to_update = {}
+        apps_to_process = {}
+        install_summary = []
         update_summary = []
+        auto_install_summary = []
 
-        # Sử dụng vòng lặp while để có thể bỏ qua đối số của lệnh
         i = 0
         while i < len(args):
             cmd = args[i]
@@ -672,13 +718,13 @@ class TekDT_AIS(QMainWindow):
             if cmd.startswith('/auto_install:'):
                 value_part = cmd.replace('/auto_install:', '').lower()
                 if value_part not in ['true', 'false']:
-                    QMessageBox.warning(self, "Lỗi", f"Giá trị cho /auto_install phải là 'true' hoặc 'false', nhận được '{value_part}'.")
+                    self.show_styled_message_box(QMessageBox.Icon.Critical, "Lỗi cú pháp", f"Giá trị cho /auto_install phải là 'true' hoặc 'false', nhận được '{value_part}'.")
                     QApplication.quit()
                     return
 
                 # Kiểm tra xem có tên phần mềm đi kèm không
                 if i + 1 >= len(args) or args[i+1].startswith('/'):
-                    QMessageBox.warning(self, "Lỗi", f"Tham số '{cmd}' thiếu tên ứng dụng.")
+                    self.show_styled_message_box(QMessageBox.Icon.Critical, "Lỗi cú pháp", f"Tham số '{cmd}' thiếu tên ứng dụng.")
                     QApplication.quit()
                     return
 
@@ -690,85 +736,126 @@ class TekDT_AIS(QMainWindow):
                         self.config['app_items'].setdefault(key, {})['auto_install'] = (value_part == 'true')
                         updated_apps.append(key)
                     else:
-                        print(f"Cảnh báo: Không tìm thấy ứng dụng '{key}'.")
+                        auto_install_summary.append(f"-> Không tìm thấy ứng dụng '{key}'.")
 
                 if updated_apps:
                     self.save_config()
-                    QMessageBox.information(self, "Cập nhật auto_install",
-                                            f"Đã đặt auto_install thành {value_part} cho: {', '.join(updated_apps)}.")
-                QApplication.quit()
-                return # Thoát sau khi hoàn thành
-
+                    auto_install_summary.append(f"Đã đặt auto_install thành '{value_part}' cho: {', '.join(updated_apps)}.")
+                
+                i += 1
             # Xử lý /install
             elif cmd == '/install':
-                # Kiểm tra xem có đối số là danh sách app không
+                apps_to_add = {}
                 if i + 1 < len(args) and not args[i+1].startswith('/'):
                     app_keys_str = args[i+1]
                     app_keys = app_keys_str.split('|')
                     for key in app_keys:
                         if key in self.remote_apps.get('app_items', {}):
-                            apps_to_install[key] = self.remote_apps['app_items'][key]
+                            apps_to_add[key] = self.remote_apps['app_items'][key]
                         else:
-                            print(f"Cảnh báo: Ứng dụng '{key}' không tồn tại.")
-                    i += 1 # Bỏ qua đối số này trong lần lặp tiếp theo
-                else: # Không có danh sách, cài đặt các app auto_install
+                            install_summary.append(f"-> Cảnh báo: Ứng dụng '{key}' không tồn tại.")
+                    i += 1 # Bỏ qua đối số tên app
+                # Trường hợp: /install (không có đối số)
+                else:
                     for key, info in self.config.get('app_items', {}).items():
                         if info.get('auto_install', False) and key in self.remote_apps.get('app_items', {}):
-                            apps_to_install[key] = self.remote_apps['app_items'][key]
+                            apps_to_add[key] = self.remote_apps['app_items'][key]
+                
+                if apps_to_add:
+                    install_summary.append("Các phần mềm sau sẽ được cài đặt:")
+                    for key, info in apps_to_add.items():
+                        install_summary.append(f"-> {info.get('display_name', key)}")
+                    apps_to_process.update(apps_to_add)
 
-            # Xử lý /update
             elif cmd == '/update':
+                apps_to_add = {}
+                keys_to_check = []
+                # Trường hợp: /update app1|app2
                 if i + 1 < len(args) and not args[i+1].startswith('/'):
-                    app_keys_str = args[i+1]
-                    app_keys = app_keys_str.split('|')
-                    for key in app_keys:
-                        if key in self.remote_apps.get('app_items', {}) and key in self.config.get('app_items', {}):
-                            local_ver = self.config['app_items'][key].get('version', '0')
-                            remote_ver = self.remote_apps['app_items'][key].get('version', '0')
-                            if remote_ver > local_ver:
-                                apps_to_update[key] = self.remote_apps['app_items'][key]
-                                self.move_app_to_selection(key, self.remote_apps['app_items'][key])
-                                update_summary.append(f"{key}: {local_ver} -> {remote_ver}")
-                            else:
-                                print(f"Ứng dụng '{key}' đã ở phiên bản mới nhất ({local_ver}).")
-                        else:
-                            print(f"Cảnh báo: Ứng dụng '{key}' không tồn tại hoặc chưa được cài đặt.")
+                    keys_to_check = args[i+1].split('|')
                     i += 1 # Bỏ qua
-                else: # Cập nhật tất cả
-                    for key, local_info in self.config.get('app_items', {}).items():
-                        if key in self.remote_apps.get('app_items', {}):
-                            remote_ver = self.remote_apps['app_items'][key].get('version', '0')
-                            local_ver = local_info.get('version', '0')
-                            if remote_ver > local_ver:
-                                apps_to_update[key] = self.remote_apps['app_items'][key]
-                                self.move_app_to_selection(key, self.remote_apps['app_items'][key])
-                                update_summary.append(f"{key}: {local_ver} -> {remote_ver}")
+                # Trường hợp: /update (toàn bộ)
+                else:
+                    keys_to_check = list(self.config.get('app_items', {}).keys())
+                
+                for key in keys_to_check:
+                    if key in self.remote_apps.get('app_items', {}) and key in self.config.get('app_items', {}):
+                        local_ver = self.config['app_items'][key].get('version', '0')
+                        remote_ver = self.remote_apps['app_items'][key].get('version', '0')
+                        if remote_ver > local_ver:
+                            apps_to_add[key] = self.remote_apps['app_items'][key]
+                            update_summary.append(f"-> {self.remote_apps['app_items'][key].get('display_name', key)}: {local_ver} -> {remote_ver}")
+                        else:
+                            update_summary.append(f"-> {self.remote_apps['app_items'][key].get('display_name', key)}: Đã ở phiên bản mới nhất.")
+                    else:
+                        update_summary.append(f"-> Cảnh báo: Ứng dụng '{key}' không tồn tại hoặc chưa được cài đặt.")
+                
+                if apps_to_add:
+                    apps_to_process.update(apps_to_add)
 
             i += 1 # Chuyển sang lệnh tiếp theo
 
-        # Phần còn lại của hàm (chuẩn bị và bắt đầu cài đặt) giữ nguyên
-        apps_to_process = {**apps_to_install, **apps_to_update}
+        # --- Tổng kết và thực thi ---
 
+        final_summary = []
+        if auto_install_summary:
+            final_summary.append("--- CẬP NHẬT AUTO INSTALL ---")
+            final_summary.extend(auto_install_summary)
+
+        if install_summary:
+            final_summary.append("\n--- TÁC VỤ CÀI ĐẶT ---")
+            final_summary.extend(install_summary)
+
+        if update_summary:
+            final_summary.append("\n--- TÁC VỤ CẬP NHẬT ---")
+            final_summary.extend(update_summary)
+
+        # Nếu chỉ có lệnh auto_install, hiển thị thông báo và thoát luôn
+        if any(cmd.startswith('/auto_install:') for cmd in args) and not apps_to_process:
+            self.show_styled_message_box(QMessageBox.Icon.Information, "Hoàn tất", "\n".join(final_summary))
+            QApplication.quit()
+            return
+            
+        # Nếu không có tác vụ nào để chạy worker
         if not apps_to_process:
-            QMessageBox.warning(self, "Thông báo", "Không có phần mềm nào cần cài đặt hoặc cập nhật.")
+            msg = "\n".join(final_summary) if final_summary else "Không có tác vụ nào được chỉ định hoặc cần thực hiện."
+            self.show_styled_message_box(QMessageBox.Icon.Information, "Thông báo", msg)
             QApplication.quit()
             return
 
-        # Di chuyển các app vào khung lựa chọn (để người dùng thấy)
+        # Di chuyển các app vào khung lựa chọn (để người dùng thấy trực quan)
         for key, info in apps_to_process.items():
             self.move_app_to_selection(key, info)
 
+        # Bắt đầu cài đặt
         self.start_installation()
 
+        # Hàm xử lý sau khi worker hoàn thành
         def on_auto_install_finished():
-            if update_summary:
-                QMessageBox.information(self, "Hoàn tất cập nhật", f"Các phần mềm đã được cập nhật:\n" + "\n".join(update_summary))
-            else:
-                QMessageBox.information(self, "Hoàn tất", "Cảm ơn bạn đã sử dụng TekDT AIS!")
+            processed_apps = list(apps_to_process.keys())
+            success_count = 0
+            fail_count = 0
+            
+            # Kiểm tra trạng thái cuối cùng của từng app
+            final_status_text = ["\n--- KẾT QUẢ ---"]
+            for i in range(self.selected_list_widget.count()):
+                widget = self.selected_list_widget.itemWidget(self.selected_list_widget.item(i))
+                if widget.app_key in processed_apps:
+                    if widget.name_label.styleSheet().startswith("color: #4CAF50"): # Success color
+                        success_count += 1
+                        final_status_text.append(f"Thành công: {widget.app_info['display_name']}")
+                    else:
+                        fail_count += 1
+                        final_status_text.append(f"Thất bại: {widget.app_info['display_name']}")
+
+            final_summary.extend(final_status_text)
+            
+            icon = QMessageBox.Icon.Information if fail_count == 0 else QMessageBox.Icon.Warning
+            self.show_styled_message_box(icon, "Hoàn tất tác vụ dòng lệnh", "\n".join(final_summary))
             QApplication.quit()
 
         self.install_worker.signals.finished.connect(on_auto_install_finished)
-    
+
     def setup_ui(self):
         self.setWindowTitle(f"{APP_NAME} - v{APP_VERSION}")
         self.setGeometry(100, 100, 1200, 800)
@@ -885,7 +972,7 @@ class TekDT_AIS(QMainWindow):
             status_text = "Tải danh sách thành công. Sẵn sàng."
             if hasattr(self, 'status_label') and self.status_label: self.status_label.setText(status_text)
         except requests.RequestException as e:
-            QMessageBox.warning(self, "Lỗi mạng", f"Không thể tải danh sách phần mềm từ máy chủ: {e}\nChương trình sẽ chỉ hiển thị các phần mềm đã có thông tin cục bộ.")
+            self.show_styled_message_box(QMessageBox.Icon.Warning, "Lỗi mạng", f"Không thể tải danh sách phần mềm từ máy chủ: {e}\nChương trình sẽ chỉ hiển thị các phần mềm đã có thông tin cục bộ.")
             self.remote_apps = {"app_items": self.local_apps}
             if hasattr(self, 'status_label') and self.status_label:
                 self.status_label.setText("Lỗi mạng. Hiển thị các phần mềm đã biết.")
@@ -1027,11 +1114,12 @@ class TekDT_AIS(QMainWindow):
         self.save_config()
 
     def confirm_update(self, key, info, widget, local_ver, remote_ver):
-        reply = QMessageBox.question(
-            self, "Cập nhật phần mềm",
+        reply = self.show_styled_message_box(
+            QMessageBox.Icon.Question,
+            "Cập nhật phần mềm",
             f"Phiên bản mới hơn của {info['display_name']} ({remote_ver}) đã có. "
             f"Phiên bản hiện tại: {local_ver}.\nBạn có muốn cập nhật không?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            buttons=QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         )
         if reply == QMessageBox.StandardButton.Yes:
             self.download_single_app(key, info, widget)
@@ -1095,10 +1183,11 @@ class TekDT_AIS(QMainWindow):
                 break
 
     def download_single_app(self, key, info, item_widget=None):
-        reply = QMessageBox.question(
-            self, "Xác nhận tải xuống",
+        reply = self.show_styled_message_box(
+            QMessageBox.Icon.Question,
+            "Xác nhận tải xuống",
             f"Bạn có muốn tải {info['display_name']} (Phiên bản {info['version']}) không?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            buttons=QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         )
         if reply == QMessageBox.StandardButton.No:
             return
@@ -1107,7 +1196,7 @@ class TekDT_AIS(QMainWindow):
         self.install_worker = InstallWorker(apps_to_process, action="install")
         self.install_worker.signals.progress.connect(self.update_install_progress)
         self.install_worker.signals.finished.connect(self.on_single_download_finished)
-        self.install_worker.signals.error.connect(lambda e: QMessageBox.critical(self, "Lỗi Worker", str(e)))
+        self.install_worker.signals.error.connect(lambda e: self.show_styled_message_box(QMessageBox.Icon.Critical, "Lỗi Worker", str(e)))
         if item_widget:
             self.install_worker.signals.progress_percentage.connect(item_widget.update_download_progress)
         
@@ -1144,9 +1233,9 @@ class TekDT_AIS(QMainWindow):
 
     def start_installation(self):
         if self.install_worker and self.install_worker.isRunning():
-            reply = QMessageBox.question(self, "Dừng tác vụ",
-                                         "Bạn có chắc muốn dừng quá trình cài đặt không?",
-                                         QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+            reply = self.show_styled_message_box(QMessageBox.Icon.Question, "Dừng tác vụ",
+                                                 "Bạn có chắc muốn dừng quá trình cài đặt không?",
+                                                 buttons=QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
             if reply == QMessageBox.StandardButton.Yes:
                 self.install_worker.stop()
                 self.start_button.setText("ĐANG DỪNG...")
@@ -1159,7 +1248,7 @@ class TekDT_AIS(QMainWindow):
         apps_to_install = {key: self.remote_apps['app_items'][key] for key in self.selected_for_install if key in self.remote_apps.get('app_items', {})}
         
         if not apps_to_install:
-            QMessageBox.information(self, "Thông báo", "Vui lòng thêm ít nhất một phần mềm để cài đặt.")
+            self.show_styled_message_box(QMessageBox.Icon.Information, "Thông báo", "Vui lòng thêm ít nhất một phần mềm để cài đặt.")
             return
 
         # Vô hiệu hóa giao diện, ngoại trừ nút "Dừng"
@@ -1171,7 +1260,7 @@ class TekDT_AIS(QMainWindow):
         self.install_worker = InstallWorker(apps_to_install, action="install")
         self.install_worker.signals.progress.connect(self.update_install_progress)
         self.install_worker.signals.finished.connect(self.on_installation_finished)
-        self.install_worker.signals.error.connect(lambda e: QMessageBox.critical(self, "Lỗi Worker", str(e)))
+        self.install_worker.signals.error.connect(lambda e: self.show_styled_message_box(QMessageBox.Icon.Critical, "Lỗi Worker", str(e)))
         self.install_worker.start()
 
     def update_install_progress(self, app_key, status, message):
@@ -1265,7 +1354,8 @@ if __name__ == '__main__':
     
     embed_mode = '--embed' in flags
     app = QApplication(sys.argv)
-    
+    main_win = TekDT_AIS(embed_mode=embed_mode)
+
     if '/help' in cli_args:
         help_text = """Sử dụng TekDT AIS qua dòng lệnh:
   /help                     Hiển thị trợ giúp này.
@@ -1275,20 +1365,21 @@ if __name__ == '__main__':
   /update app1|app2         Cập nhật các phần mềm được chỉ định.
   /auto_install:true app1|app2  Đặt auto_install thành true cho các ứng dụng chỉ định.
   /auto_install:false app1|app2 Đặt auto_install thành false cho các ứng dụng chỉ định.
-Ghi chú: Tên phần mềm có khoảng trắng cần đặt trong dấu ngoặc kép, ví dụ: /update "app name".
+Ghi chú:
+- Tên phần mềm có khoảng trắng cần đặt trong dấu ngoặc kép, ví dụ: /update "app name".
+- Tên phần mềm (app key) là định danh duy nhất, không phải tên hiển thị.
 """
-        QMessageBox.information(None, "Trợ giúp dòng lệnh - TekDT AIS", help_text)
+        main_win.show_styled_message_box(QMessageBox.Icon.Information, "Trợ giúp dòng lệnh - TekDT AIS", help_text)
         sys.exit(0)
 
-    is_auto_install_cmd = any(cmd.startswith('/auto_install:') for cmd in cli_args)
-    if is_auto_install_cmd and not embed_mode:
-         main_win = TekDT_AIS()
-         main_win.hide()
-         main_win.handle_cli_args(cli_args)
-         sys.exit()
+    is_cli_command = any(arg.startswith('/') for arg in cli_args)
 
-    main_win = TekDT_AIS(embed_mode=embed_mode)
-    main_win.show()
-    if cli_args:
+    if is_cli_command:
+        # Ẩn cửa sổ chính và để handle_cli_args xử lý mọi thứ, bao gồm cả việc thoát
+        main_win.hide()
         main_win.handle_cli_args(cli_args)
-    sys.exit(app.exec())
+        # Không gọi sys.exit(app.exec()) ở đây nữa vì handle_cli_args sẽ tự thoát
+    else:
+        # Nếu không có lệnh CLI, hiển thị cửa sổ bình thường
+        main_win.show()
+        sys.exit(app.exec())
