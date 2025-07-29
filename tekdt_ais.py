@@ -101,10 +101,19 @@ class ToolManager(QObject):
         self.session.headers.update({'User-Agent': 'TekDT-AIS-App'})
 
     def run_checks(self):
+        # Kiểm tra xem công cụ đã có sẵn chưa
+        tools_present = ARIA2_EXEC.exists() and SEVENZ_EXEC.exists()
+        
+        if not tools_present:
+            try:
+                self.progress_update.emit("Kiểm tra kết nối internet...")
+                self.session.get("https://www.google.com", timeout=5)
+            except requests.ConnectionError:
+                self.finished.emit(False, "Không có internet và thiếu công cụ. Vui lòng kết nối mạng và khởi động lại.")
+                return
+        
+        # Tiếp tục kiểm tra cập nhật nếu có internet
         try:
-            self.progress_update.emit("Kiểm tra kết nối internet...")
-            self.session.get("https://www.google.com", timeout=5)
-
             self.progress_update.emit("Kiểm tra và cập nhật 7-Zip...")
             self._check_7zip()
 
@@ -112,12 +121,15 @@ class ToolManager(QObject):
             self._check_aria2()
             self.finished.emit(True, "Kiểm tra công cụ hoàn tất.")
         except requests.ConnectionError:
-            if not ARIA2_EXEC.exists() or not SEVENZ_EXEC.exists():
-                self.finished.emit(False, "Thiếu công cụ và không có internet. Vui lòng kết nối mạng và khởi động lại.")
-            else:
+            if tools_present:
                 self.finished.emit(True, "Không có internet, sử dụng công cụ có sẵn.")
+            else:
+                self.finished.emit(False, "Không có internet và thiếu công cụ. Vui lòng kết nối mạng và khởi động lại.")
         except Exception as e:
-            self.finished.emit(False, f"Lỗi không xác định khi kiểm tra công cụ: {e}")
+            if tools_present:
+                self.finished.emit(True, f"Lỗi khi kiểm tra công cụ: {e}. Sử dụng công cụ có sẵn.")
+            else:
+                self.finished.emit(False, f"Lỗi khi kiểm tra công cụ: {e}. Thiếu công cụ cần thiết.")
 
     def _check_7zip(self):
         tool_dir = SEVENZ_DIR
@@ -581,13 +593,16 @@ class TekDT_AIS(QMainWindow):
         if self.startup_label:
             self.startup_label.hide()
 
-        if success:
-            if hasattr(self, 'status_label') and self.status_label:
-                 self.status_label.setText(message)
-            self.load_config_and_apps()
-        else:
-            QMessageBox.critical(self, "Lỗi nghiêm trọng", message)
-            self.close()
+        if not success:
+            # Chỉ hiển thị cảnh báo, không thoát chương trình
+            QMessageBox.warning(self, "Cảnh báo", message)
+            # Thoát chương trình nếu không có công cụ
+            if not (ARIA2_EXEC.exists() and SEVENZ_EXEC.exists()):
+                QApplication.quit()
+                return
+        
+        # Tiếp tục tải cấu hình và ứng dụng
+        self.load_config_and_apps()
 
     def setup_embed_ui(self):
         self.setWindowTitle(f"{APP_NAME} - Embed Mode")
@@ -685,15 +700,23 @@ class TekDT_AIS(QMainWindow):
         main_layout.addWidget(bottom_panel)
 
     def set_ui_interactive(self, enabled):
-        """Enable or disable all interactive UI elements."""
+        """Enable or disable all interactive UI elements except the stop button when disabled."""
         self.search_box.setEnabled(enabled)
         self.available_list_widget.setEnabled(enabled)
         
-        # Disable/Enable remove buttons in the selected list
+        # Cập nhật các mục trong danh sách đã chọn
         for i in range(self.selected_list_widget.count()):
             item = self.selected_list_widget.item(i)
             widget = self.selected_list_widget.itemWidget(item)
             if hasattr(widget, 'action_button'):
+                if not enabled:
+                    # Ẩn nút "Bỏ" và hiển thị trạng thái "processing" khi bắt đầu cài đặt
+                    widget.action_button.hide()  # Ẩn nút "Bỏ"
+                    widget.set_status("processing")  # Hiển thị icon "đang xử lý"
+                else:
+                    # Hiển thị lại nút "Bỏ" và ẩn trạng thái khi kết thúc
+                    widget.action_button.show()
+                    widget.set_status("")  # Trạng thái rỗng để ẩn icon
                 widget.action_button.setEnabled(enabled)
     
     def load_config_and_apps(self):
@@ -995,6 +1018,9 @@ class TekDT_AIS(QMainWindow):
                 self.install_worker.stop()
                 self.start_button.setText("ĐANG DỪNG...")
                 self.start_button.setDisabled(True)
+                # Chờ worker dừng và đặt lại giao diện
+                self.install_worker.wait()
+                self.reset_ui_after_completion()  # Đặt lại giao diện khi dừng
             return
 
         apps_to_install = {key: self.remote_apps['app_items'][key] for key in self.selected_for_install if key in self.remote_apps.get('app_items', {})}
@@ -1003,11 +1029,11 @@ class TekDT_AIS(QMainWindow):
             QMessageBox.information(self, "Thông báo", "Vui lòng thêm ít nhất một phần mềm để cài đặt.")
             return
 
-        self.set_ui_interactive(False) # Disable UI
+        # Vô hiệu hóa giao diện, ngoại trừ nút "Dừng"
+        self.set_ui_interactive(False)
         self.start_button.setText("DỪNG")
-        self.start_button.setDisabled(False) # Keep stop button enabled
+        self.start_button.setEnabled(True)  # Đảm bảo nút "Dừng" luôn bật
         self.start_button.setStyleSheet("background-color: #e74c3c; color: white; border: none; padding: 8px 16px; border-radius: 4px; font-weight: bold;")
-
 
         self.install_worker = InstallWorker(apps_to_install, action="install")
         self.install_worker.signals.progress.connect(self.update_install_progress)
@@ -1046,10 +1072,11 @@ class TekDT_AIS(QMainWindow):
         if not self.embed_mode:
             self.status_label.setText(status_text)
             self.start_button.setText("Xong")
-            self.start_button.setDisabled(False)
-            self.start_button.setStyleSheet("background-color: #4CAF50; color: white; border: none; padding: 8px 16px; border-radius: 4px; font-weight: bold;") # Green button
+            self.start_button.setEnabled(True)  # Đảm bảo nút "Xong" hoạt động
+            self.start_button
+            self.start_button.setStyleSheet("background-color: #4CAF50; color: white; border: none; padding: 8px 16px; border-radius: 4px; font-weight: bold;")
             
-            # Disconnect old signals and connect the reset function
+            # Ngắt kết nối tín hiệu cũ và kết nối với reset_ui_after_completion
             self.start_button.clicked.disconnect()
             self.start_button.clicked.connect(self.reset_ui_after_completion)
         
