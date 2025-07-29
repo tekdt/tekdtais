@@ -15,7 +15,7 @@ import re
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
                              QListWidget, QListWidgetItem, QLabel, QPushButton, QLineEdit,
                              QFrame, QScrollArea, QGraphicsOpacityEffect, QToolTip,
-                             QMessageBox, QSizePolicy)
+                             QMessageBox, QSizePolicy, QTextEdit)
 from PyQt6.QtGui import QIcon, QPixmap, QColor, QPalette, QFont, QMovie
 from PyQt6.QtCore import (Qt, QSize, QThread, pyqtSignal, QObject, QPropertyAnimation,
                           QEasingCurve, QTimer)
@@ -87,6 +87,22 @@ def initialize_directories_and_tools():
 
 # Chạy hàm khởi tạo ngay lập tức
 initialize_directories_and_tools()
+
+class CliProgressWindow(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Tiến trình cài đặt - TekDT AIS")
+        self.setGeometry(150, 150, 700, 400)
+        layout = QVBoxLayout(self)
+        self.log_output = QTextEdit()
+        self.log_output.setReadOnly(True)
+        self.log_output.setStyleSheet("background-color: #2b2b2b; color: #f0f0f0; font-family: Consolas, monospace;")
+        layout.addWidget(self.log_output)
+        
+    def append_message(self, message):
+        self.log_output.append(message)
+        # Tự động cuộn xuống dưới
+        self.log_output.verticalScrollBar().setValue(self.log_output.verticalScrollBar().maximum())
 
 
 # --- NEW: Lớp quản lý và cập nhật công cụ ---
@@ -606,8 +622,7 @@ class TekDT_AIS(QMainWindow):
 
     def setup_embed_ui(self):
         self.setWindowTitle(f"{APP_NAME}")
-        # Kích thước mặc định, có thể được ghi đè bởi chương trình cha
-        self.setGeometry(100, 100, 500, 700)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         # Thiết lập để cửa sổ có thể được nhúng
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint)
         self.setStyleSheet("""
@@ -1130,6 +1145,15 @@ def handle_cli(args):
         print_cli_help()
         return
 
+    # Phải có một instance QApplication để tạo widget
+    # Dùng a`pp = QApplication.instance()` để tránh tạo nhiều instance nếu đã có
+    app = QApplication.instance() 
+    if not app:
+        app = QApplication(sys.argv)
+    
+    progress_window = CliProgressWindow()
+    progress_window.show()
+
     # Initialize tools without GUI
     initialize_directories_and_tools()
     tool_manager = ToolManager()
@@ -1214,11 +1238,13 @@ def handle_cli(args):
     # Custom progress handler for CLI
     def cli_progress_handler(app_key, status, message):
         app_name = apps_to_process.get(app_key, {}).get('display_name', app_key)
-        print(f"{app_name}: {message}")
+        log_message = f"[{status.upper()}] {app_name}: {message}"
+        progress_window.append_message(log_message)
 
     worker = InstallWorker(apps_to_process, action="install")
     worker.signals.progress.connect(cli_progress_handler)
-    worker.signals.error.connect(lambda e: print(f"Lỗi nghiêm trọng: {e}"))
+    worker.signals.error.connect(lambda e: progress_window.append_message(f"LỖI NGHIÊM TRỌNG: {e}"))
+    worker.signals.finished.connect(lambda: progress_window.append_message("\n==> HOÀN TẤT! <=="))
     
     worker.start()
     worker.wait() # Block until the thread is finished
@@ -1241,16 +1267,23 @@ if __name__ == '__main__':
     flags = [arg for arg in sys.argv[1:] if arg.startswith('--')]
     
     embed_mode = '--embed' in flags
+    app = QApplication(sys.argv)
     
     if '/help' in cli_args:
-        print_cli_help()
-        sys.exit(0)
+        # Thay vì gọi hàm print, hãy hiển thị MessageBox
+        help_text = """Sử dụng TekDT AIS qua dòng lệnh:
+  /help                     Hiển thị trợ giúp này.
+  /install                  Cài đặt tất cả các phần mềm được đánh dấu 'auto_install'.
+  /install app1|app2        Cài đặt các phần mềm được chỉ định.
+  /update                   Kiểm tra và cập nhật tất cả phần mềm đã cài.
+        """
+        QMessageBox.information(None, "Trợ giúp dòng lệnh - TekDT AIS", help_text)
+        sys.exit(0) # Thoát sau khi hiển thị trợ giúp
 
     if cli_args and not embed_mode:
         handle_cli(cli_args)
         sys.exit(0)
     else:
-        app = QApplication(sys.argv)
         app.setStyleSheet("""
             QMessageBox { background-color: #2c3e50; }
             QMessageBox QLabel { color: #ecf0f1; font-size: 10pt; }
