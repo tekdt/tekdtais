@@ -652,6 +652,115 @@ class TekDT_AIS(QMainWindow):
         main_layout.addWidget(self.search_box)
         main_layout.addWidget(self.available_list_widget)
 
+    def handle_cli_args(self, args):
+        if not args:
+            return
+
+        self.load_config_and_apps()
+
+        auto_install_cmds = [arg for arg in args if arg.startswith('/auto_install:')]
+        other_cmds = [arg for arg in args if not arg.startswith('/auto_install:')]
+
+        if auto_install_cmds:
+            for cmd in auto_install_cmds:
+                parts = shlex.split(cmd)  # Sử dụng shlex để xử lý khoảng trắng
+                if len(parts) < 2 or not parts[0].startswith('/auto_install:'):
+                    QMessageBox.warning(self, "Lỗi", f"Tham số '{cmd}' không hợp lệ hoặc thiếu tên ứng dụng.")
+                    QApplication.quit()
+                    continue
+                value_part = parts[0].replace('/auto_install:', '').lower()
+                if value_part not in ['true', 'false']:
+                    QMessageBox.warning(self, "Lỗi", f"Giá trị cho /auto_install phải là 'true' hoặc 'false', nhận được '{value_part}'.")
+                    QApplication.quit()
+                    continue
+                app_keys = parts[1].split('|')  # Lấy danh sách ứng dụng
+                updated_apps = []
+                for key in app_keys:
+                    if key in self.remote_apps.get('app_items', {}):
+                        self.config['app_items'].setdefault(key, {})['auto_install'] = (value_part == 'true')
+                        updated_apps.append(key)
+                    else:
+                        print(f"Cảnh báo: Không tìm thấy ứng dụng '{key}'.")
+                if updated_apps:
+                    self.save_config()
+                    QMessageBox.information(self, "Cập nhật auto_install",
+                                            f"Đã đặt auto_install thành {value_part} cho: {', '.join(updated_apps)}.")
+                    QApplication.quit()
+            if not other_cmds:
+                QApplication.quit()
+                return
+
+        # Xử lý /install và /update
+        apps_to_install = {}
+        apps_to_update = {}
+        update_summary = []
+
+        for cmd in other_cmds:
+            cmd_parts = cmd.split(' ', 1)
+            cmd_name = cmd_parts[0]
+
+            if cmd_name == '/install':
+                if len(cmd_parts) > 1:  # Có danh sách ứng dụng
+                    app_keys = cmd_parts[1].split('|')
+                    for key in app_keys:
+                        if key in self.remote_apps.get('app_items', {}):
+                            apps_to_install[key] = self.remote_apps['app_items'][key]
+                            self.move_app_to_selection(key, self.remote_apps['app_items'][key])
+                        else:
+                            print(f"Cảnh báo: Ứng dụng '{key}' không tồn tại trong danh sách từ xa.")
+                else:  # Không có danh sách, chọn các ứng dụng auto_install
+                    for key, info in self.config.get('app_items', {}).items():
+                        if info.get('auto_install', False) and key in self.remote_apps.get('app_items', {}):
+                            apps_to_install[key] = self.remote_apps['app_items'][key]
+                            self.move_app_to_selection(key, self.remote_apps['app_items'][key])
+                    if not apps_to_install:
+                        QMessageBox.warning(self, "Thông báo", "Không có ứng dụng nào được đánh dấu 'auto_install' để cài đặt.")
+
+            elif cmd_name == '/update':
+                if len(cmd_parts) > 1:  # Có danh sách ứng dụng
+                    app_keys = cmd_parts[1].split('|')
+                    for key in app_keys:
+                        if key in self.remote_apps.get('app_items', {}) and key in self.config.get('app_items', {}):
+                            local_ver = self.config['app_items'][key].get('version', '0')
+                            remote_ver = self.remote_apps['app_items'][key].get('version', '0')
+                            if remote_ver > local_ver:
+                                apps_to_update[key] = self.remote_apps['app_items'][key]
+                                self.move_app_to_selection(key, self.remote_apps['app_items'][key])
+                                update_summary.append(f"{key}: {local_ver} -> {remote_ver}")
+                            else:
+                                print(f"Ứng dụng '{key}' đã ở phiên bản mới nhất ({local_ver}).")
+                        else:
+                            print(f"Cảnh báo: Ứng dụng '{key}' không tồn tại hoặc chưa được cài đặt.")
+                else:  # Cập nhật tất cả
+                    for key, local_info in self.config.get('app_items', {}).items():
+                        if key in self.remote_apps.get('app_items', {}):
+                            remote_ver = self.remote_apps['app_items'][key].get('version', '0')
+                            local_ver = local_info.get('version', '0')
+                            if remote_ver > local_ver:
+                                apps_to_update[key] = self.remote_apps['app_items'][key]
+                                self.move_app_to_selection(key, self.remote_apps['app_items'][key])
+                                update_summary.append(f"{key}: {local_ver} -> {remote_ver}")
+
+        apps_to_process = {**apps_to_install, **apps_to_update}
+        if not apps_to_process:
+            QMessageBox.warning(self, "Thông báo", "Không có phần mềm nào cần cài đặt hoặc cập nhật.")
+            QApplication.quit()
+            return
+
+        # Tự động bắt đầu cài đặt
+        self.start_installation()
+
+        # Kết nối tín hiệu finished để thoát và hiển thị thông báo
+        def on_auto_install_finished():
+            if update_summary:
+                QMessageBox.information(self, "Hoàn tất cập nhật",
+                                        f"Các phần mềm đã được cập nhật:\n" + "\n".join(update_summary))
+            else:
+                QMessageBox.information(self, "Hoàn tất", "Cài đặt hoàn tất. Cảm ơn bạn đã sử dụng TekDT AIS!")
+            QApplication.quit()
+
+        self.install_worker.signals.finished.connect(on_auto_install_finished)
+    
     def setup_ui(self):
         self.setWindowTitle(f"{APP_NAME} - v{APP_VERSION}")
         self.setGeometry(100, 100, 1200, 800)
@@ -1139,150 +1248,152 @@ class TekDT_AIS(QMainWindow):
         self.save_config()
         super().closeEvent(event)
         
-# --- LOGIC DÒNG LỆNH (CLI) ---
-def handle_cli(args):
-    print(f"{APP_NAME} - CLI Mode")
-    if not args:
-        print_cli_help()
-        return
+# # --- LOGIC DÒNG LỆNH (CLI) ---
+# def handle_cli(args):
+    # print(f"{APP_NAME} - CLI Mode")
+    # if not args:
+        # print_cli_help()
+        # return
 
-    # Phải có một instance QApplication để tạo widget
-    app = QApplication.instance()
-    if not app:
-        app = QApplication(sys.argv)
+    # # Phải có một instance QApplication để tạo widget
+    # app = QApplication.instance()
+    # if not app:
+        # app = QApplication(sys.argv)
 
-    progress_window = CliProgressWindow()
-    progress_window.show()
+    # progress_window = CliProgressWindow()
+    # progress_window.show()
 
-    # Khởi tạo thư mục và công cụ
-    initialize_directories_and_tools()
-    tool_manager = ToolManager()
-    try:
-        print("Kiểm tra và cập nhật công cụ...")
-        tool_manager._check_7zip()
-        tool_manager._check_aria2()
-        print("Kiểm tra công cụ hoàn tất.")
-    except Exception as e:
-        print(f"Lỗi khi khởi tạo công cụ: {e}")
-        return
+    # # Khởi tạo thư mục và công cụ
+    # initialize_directories_and_tools()
+    # tool_manager = ToolManager()
+    # try:
+        # print("Kiểm tra và cập nhật công cụ...")
+        # tool_manager._check_7zip()
+        # tool_manager._check_aria2()
+        # print("Kiểm tra công cụ hoàn tất.")
+    # except Exception as e:
+        # print(f"Lỗi khi khởi tạo công cụ: {e}")
+        # return
 
-    # Tải cấu hình cục bộ
-    config = {}
-    if CONFIG_FILE.exists():
-        with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
-            config = json.load(f)
-    config.setdefault('app_items', {})  # Đảm bảo khóa 'app_items' tồn tại
+    # # Tải cấu hình cục bộ
+    # config = {}
+    # if CONFIG_FILE.exists():
+        # with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+            # config = json.load(f)
+    # config.setdefault('app_items', {})  # Đảm bảo khóa 'app_items' tồn tại
 
-    # Tải danh sách ứng dụng từ máy chủ
-    session = requests.Session()
-    session.headers.update({'User-Agent': 'TekDT-AIS-App'})
-    remote_apps = {}
-    try:
-        print("Đang tải danh sách phần mềm từ máy chủ...")
-        response = session.get(REMOTE_APP_LIST_URL, timeout=10)
-        response.raise_for_status()
-        remote_apps = response.json().get('app_items', {})
-        print("Tải danh sách thành công.")
-    except requests.RequestException as e:
-        print(f"Không thể tải danh sách phần mềm từ máy chủ: {e}")
-        return
+    # # Tải danh sách ứng dụng từ máy chủ
+    # session = requests.Session()
+    # session.headers.update({'User-Agent': 'TekDT-AIS-App'})
+    # remote_apps = {}
+    # try:
+        # print("Đang tải danh sách phần mềm từ máy chủ...")
+        # response = session.get(REMOTE_APP_LIST_URL, timeout=10)
+        # response.raise_for_status()
+        # remote_apps = response.json().get('app_items', {})
+        # print("Tải danh sách thành công.")
+    # except requests.RequestException as e:
+        # print(f"Không thể tải danh sách phần mềm từ máy chủ: {e}")
+        # return
 
-    # Phân tích các tham số
-    commands = []
-    auto_install_cmds = []
-    for arg in args:
-        if arg.startswith('/auto_install:'):
-            auto_install_cmds.append(arg)
-        elif arg in ['/install', '/update'] or ' ' in arg:
-            commands.append(arg)
+    # # Phân tích các tham số
+    # commands = []
+    # auto_install_cmds = []
+    # for arg in args:
+        # if arg.startswith('/auto_install:'):
+            # auto_install_cmds.append(arg)
+        # elif arg in ['/install', '/update'] or ' ' in arg:
+            # commands.append(arg)
 
-    # Xử lý /auto_install trước
-    for cmd in auto_install_cmds:
-        parts = cmd.split(' ', 1)
-        if len(parts) < 2:
-            print(f"Lỗi: Tham số {cmd} thiếu giá trị hoặc ứng dụng.")
-            continue
-        value_and_apps = parts[0].replace('/auto_install:', '').lower()
-        if value_and_apps not in ['true', 'false']:
-            print(f"Lỗi: Giá trị cho /auto_install phải là 'true' hoặc 'false', nhận được '{value_and_apps}'.")
-            continue
-        if len(parts) < 2 or not parts[1]:
-            print(f"Lỗi: Tham số {cmd} thiếu tên ứng dụng.")
-            continue
-        app_keys = parts[1].split('|')
-        for key in app_keys:
-            if key in remote_apps:
-                config['app_items'].setdefault(key, {})['auto_install'] = (value_and_apps == 'true')
-                print(f"Đã đặt auto_install cho {key} thành {value_and_apps}.")
-            else:
-                print(f"Cảnh báo: Không tìm thấy ứng dụng '{key}'.")
+    # # Xử lý /auto_install trước
+    # for cmd in auto_install_cmds:
+        # parts = cmd.split(' ', 1)
+        # if len(parts) < 2:
+            # print(f"Lỗi: Tham số {cmd} thiếu giá trị hoặc ứng dụng.")
+            # continue
+        # value_and_apps = parts[0].replace('/auto_install:', '').lower()
+        # if value_and_apps not in ['true', 'false']:
+            # print(f"Lỗi: Giá trị cho /auto_install phải là 'true' hoặc 'false', nhận được '{value_and_apps}'.")
+            # continue
+        # if len(parts) < 2 or not parts[1]:
+            # print(f"Lỗi: Tham số {cmd} thiếu tên ứng dụng.")
+            # continue
+        # app_keys = parts[1].split('|')
+        # for key in app_keys:
+            # if key in remote_apps:
+                # config['app_items'].setdefault(key, {})['auto_install'] = (value_and_apps == 'true')
+                # print(f"Đã đặt auto_install cho {key} thành {value_and_apps}.")
+            # else:
+                # print(f"Cảnh báo: Không tìm thấy ứng dụng '{key}'.")
 
-    # Lưu config sau khi xử lý /auto_install
-    with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
-        json.dump(config, f, indent=2, ensure_ascii=False)
+    # # Lưu config sau khi xử lý /auto_install
+    # with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
+        # json.dump(config, f, indent=2, ensure_ascii=False)
 
-    # Xử lý /install và /update
-    for command in commands:
-        print(f"\nĐang xử lý lệnh: {command}")
-        apps_to_process = {}
-        cmd_parts = command.split(' ', 1)
-        cmd_name = cmd_parts[0]
+    # # Xử lý /install và /update
+    # for command in commands:
+        # print(f"\nĐang xử lý lệnh: {command}")
+        # apps_to_process = {}
+        # cmd_parts = command.split(' ', 1)
+        # cmd_name = cmd_parts[0]
 
-        if cmd_name == '/install':
-            if len(cmd_parts) > 1:  # Có danh sách ứng dụng cụ thể
-                app_keys = cmd_parts[1].split('|')
-                for key in app_keys:
-                    if key in remote_apps:
-                        apps_to_process[key] = remote_apps[key]
-                    else:
-                        print(f"Cảnh báo: Không tìm thấy ứng dụng '{key}' trong danh sách.")
-            else:  # Không có danh sách, cài các ứng dụng auto_install
-                for key, app_info in remote_apps.items():
-                    if config.get('app_items', {}).get(key, {}).get('auto_install', False):
-                        apps_to_process[key] = app_info
+        # if cmd_name == '/install':
+            # if len(cmd_parts) > 1:  # Có danh sách ứng dụng cụ thể
+                # app_keys = cmd_parts[1].split('|')
+                # for key in app_keys:
+                    # if key in remote_apps:
+                        # apps_to_process[key] = remote_apps[key]
+                    # else:
+                        # print(f"Cảnh báo: Không tìm thấy ứng dụng '{key}' trong danh sách.")
+            # else:  # Không có danh sách, cài các ứng dụng auto_install
+                # for key, app_info in remote_apps.items():
+                    # if config.get('app_items', {}).get(key, {}).get('auto_install', False):
+                        # apps_to_process[key] = app_info
 
-        elif cmd_name == '/update':
-            if len(cmd_parts) > 1:  # Có danh sách ứng dụng cụ thể
-                app_keys = cmd_parts[1].split('|')
-                for key in app_keys:
-                    if key in remote_apps and key in config.get('app_items', {}):
-                        local_ver = config['app_items'][key].get('version', '0')
-                        remote_ver = remote_apps[key].get('version', '0')
-                        if remote_ver > local_ver:
-                            apps_to_process[key] = remote_apps[key]
-                    else:
-                        print(f"Cảnh báo: Không tìm thấy ứng dụng '{key}' hoặc không cần cập nhật.")
-            else:  # Không có danh sách, cập nhật tất cả ứng dụng đã cài
-                for key, local_info in config.get('app_items', {}).items():
-                    if key in remote_apps:
-                        remote_ver = remote_apps[key].get('version', '0')
-                        local_ver = local_info.get('version', '0')
-                        if remote_ver > local_ver:
-                            apps_to_process[key] = remote_apps[key]
+        # elif cmd_name == '/update':
+            # if len(cmd_parts) > 1:  # Có danh sách ứng dụng cụ thể
+                # app_keys = cmd_parts[1].split('|')
+                # for key in app_keys:
+                    # if key in remote_apps and key in config.get('app_items', {}):
+                        # local_ver = config['app_items'][key].get('version', '0')
+                        # remote_ver = remote_apps[key].get('version', '0')
+                        # if remote_ver > local_ver:
+                            # apps_to_process[key] = remote_apps[key]
+                        # else:
+                            # print(f"Phiên bản mới nhất của {key} đã được cài đặt.")
+                    # else:
+                        # print(f"Cảnh báo: Không tìm thấy ứng dụng '{key}' hoặc chưa được cài đặt.")
+            # else:  # Không có danh sách, cập nhật tất cả ứng dụng đã cài
+                # for key, local_info in config.get('app_items', {}).items():
+                    # if key in remote_apps:
+                        # remote_ver = remote_apps[key].get('version', '0')
+                        # local_ver = local_info.get('version', '0')
+                        # if remote_ver > local_ver:
+                            # apps_to_process[key] = remote_apps[key]
 
-        if not apps_to_process:
-            print("Không có phần mềm nào cần xử lý cho lệnh này.")
-            continue
+        # if not apps_to_process:
+            # print("Không có phần mềm nào cần xử lý cho lệnh này.")
+            # continue
 
-        print("\nCác phần mềm sau sẽ được xử lý:")
-        for key, info in apps_to_process.items():
-            print(f"- {info.get('display_name', key)}")
+        # print("\nCác phần mềm sau sẽ được xử lý:")
+        # for key, info in apps_to_process.items():
+            # print(f"- {info.get('display_name', key)}")
 
-        # Xử lý tiến trình cài đặt/cập nhật
-        def cli_progress_handler(app_key, status, message):
-            app_name = apps_to_process.get(app_key, {}).get('display_name', app_key)
-            log_message = f"[{status.upper()}] {app_name}: {message}"
-            progress_window.append_message(log_message)
+        # # Xử lý tiến trình cài đặt/cập nhật
+        # def cli_progress_handler(app_key, status, message):
+            # app_name = apps_to_process.get(app_key, {}).get('display_name', app_key)
+            # log_message = f"[{status.upper()}] {app_name}: {message}"
+            # progress_window.append_message(log_message)
 
-        worker = InstallWorker(apps_to_process, action="install")
-        worker.signals.progress.connect(cli_progress_handler)
-        worker.signals.error.connect(lambda e: progress_window.append_message(f"LỖI NGHIÊM TRỌNG: {e}"))
-        worker.signals.finished.connect(lambda: progress_window.append_message("\n==> HOÀN TẤT! <=="))
+        # worker = InstallWorker(apps_to_process, action="install")
+        # worker.signals.progress.connect(cli_progress_handler)
+        # worker.signals.error.connect(lambda e: progress_window.append_message(f"LỖI NGHIÊM TRỌNG: {e}"))
+        # worker.signals.finished.connect(lambda: progress_window.append_message("\n==> HOÀN TẤT! <=="))
 
-        worker.start()
-        worker.wait()  # Chặn cho đến khi luồng hoàn tất
+        # worker.start()
+        # worker.wait()  # Chặn cho đến khi luồng hoàn tất
 
-    print("\nCài đặt hoàn tất. Cảm ơn bạn đã sử dụng TekDT AIS!")
+    # print("\nCài đặt hoàn tất. Cảm ơn bạn đã sử dụng TekDT AIS!")
 
 def print_cli_help():
     print("\nSử dụng TekDT AIS qua dòng lệnh:")
@@ -1293,28 +1404,35 @@ def print_cli_help():
     print("\n  Có thể kết hợp các lệnh, ví dụ: /install /update\n")
 
 if __name__ == '__main__':
-    ## EMBED MODE ## - Xử lý tham số dòng lệnh
-    # Tách các tham số CLI (/command) và các cờ (--flag)
-    cli_args = [arg for arg in sys.argv[1:] if arg.startswith('/')]
-    flags = [arg for arg in sys.argv[1:] if arg.startswith('--')]
+    # Phân tích tham số bằng shlex để hỗ trợ khoảng trắng mà không cần dấu ngoặc kép nếu không bắt buộc
+    raw_args = ' '.join(sys.argv[1:])
+    parsed_args = shlex.split(raw_args)
+    cli_args = [arg for arg in parsed_args if arg.startswith('/')]
+    flags = [arg for arg in parsed_args if arg.startswith('--')]
     
     embed_mode = '--embed' in flags
     app = QApplication(sys.argv)
     
     if '/help' in cli_args:
-        # Thay vì gọi hàm print, hãy hiển thị MessageBox
         help_text = """Sử dụng TekDT AIS qua dòng lệnh:
   /help                     Hiển thị trợ giúp này.
-  /install                  Cài đặt tất cả các phần mềm được đánh dấu 'auto_install'.
-  /install app1|app2        Cài đặt các phần mềm được chỉ định.
-  /update                   Kiểm tra và cập nhật tất cả phần mềm đã cài.
-        """
+  /install                  Tự động cài đặt các phần mềm có auto_install: true.
+  /install app1|app2        Tự động cài đặt các phần mềm được chỉ định.
+  /update                   Cập nhật tất cả phần mềm đã cài có phiên bản mới.
+  /update app1|app2         Cập nhật các phần mềm được chỉ định.
+  /auto_install:true app1|app2  Đặt auto_install thành true cho các ứng dụng chỉ định.
+  /auto_install:false app1|app2 Đặt auto_install thành false cho các ứng dụng chỉ định.
+Ghi chú: Tên phần mềm có khoảng trắng cần đặt trong dấu ngoặc kép, ví dụ: /update "app name".
+"""
         QMessageBox.information(None, "Trợ giúp dòng lệnh - TekDT AIS", help_text)
-        sys.exit(0) # Thoát sau khi hiển thị trợ giúp
+        sys.exit(0)
 
     if cli_args and not embed_mode:
-        handle_cli(cli_args)
-        sys.exit(0)
+        # Chuyển sang xử lý GUI với hành động tự động thay vì CLI cũ
+        main_win = TekDT_AIS(embed_mode=embed_mode)
+        main_win.show()
+        main_win.handle_cli_args(cli_args)  # Gọi hàm mới để xử lý tham số
+        sys.exit(app.exec())
     else:
         app.setStyleSheet("""
             QMessageBox { background-color: #2c3e50; }
@@ -1335,4 +1453,6 @@ if __name__ == '__main__':
 
         main_win = TekDT_AIS(embed_mode=embed_mode)
         main_win.show()
+        if cli_args:
+            main_win.handle_cli_args(cli_args)
         sys.exit(app.exec())
