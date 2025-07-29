@@ -832,25 +832,25 @@ class TekDT_AIS(QMainWindow):
         main_layout.addLayout(panels_layout)
         main_layout.addWidget(bottom_panel)
 
-        def set_ui_interactive(self, enabled):
-            """Enable or disable all interactive UI elements except the stop button when disabled."""
-            self.search_box.setEnabled(enabled)
-            self.available_list_widget.setEnabled(enabled)
-            
-            # Cập nhật các mục trong danh sách đã chọn
-            for i in range(self.selected_list_widget.count()):
-                item = self.selected_list_widget.item(i)
-                widget = self.selected_list_widget.itemWidget(item)
-                if hasattr(widget, 'action_button'):
-                    if not enabled:
-                        # Ẩn nút "Bỏ" và hiển thị trạng thái "processing" khi bắt đầu cài đặt
-                        widget.action_button.hide()  # Ẩn nút "Bỏ"
-                        widget.set_status("processing")  # Hiển thị icon "đang xử lý"
-                    else:
-                        # Hiển thị lại nút "Bỏ" và ẩn trạng thái khi kết thúc
-                        widget.action_button.show()
-                        widget.set_status("")  # Trạng thái rỗng để ẩn icon
-                    widget.action_button.setEnabled(enabled)
+    def set_ui_interactive(self, enabled):
+        """Enable or disable all interactive UI elements except the stop button when disabled."""
+        self.search_box.setEnabled(enabled)
+        self.available_list_widget.setEnabled(enabled)
+        
+        # Cập nhật các mục trong danh sách đã chọn
+        for i in range(self.selected_list_widget.count()):
+            item = self.selected_list_widget.item(i)
+            widget = self.selected_list_widget.itemWidget(item)
+            if hasattr(widget, 'action_button'):
+                if not enabled:
+                    # Ẩn nút "Bỏ" và hiển thị trạng thái "processing" khi bắt đầu cài đặt
+                    widget.action_button.hide()  # Ẩn nút "Bỏ"
+                    widget.set_status("processing")  # Hiển thị icon "đang xử lý"
+                else:
+                    # Hiển thị lại nút "Bỏ" và ẩn trạng thái khi kết thúc
+                    widget.action_button.show()
+                    widget.set_status("")  # Trạng thái rỗng để ẩn icon
+                widget.action_button.setEnabled(enabled)
     
     def load_config_and_apps(self):
         # Load local config
