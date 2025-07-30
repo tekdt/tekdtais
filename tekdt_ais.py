@@ -12,6 +12,7 @@ from pathlib import Path
 import platform
 import re
 import shlex
+from packaging.version import parse as parse_version
 
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
                              QListWidget, QListWidgetItem, QLabel, QPushButton, QLineEdit,
@@ -772,7 +773,7 @@ class TekDT_AIS(QMainWindow):
                     if local_info and remote_info:
                         local_ver = local_info.get('version', '0')
                         remote_ver = remote_info.get('version', '0')
-                        if remote_ver > local_ver:
+                        if parse_version(remote_ver) > parse_version(local_ver):
                             apps_for_update[key] = remote_info
                             update_summary.append(f"-> Sẽ cập nhật {display_name}: {local_ver} -> {remote_ver}")
                         else:
@@ -1121,7 +1122,7 @@ class TekDT_AIS(QMainWindow):
                 local_ver = self.local_apps.get(key, {}).get('version', '0')
                 remote_ver = info.get('version', '0')
                 
-                if remote_ver > local_ver:
+                if parse_version(remote_ver) > parse_version(local_ver):
                     item_widget.name_label.setStyleSheet("color: #2ecc71; font-weight: bold;")
                     item_widget.setToolTip(f"Có bản cập nhật: {remote_ver}. Phiên bản hiện tại: {local_ver}")
                     item_widget.action_button.setText("Cập nhật")
@@ -1371,6 +1372,7 @@ class TekDT_AIS(QMainWindow):
         self.save_config()
         super().closeEvent(event)
 
+# KHỐI MỚI ĐỂ THAY THẾ
 if __name__ == '__main__':
     # Phân tích tham số bằng shlex để hỗ trợ khoảng trắng
     raw_args = ' '.join(sys.argv[1:])
@@ -1396,30 +1398,28 @@ if __name__ == '__main__':
     app = QApplication(sys.argv)
     main_win = TekDT_AIS(embed_mode=embed_mode, embed_size=embed_size)
 
+    # Xử lý /help riêng biệt vì nó không cần giao diện
     if '/help' in cli_args:
         help_text = """Sử dụng TekDT AIS qua dòng lệnh:
-  /help                     Hiển thị trợ giúp này.
+  /help                       Hiển thị trợ giúp này.
   /install                  Tự động cài đặt các phần mềm có auto_install: true.
   /install app1|app2        Tự động cài đặt các phần mềm được chỉ định.
   /update                   Cập nhật tất cả phần mềm đã cài có phiên bản mới.
   /update app1|app2         Cập nhật các phần mềm được chỉ định.
-  /auto_install:true app1|app2  Đặt auto_install thành true cho các ứng dụng chỉ định.
-  /auto_install:false app1|app2 Đặt auto_install thành false cho các ứng dụng chỉ định.
-Ghi chú:
-- Tên phần mềm có khoảng trắng cần đặt trong dấu ngoặc kép, ví dụ: /update "app name".
-- Tên phần mềm (app key) là định danh duy nhất, không phải tên hiển thị.
-"""
+  /auto_install:true app1   Đặt auto_install thành true cho các ứng dụng chỉ định.
+  /auto_install:false app1  Đặt auto_install thành false cho các ứng dụng chỉ định.
+Ghi chú: Tên phần mềm (app key) là định danh duy nhất, không phải tên hiển thị."""
         main_win.show_styled_message_box(QMessageBox.Icon.Information, "Trợ giúp dòng lệnh - TekDT AIS", help_text)
         sys.exit(0)
 
     is_cli_command = any(arg.startswith('/') for arg in cli_args)
 
     if is_cli_command:
-        # Ẩn cửa sổ chính và để handle_cli_args xử lý mọi thứ, bao gồm cả việc thoát
-        main_win.hide()
+        # Ở chế độ CLI, không ẩn cửa sổ nữa, handle_cli_args sẽ quyết định
+        # và lên lịch cho tác vụ. Worker sẽ gọi QApplication.quit() khi xong.
         main_win.handle_cli_args(cli_args)
-        # Không gọi sys.exit(app.exec()) ở đây nữa vì handle_cli_args sẽ tự thoát
     else:
-        # Nếu không có lệnh CLI, hiển thị cửa sổ bình thường
+        # Chế độ GUI bình thường
         main_win.show()
-        sys.exit(app.exec())
+    
+    sys.exit(app.exec())
