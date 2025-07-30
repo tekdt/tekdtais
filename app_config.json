@@ -4,14 +4,16 @@
   },
   "app_items": {
     "googlechrome64": {
-      "icon_file": "chrome-logo-m100.svg"
+      "icon_file": "chrome-logo-m100.svg",
+      "version": "138.0.7204.169",
+      "display_name": "Google Chrome 64bit"
     },
     "googlechrome32": {
       "icon_file": "chrome-logo-m100.svg"
     },
     "vlc64": {
       "display_name": "VLC Media Player 64bit",
-      "version": "2.0.21",
+      "version": "3.0.21",
       "category": "Media",
       "description": "Trình phát đa phương tiện miễn phí, mã nguồn mở, có thể phát hầu hết các định dạng.",
       "type": "installer",
@@ -21,10 +23,12 @@
       "install_params": "/L=1066 /S",
       "executable": "vlc-3.0.21-win64.exe",
       "icon_url": "https://images.videolan.org/images/largeVLC.png",
-      "icon_file": "largeVLC.png"
+      "icon_file": "largeVLC.png",
+      "auto_install": false
     },
     "vlc32": {
-      "icon_file": "largeVLC.png"
+      "icon_file": "largeVLC.png",
+      "auto_install": false
     },
     "rufus64": {
       "icon_file": "rufus-128.png"
