@@ -43,7 +43,8 @@
       "install_params": "/L=1066 /S",
       "executable": "vlc-3.0.21-win64.exe",
       "icon_url": "https://images.videolan.org/images/largeVLC.png",
-      "icon_file": "largeVLC.png"
+      "icon_file": "largeVLC.png",
+      "auto_install": false
     },
     "vlc32": {
       "display_name": "VLC Media Player 32bit",
