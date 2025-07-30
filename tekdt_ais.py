@@ -578,9 +578,6 @@ class TekDT_AIS(QMainWindow):
 
         if self.embed_mode:
             self.setup_embed_ui()
-            self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred)
-            if self.embed_size:
-                self.setFixedSize(self.embed_size[0], self.embed_size[1])
         else:
             self.setup_ui()
         self.tool_manager_thread = QThread()
@@ -671,9 +668,11 @@ class TekDT_AIS(QMainWindow):
 
     def setup_embed_ui(self):
         self.setWindowTitle(f"{APP_NAME}")
-        self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         # Thiết lập để cửa sổ có thể được nhúng
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint)
+        if self.embed_size:
+            self.resize(self.embed_size[0], self.embed_size[1])
         self.setStyleSheet("""
             QWidget { background-color: #2c3e50; }
             QLabel { color: #ecf0f1; font-size: 10pt; }
@@ -687,11 +686,8 @@ class TekDT_AIS(QMainWindow):
         """)
 
         central_widget = QWidget()
-        central_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.setCentralWidget(central_widget)
         main_layout = QVBoxLayout(central_widget)
-        main_layout.setContentsMargins(0, 0, 0, 0)
-        main_layout.setSpacing(0)
         
         # Chỉ giữ lại khung tìm kiếm và danh sách phần mềm
         self.search_box = QLineEdit()
@@ -699,7 +695,6 @@ class TekDT_AIS(QMainWindow):
         self.search_box.textChanged.connect(self.filter_apps)
         
         self.available_list_widget = QListWidget()
-        self.available_list_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         
         main_layout.addWidget(self.search_box)
         main_layout.addWidget(self.available_list_widget)
@@ -1087,7 +1082,6 @@ class TekDT_AIS(QMainWindow):
                 item_widget.action_button.clicked.connect(lambda _, k=key, i=info, w=item_widget: self.confirm_update(k, i, w, local_ver_str, remote_ver_str))
 
         list_item = QListWidgetItem()
-        list_item.setFlags(list_item.flags() | Qt.ItemFlag.ItemNeverHasChildren)
         list_item.setSizeHint(QSize(0, 70))
         list_item.setData(Qt.ItemDataRole.UserRole, key)
         
