@@ -607,7 +607,7 @@ class TekDT_AIS(QMainWindow):
             QMessageBox QLabel#qt_msgbox_label { /* Title Label */
                 color: #ecf0f1;
                 font-size: 12pt;
-                font-weight: bold;
+                /* font-weight: bold; ĐÃ BỎ */
             }
             QMessageBox QLabel#qt_msgbox_informativetext { /* Detailed Text Label */
                 color: #bdc3c7;
