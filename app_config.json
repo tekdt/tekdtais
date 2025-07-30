@@ -1,8 +1,6 @@
 {
   "settings": {
-    "selected_for_install": [
-      "vlc64"
-    ]
+    "selected_for_install": []
   },
   "app_items": {
     "googlechrome64": {
@@ -35,7 +33,7 @@
     },
     "vlc64": {
       "display_name": "VLC Media Player 64bit",
-      "version": "3.0.21",
+      "version": "2.0.21",
       "category": "Media",
       "description": "Trình phát đa phương tiện miễn phí, mã nguồn mở, có thể phát hầu hết các định dạng.",
       "type": "installer",
