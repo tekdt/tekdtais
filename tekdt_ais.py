@@ -363,6 +363,7 @@ class InstallWorker(QThread):
                     
                     # Cập nhật các thông tin đã xử lý
                     updated_info['icon_file'] = icon_filename
+                    updated_info['version'] = app_info.get('version')
                     updated_info['auto_install'] = auto_install_value # Áp dụng lại giá trị auto_install cũ
                     
                     # Ghi đè toàn bộ mục ứng dụng với thông tin đã được làm giàu
@@ -1081,46 +1082,60 @@ class TekDT_AIS(QMainWindow):
         remote_ver_str = self.remote_apps.get('app_items', {}).get(key, {}).get('version', '0')
         is_update_available = is_downloaded and parse_version(remote_ver_str) > parse_version(local_ver_str)
 
-        # Hủy kết nối mặc định để thiết lập lại
+        # Luôn hiển thị thông báo nếu có cập nhật
+        if is_update_available:
+            item_widget.version_label.setText(f"Cập nhật: {local_ver_str} -> {remote_ver_str}")
+            item_widget.version_label.setStyleSheet("color: #2ecc71; font-weight: bold;") # Màu xanh lá
+
+        # Ngắt kết nối mặc định để thiết lập lại cho từng trường hợp
         item_widget.action_button.clicked.disconnect()
-        if self.embed_mode:
-            item_widget.auto_install_toggled.connect(self.on_auto_install_toggled)
-            # Nếu chưa tải về -> Nút "Tải"
-            if not is_downloaded:
-                item_widget.action_button.setText("Tải")
-                item_widget.action_button.setToolTip(f"Tải về {info['display_name']}")
-                item_widget.action_button.setStyleSheet("background-color: #f39c12; color: white;") # Màu cam
-                item_widget.action_button.clicked.connect(lambda _, k=key, i=info, w=item_widget: self.confirm_download(k, i, w))
-            # Nếu đã tải về -> Nút "Thêm"/"Xoá" để bật/tắt auto_install
+
+        if not is_downloaded:
+            # --- TRƯỜNG HỢP 1: CHƯA TẢI VỀ ---
+            item_widget.action_button.setText("Tải")
+            item_widget.action_button.setToolTip(f"Tải về {info['display_name']}")
+            item_widget.action_button.setStyleSheet("background-color: #f39c12; color: white;") # Màu cam
+            # Hành động tải không thay đổi giữa các chế độ
+            item_widget.action_button.clicked.connect(lambda _, k=key, i=info, w=item_widget: self.confirm_download(k, i, w))
+
+        elif self.embed_mode:
+            # --- TRƯỜNG HỢP 2: ĐÃ TẢI VỀ (CHẾ ĐỘ EMBED) ---
+            is_auto = self.local_apps.get(key, {}).get('auto_install', False)
+            if is_auto:
+                item_widget.set_auto_install_button_state(True) # Nút "Xoá"
+                # Hành động Xoá: chỉ cần bật/tắt auto_install
+                item_widget.action_button.clicked.connect(lambda: item_widget.auto_install_toggled.emit(key, False))
             else:
-                is_auto = self.local_apps.get(key, {}).get('auto_install', False)
-                item_widget.set_auto_install_button_state(is_auto)
-                # Kết nối lại với hành vi gốc của widget
-                item_widget.action_button.clicked.connect(item_widget._on_action_button_clicked)
-        else:
-            item_widget.add_requested.connect(self.move_app_to_selection)
-            item_widget.remove_requested.connect(self.remove_app_from_selection)
+                item_widget.set_auto_install_button_state(False) # Nút "Thêm"
+                # Hành động Thêm:
+                # 1. Kiểm tra cập nhật (nếu có)
+                # 2. Sau đó bật auto_install = true
+                on_complete_action = lambda: item_widget.auto_install_toggled.emit(key, True)
+                if is_update_available:
+                    # Nếu có cập nhật -> gọi confirm_update với hành động sau cùng là bật auto_install
+                    item_widget.action_button.clicked.connect(lambda _, k=key, i=info, w=item_widget, lv=local_ver_str, rv=remote_ver_str, cb=on_complete_action: self.confirm_update(k, i, w, lv, rv, on_complete=cb))
+                else:
+                    # Nếu không có cập nhật -> thực hiện hành động sau cùng ngay lập tức
+                    item_widget.action_button.clicked.connect(on_complete_action)
             
-            # Ưu tiên 1: Có cập nhật -> Nút "Cập nhật"
+            item_widget.auto_install_toggled.connect(self.on_auto_install_toggled)
+
+        else: # Chế độ thông thường
+            # --- TRƯỜNG HỢP 3: ĐÃ TẢI VỀ (CHẾ ĐỘ THƯỜNG) ---
+            item_widget.action_button.setText("Thêm")
+            item_widget.action_button.setToolTip(f"Thêm {info['display_name']} vào danh sách")
+            item_widget.action_button.setStyleSheet("background-color: #4CAF50; color: white;")
+            
+            # Hành động Thêm:
+            # 1. Kiểm tra cập nhật (nếu có)
+            # 2. Sau đó chuyển sang khung bên phải
+            on_complete_action = lambda: self.move_app_to_selection(key, info)
             if is_update_available:
-                item_widget.version_label.setText(f"Cập nhật: {local_ver_str} -> {remote_ver_str}")
-                item_widget.version_label.setStyleSheet("color: #2ecc71; font-weight: bold;") # Màu xanh lá
-                item_widget.action_button.setText("Cập nhật")
-                item_widget.action_button.setToolTip(f"Cập nhật {info['display_name']} lên phiên bản {remote_ver_str}")
-                item_widget.action_button.setStyleSheet("background-color: #f39c12; color: white;") # Màu cam
-                item_widget.action_button.clicked.connect(lambda _, k=key, i=info, w=item_widget: self.confirm_update(k, i, w, local_ver_str, remote_ver_str))
-            # Ưu tiên 2: Chưa tải về -> Nút "Tải"
-            elif not is_downloaded:
-                item_widget.action_button.setText("Tải")
-                item_widget.action_button.setToolTip(f"Tải về {info['display_name']}")
-                item_widget.action_button.setStyleSheet("background-color: #f39c12; color: white;") # Màu cam
-                item_widget.action_button.clicked.connect(lambda _, k=key, i=info, w=item_widget: self.confirm_download(k, i, w))
-            # Mặc định: Đã tải về và không có cập nhật -> Nút "Thêm"
+                # Nếu có cập nhật -> gọi confirm_update với hành động sau cùng là chuyển khung
+                item_widget.action_button.clicked.connect(lambda _, k=key, i=info, w=item_widget, lv=local_ver_str, rv=remote_ver_str, cb=on_complete_action: self.confirm_update(k, i, w, lv, rv, on_complete=cb))
             else:
-                item_widget.action_button.setText("Thêm")
-                item_widget.action_button.setToolTip(f"Thêm {info['display_name']} vào danh sách")
-                item_widget.action_button.setStyleSheet("background-color: #4CAF50; color: white; border: none; padding: 8px 16px; border-radius: 4px; font-weight: bold;")
-                item_widget.action_button.clicked.connect(item_widget._on_action_button_clicked)
+                # Nếu không có cập nhật -> chuyển khung ngay lập tức
+                item_widget.action_button.clicked.connect(on_complete_action)
 
         list_item = QListWidgetItem()
         list_item.setSizeHint(QSize(0, 70))
@@ -1160,21 +1175,24 @@ class TekDT_AIS(QMainWindow):
             widget.set_status("processing")
             self.install_worker.start()
     
-    def confirm_update(self, key, info, widget, local_ver, remote_ver):
+    def confirm_update(self, key, info, widget, local_ver, remote_ver, on_complete):
         reply = self.show_styled_message_box(
             QMessageBox.Icon.Question,
             "Cập nhật phần mềm",
             f"Phiên bản mới hơn của {info['display_name']} ({remote_ver}) đã có. "
-            f"Phiên bản hiện tại: {local_ver}.\n\nBạn có muốn cập nhật và thêm vào danh sách cài đặt không?",
+            f"Phiên bản hiện tại: {local_ver}.\n\nBạn có muốn cập nhật không?",
             buttons=QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         )
+
         if reply == QMessageBox.StandardButton.No:
-            self.move_app_to_selection(key, info)
+            # Nếu không cập nhật, thực hiện hành động sau cùng ngay lập tức
+            if on_complete:
+                on_complete()
             return
 
         if reply == QMessageBox.StandardButton.Yes:
-            # Đánh dấu app này để được chọn sau khi cập nhật xong
-            self._app_to_select_after_action = key
+            # Đánh dấu hành động sau cùng để thực hiện khi worker xong việc
+            self._app_to_select_after_action = (key, on_complete)
 
             # Sử dụng worker mới với tác vụ 'update'
             worker_tasks = {key: {'info': info, 'action': 'update'}}
@@ -1243,53 +1261,51 @@ class TekDT_AIS(QMainWindow):
                     )
                     widget.action_button.setText("Đã chọn")
                 else:
-                    # Tái sử dụng logic kiểm tra cập nhật để quyết định nút là "Cập nhật" hay "Thêm"
+                    # Khi một item được bỏ chọn, tái tạo lại nút của nó ở danh sách bên trái
+                    widget.action_button.setEnabled(True)
+                    
                     is_downloaded = self.is_app_downloaded(key, widget.app_info)
                     local_ver_str = self.local_apps.get(key, {}).get('version', '0')
                     remote_ver_str = self.remote_apps.get('app_items', {}).get(key, {}).get('version', '0')
                     is_update_available = is_downloaded and parse_version(remote_ver_str) > parse_version(local_ver_str)
                     
                     # Ngắt kết nối cũ để tránh gọi nhiều lần
-                    try: widget.action_button.clicked.disconnect() 
+                    try: widget.action_button.clicked.disconnect()
                     except TypeError: pass
 
-                    if is_update_available:
-                        widget.action_button.setText("Cập nhật")
-                        widget.action_button.setToolTip(f"Cập nhật {widget.app_info['display_name']} lên phiên bản {remote_ver_str}")
-                        widget.action_button.setStyleSheet("background-color: #f39c12; color: white;") # Màu cam
-                        widget.action_button.clicked.connect(lambda _, k=key, i=widget.app_info, w=widget, lv=local_ver_str, rv=remote_ver_str: self.confirm_update(k, i, w, lv, rv))
-                    elif not is_downloaded:
+                    if not is_downloaded:
                         widget.action_button.setText("Tải")
                         widget.action_button.setToolTip(f"Tải về {widget.app_info['display_name']}")
-                        widget.action_button.setStyleSheet("background-color: #f39c12; color: white;") # Màu cam
+                        widget.action_button.setStyleSheet("background-color: #f39c12; color: white;")
                         widget.action_button.clicked.connect(lambda _, k=key, i=widget.app_info, w=widget: self.confirm_download(k, i, w))
-                    else:
+                    else: # Đã tải về
                         widget.action_button.setText("Thêm")
                         widget.action_button.setToolTip(f"Thêm {widget.app_info['display_name']} vào danh sách")
                         widget.action_button.setStyleSheet("background-color: #4CAF50; color: white;")
-                        widget.action_button.clicked.connect(widget._on_action_button_clicked)
+                        
+                        on_complete_action = lambda: self.move_app_to_selection(key, widget.app_info)
+                        if is_update_available:
+                            widget.action_button.clicked.connect(lambda _, k=key, i=widget.app_info, w=widget, lv=local_ver_str, rv=remote_ver_str, cb=on_complete_action: self.confirm_update(k, i, w, lv, rv, on_complete=cb))
+                        else:
+                            widget.action_button.clicked.connect(on_complete_action)
                 break
 
     def on_single_download_finished(self):
         """Được gọi khi một tác vụ tải/cập nhật đơn lẻ hoàn tất."""
-        key_to_select = self._app_to_select_after_action
+        key_to_select = None
+        on_complete_action = None
+        if self._app_to_select_after_action:
+            key_to_select, on_complete_action = self._app_to_select_after_action
+
         self._app_to_select_after_action = None # Reset lại
         self.install_worker = None
 
         # Tải lại toàn bộ danh sách để phản ánh các thay đổi (vd: phiên bản mới)
-        self.load_config_and_apps() 
-        
-        # Nếu có một ứng dụng cần được tự động chọn sau hành động
-        if key_to_select and not self.embed_mode:
-            # Tìm thông tin mới nhất của app để thêm vào danh sách chọn
-            all_apps = self.remote_apps.get("app_items", {})
-            local_info = self.local_apps.get(key_to_select, {})
-            remote_info = all_apps.get(key_to_select, {})
-            
-            if remote_info: # Chỉ thêm nếu app vẫn còn tồn tại trên server
-                combined_info = remote_info.copy()
-                combined_info.update(local_info)
-                self.move_app_to_selection(key_to_select, combined_info)
+        self.load_config_and_apps()
+
+        # Nếu có một hành động sau cùng cần thực hiện
+        if on_complete_action:
+            on_complete_action()
 
     def filter_apps(self, text):
         text = text.lower().strip()

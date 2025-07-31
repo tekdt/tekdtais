@@ -31,10 +31,19 @@
       "auto_install": false
     },
     "vlc32": {
-      "icon_file": "largeVLC.png",
-      "auto_install": false,
+      "display_name": "VLC Media Player 32bit",
       "version": "3.0.21",
-      "display_name": "VLC Media Player 32bit"
+      "category": "Media",
+      "description": "Trình phát đa phương tiện miễn phí, mã nguồn mở, có thể phát hầu hết các định dạng.",
+      "type": "installer",
+      "architecture": "32bit",
+      "compatible_os_arch": "both",
+      "download_url": "https://get.videolan.org/vlc/3.0.21/win32/vlc-3.0.21-win32.exe",
+      "install_params": "/L=1066 /S",
+      "executable": "vlc-3.0.21-win32.exe",
+      "icon_url": "https://images.videolan.org/images/largeVLC.png",
+      "icon_file": "largeVLC.png",
+      "auto_install": false
     },
     "rufus64": {
       "icon_file": "rufus-128.png",
