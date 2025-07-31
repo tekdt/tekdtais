@@ -32,7 +32,7 @@
     },
     "vlc32": {
       "display_name": "VLC Media Player 32bit",
-      "version": "3.0.21",
+      "version": "0.0.21",
       "category": "Media",
       "description": "Trình phát đa phương tiện miễn phí, mã nguồn mở, có thể phát hầu hết các định dạng.",
       "type": "installer",
@@ -51,9 +51,18 @@
       "display_name": "Rufus 64bit"
     },
     "rufus32": {
-      "icon_file": "rufus-128.png",
+      "display_name": "Rufus 32bit",
       "version": "4.9",
-      "display_name": "Rufus 32bit"
+      "category": "Tiện ích hệ thống",
+      "description": "Công cụ giúp định dạng và tạo ổ đĩa USB có khả năng khởi động.",
+      "type": "portable",
+      "architecture": "32bit",
+      "compatible_os_arch": "both",
+      "download_url": "https://github.com/pbatard/rufus/releases/download/v4.9/rufus-4.9_x86.exe",
+      "executable": "rufus-4.9_x86.exe",
+      "icon_url": "https://rufus.ie/pics/rufus-128.png",
+      "icon_file": "rufus-128.png",
+      "auto_install": false
     },
     "notepadplusplus64": {
       "display_name": "Notepad++ 64bit",
@@ -68,7 +77,7 @@
       "executable": "npp.8.8.3.Installer.x64.exe",
       "icon_url": "https://notepad-plus-plus.org/images/logo.svg",
       "icon_file": "logo.svg",
-      "auto_install": true
+      "auto_install": false
     },
     "notepadplusplus32": {
       "display_name": "Notepad++ 32bit",
@@ -83,7 +92,7 @@
       "executable": "npp.8.8.3.Installer.exe",
       "icon_url": "https://notepad-plus-plus.org/images/logo.svg",
       "icon_file": "logo.svg",
-      "auto_install": true
+      "auto_install": false
     },
     "firefox64": {
       "icon_file": "logo.eb1324e44442.svg",
