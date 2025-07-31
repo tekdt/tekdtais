@@ -1104,7 +1104,9 @@ class TekDT_AIS(QMainWindow):
             if is_auto:
                 item_widget.set_auto_install_button_state(True) # Nút "Xoá"
                 # Hành động Xoá: chỉ cần bật/tắt auto_install
-                item_widget.action_button.clicked.connect(lambda: item_widget.auto_install_toggled.emit(key, False))
+                item_widget.action_button.clicked.connect(
+                    lambda w=item_widget, k=key: (w.auto_install_toggled.emit(k, False), w.set_auto_install_button_state(False))
+                )
             else:
                 item_widget.set_auto_install_button_state(False) # Nút "Thêm"
                 # Hành động Thêm:
@@ -1116,7 +1118,9 @@ class TekDT_AIS(QMainWindow):
                     item_widget.action_button.clicked.connect(lambda _, k=key, i=info, w=item_widget, lv=local_ver_str, rv=remote_ver_str, cb=on_complete_action: self.confirm_update(k, i, w, lv, rv, on_complete=cb))
                 else:
                     # Nếu không có cập nhật -> thực hiện hành động sau cùng ngay lập tức
-                    item_widget.action_button.clicked.connect(on_complete_action)
+                    item_widget.action_button.clicked.connect(
+                        lambda w=item_widget, k=key: (w.auto_install_toggled.emit(k, True), w.set_auto_install_button_state(True))
+                    )
             
             item_widget.auto_install_toggled.connect(self.on_auto_install_toggled)
 
@@ -1135,7 +1139,9 @@ class TekDT_AIS(QMainWindow):
                 item_widget.action_button.clicked.connect(lambda _, k=key, i=info, w=item_widget, lv=local_ver_str, rv=remote_ver_str, cb=on_complete_action: self.confirm_update(k, i, w, lv, rv, on_complete=cb))
             else:
                 # Nếu không có cập nhật -> chuyển khung ngay lập tức
-                item_widget.action_button.clicked.connect(on_complete_action)
+                item_widget.action_button.clicked.connect(
+                    lambda w=item_widget, k=key: (w.auto_install_toggled.emit(k, True), w.set_auto_install_button_state(True))
+                )
 
         list_item = QListWidgetItem()
         list_item.setSizeHint(QSize(0, 70))
@@ -1294,16 +1300,37 @@ class TekDT_AIS(QMainWindow):
         """Được gọi khi một tác vụ tải/cập nhật đơn lẻ hoàn tất."""
         key_to_select = None
         on_complete_action = None
-        if self._app_to_select_after_action:
+        
+        # NEW: Xử lý linh hoạt cho cả string (tải mới) và tuple (cập nhật)
+        if isinstance(self._app_to_select_after_action, tuple):
+            # Trường hợp cập nhật: (key, on_complete_action)
             key_to_select, on_complete_action = self._app_to_select_after_action
+            
+            # <<< START: ĐOẠN CODE THÊM MỚI QUAN TRỌNG >>>
+            # Sau khi cập nhật thành công, cập nhật phiên bản trong config
+            if key_to_select and key_to_select in self.remote_apps.get('app_items', {}):
+                remote_info = self.remote_apps['app_items'][key_to_select]
+                new_version = remote_info.get('version')
+                
+                # Cập nhật cả trong config và trong bộ nhớ local_apps
+                if new_version:
+                    self.config['app_items'].setdefault(key_to_select, {})['version'] = new_version
+                    self.local_apps.setdefault(key_to_select, {})['version'] = new_version
+                    self.save_config() # Lưu lại ngay lập tức
+            # <<< END: ĐOẠN CODE THÊM MỚI QUAN TRỌNG >>>
+
+        elif isinstance(self._app_to_select_after_action, str):
+            # Trường hợp tải mới: chỉ có key
+            key_to_select = self._app_to_select_after_action
 
         self._app_to_select_after_action = None # Reset lại
         self.install_worker = None
 
         # Tải lại toàn bộ danh sách để phản ánh các thay đổi (vd: phiên bản mới)
+        # Vì đã cập nhật config và local_apps, lần tải lại này sẽ hiển thị đúng trạng thái.
         self.load_config_and_apps()
 
-        # Nếu có một hành động sau cùng cần thực hiện
+        # Nếu có một hành động sau cùng cần thực hiện (ví dụ: chuyển sang khung bên phải)
         if on_complete_action:
             on_complete_action()
 

@@ -17,7 +17,7 @@
     },
     "vlc64": {
       "display_name": "VLC Media Player 64bit",
-      "version": "2.0.21",
+      "version": "3.0.21",
       "category": "Media",
       "description": "Trình phát đa phương tiện miễn phí, mã nguồn mở, có thể phát hầu hết các định dạng.",
       "type": "installer",
@@ -56,9 +56,18 @@
       "display_name": "Rufus 32bit"
     },
     "notepadplusplus64": {
-      "icon_file": "logo.svg",
-      "version": "8.8.3",
       "display_name": "Notepad++ 64bit",
+      "version": "8.8.3",
+      "category": "Lập trình",
+      "description": "Trình soạn thảo mã nguồn và thay thế Notepad hỗ trợ nhiều ngôn ngữ.",
+      "type": "installer",
+      "architecture": "64bit",
+      "compatible_os_arch": "64bit",
+      "download_url": "https://github.com/notepad-plus-plus/notepad-plus-plus/releases/download/v8.8.3/npp.8.8.3.Installer.x64.exe",
+      "install_params": "/S",
+      "executable": "npp.8.8.3.Installer.x64.exe",
+      "icon_url": "https://notepad-plus-plus.org/images/logo.svg",
+      "icon_file": "logo.svg",
       "auto_install": false
     },
     "notepadplusplus32": {
