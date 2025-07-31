@@ -758,7 +758,7 @@ class TekDT_AIS(QMainWindow):
                 if is_install_action: report['install']['skipped_not_found'].append(key)
                 continue
             local_info = self.local_apps.get(key, {})
-            if not local_info.get('executable'):
+            if not self.is_app_downloaded(key, remote_info):
                 if is_update_action: report['update']['skipped_online'].append(key)
                 if is_install_action: report['install']['skipped_online'].append(key)
                 continue
@@ -1074,25 +1074,27 @@ class TekDT_AIS(QMainWindow):
         else:
             item_widget.add_requested.connect(self.move_app_to_selection)
             item_widget.remove_requested.connect(self.remove_app_from_selection)
-            item_widget.action_button.setText("Thêm")
-            item_widget.action_button.setToolTip(f"Thêm {info['display_name']} vào danh sách")
-            item_widget.action_button.setStyleSheet("background-color: #4CAF50; color: white; border: none; padding: 8px 16px; border-radius: 4px; font-weight: bold;")
-
-            # So sánh phiên bản để hiển thị nút "Cập nhật"
-            local_ver_str = self.local_apps.get(key, {}).get('version', '0')
-            remote_ver_str = self.remote_apps.get('app_items', {}).get(key, {}).get('version', '0')
             
-            is_downloaded = self.is_app_downloaded(key, info)
-
-            if is_downloaded and parse_version(remote_ver_str) > parse_version(local_ver_str):
+            # Ưu tiên 1: Có cập nhật -> Nút "Cập nhật"
+            if is_update_available:
                 item_widget.version_label.setText(f"Cập nhật: {local_ver_str} -> {remote_ver_str}")
                 item_widget.version_label.setStyleSheet("color: #2ecc71; font-weight: bold;") # Màu xanh lá
                 item_widget.action_button.setText("Cập nhật")
                 item_widget.action_button.setToolTip(f"Cập nhật {info['display_name']} lên phiên bản {remote_ver_str}")
                 item_widget.action_button.setStyleSheet("background-color: #f39c12; color: white;") # Màu cam
-                # Ngắt kết nối cũ và kết nối với hàm confirm_update
-                item_widget.action_button.clicked.disconnect()
                 item_widget.action_button.clicked.connect(lambda _, k=key, i=info, w=item_widget: self.confirm_update(k, i, w, local_ver_str, remote_ver_str))
+            # Ưu tiên 2: Chưa tải về -> Nút "Tải"
+            elif not is_downloaded:
+                item_widget.action_button.setText("Tải")
+                item_widget.action_button.setToolTip(f"Tải về {info['display_name']}")
+                item_widget.action_button.setStyleSheet("background-color: #f39c12; color: white;") # Màu cam
+                item_widget.action_button.clicked.connect(lambda _, k=key, i=info, w=item_widget: self.confirm_download(k, i, w))
+            # Mặc định: Đã tải về và không có cập nhật -> Nút "Thêm"
+            else:
+                item_widget.action_button.setText("Thêm")
+                item_widget.action_button.setToolTip(f"Thêm {info['display_name']} vào danh sách")
+                item_widget.action_button.setStyleSheet("background-color: #4CAF50; color: white; border: none; padding: 8px 16px; border-radius: 4px; font-weight: bold;")
+                item_widget.action_button.clicked.connect(item_widget._on_action_button_clicked)
 
         list_item = QListWidgetItem()
         list_item.setSizeHint(QSize(0, 70))
@@ -1147,6 +1149,7 @@ class TekDT_AIS(QMainWindow):
             self.install_worker.signals.error.connect(lambda e: self.show_styled_message_box(QMessageBox.Icon.Critical, "Lỗi Worker", str(e)))
             if widget:
                 self.install_worker.signals.progress_percentage.connect(widget.update_download_progress)
+            widget.set_status("processing")
             self.install_worker.start()
 
     def move_app_to_selection(self, key, info):
@@ -1408,6 +1411,8 @@ def handle_auto_install_cli(args):
     return True # Đã xử lý lệnh, nên thoát chương trình
 
 if __name__ == '__main__':
+    QApplication.setHighDpiScaleFactorRoundingPolicy(Qt.HighDpiScaleFactorRoundingPolicy.PassThrough)
+    
     # Phân tích tham số bằng shlex để hỗ trợ khoảng trắng
     raw_args = ' '.join(sys.argv[1:])
     cli_args = sys.argv[1:]
