@@ -6,10 +6,14 @@
     "googlechrome64": {
       "icon_file": "chrome-logo-m100.svg",
       "version": "138.0.7204.169",
-      "display_name": "Google Chrome 64bit"
+      "display_name": "Google Chrome 64bit",
+      "auto_install": false
     },
     "googlechrome32": {
-      "icon_file": "chrome-logo-m100.svg"
+      "icon_file": "chrome-logo-m100.svg",
+      "version": "138.0.7204.169",
+      "display_name": "Google Chrome 32bit",
+      "auto_install": false
     },
     "vlc64": {
       "display_name": "VLC Media Player 64bit",
@@ -28,29 +32,41 @@
     },
     "vlc32": {
       "icon_file": "largeVLC.png",
-      "auto_install": true,
+      "auto_install": false,
       "version": "3.0.21",
       "display_name": "VLC Media Player 32bit"
     },
     "rufus64": {
-      "icon_file": "rufus-128.png"
+      "icon_file": "rufus-128.png",
+      "version": "4.9",
+      "display_name": "Rufus 64bit"
     },
     "rufus32": {
-      "icon_file": "rufus-128.png"
+      "icon_file": "rufus-128.png",
+      "version": "4.9",
+      "display_name": "Rufus 32bit"
     },
     "notepadplusplus64": {
       "icon_file": "logo.svg",
       "version": "8.8.3",
-      "display_name": "Notepad++ 64bit"
+      "display_name": "Notepad++ 64bit",
+      "auto_install": false
     },
     "notepadplusplus32": {
-      "icon_file": "logo.svg"
+      "icon_file": "logo.svg",
+      "version": "8.8.3",
+      "display_name": "Notepad++ 32bit",
+      "auto_install": false
     },
     "firefox64": {
-      "icon_file": "logo.eb1324e44442.svg"
+      "icon_file": "logo.eb1324e44442.svg",
+      "version": "141.0",
+      "display_name": "Mozilla Firefox 64bit"
     },
     "firefox32": {
-      "icon_file": "logo.eb1324e44442.svg"
+      "icon_file": "logo.eb1324e44442.svg",
+      "version": "141.0",
+      "display_name": "Mozilla Firefox 32bit"
     }
   }
 }
