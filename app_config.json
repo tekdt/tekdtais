@@ -28,7 +28,9 @@
     },
     "vlc32": {
       "icon_file": "largeVLC.png",
-      "auto_install": false
+      "auto_install": false,
+      "version": "3.0.21",
+      "display_name": "VLC Media Player 32bit"
     },
     "rufus64": {
       "icon_file": "rufus-128.png"
