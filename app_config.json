@@ -62,7 +62,7 @@
       "executable": "rufus-4.9_x86.exe",
       "icon_url": "https://rufus.ie/pics/rufus-128.png",
       "icon_file": "rufus-128.png",
-      "auto_install": false
+      "auto_install": true
     },
     "notepadplusplus64": {
       "display_name": "Notepad++ 64bit",

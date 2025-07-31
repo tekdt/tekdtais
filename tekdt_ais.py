@@ -12,6 +12,9 @@ from pathlib import Path
 import platform
 import re
 import shlex
+import signal
+import threading
+import time
 from packaging.version import parse as parse_version
 
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
@@ -568,6 +571,8 @@ class TekDT_AIS(QMainWindow):
     def __init__(self, embed_mode=False, embed_size=None):
         super().__init__()
         self.embed_mode = embed_mode
+        if embed_mode:
+            threading.Thread(target=self.check_shutdown_signal, daemon=True).start()
         self.embed_size = embed_size
         self.config = {}
         self.remote_apps = {}
@@ -735,7 +740,6 @@ class TekDT_AIS(QMainWindow):
         download_path = APPS_DIR / app_key / file_name
         return download_path.exists()
 
-    # --- REFACTORED: Hàm xử lý CLI được viết lại hoàn toàn ---
     def handle_cli_args(self, args):
         """Xử lý các tham số dòng lệnh cho /install và /update."""
         self.load_config_and_apps(populate=False)
@@ -1483,6 +1487,13 @@ class TekDT_AIS(QMainWindow):
             self.tool_manager_thread.wait(5000)
         self.save_config()
         super().closeEvent(event)
+        
+    def check_shutdown_signal(self):
+        while True:
+            if os.path.exists("shutdown_signal.txt"):  # Tệp do A tạo để ra lệnh tắt
+                print("Nhận tín hiệu tắt, đang thoát...")
+                os._exit(0)
+            time.sleep(1)
 
 def handle_auto_install_cli(args):
     """Xử lý riêng cho tham số dòng lệnh /auto_install."""
