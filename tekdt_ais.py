@@ -373,7 +373,7 @@ class InstallWorker(QThread):
                     f.truncate()
                 
                 # --- Cài đặt ---
-                if app_info.get('type') == 'installer' and download_path.exists():
+                if action == "install" and app_info.get('type') == 'installer' and download_path.exists():
                     self.signals.progress.emit(app_key, "installing", f"Đang cài đặt {display_name}...")
                     install_params = app_info.get('install_params', '')
                     if not install_params:
@@ -395,7 +395,8 @@ class InstallWorker(QThread):
                 
                 elif app_info.get('type') == 'portable' and download_path.exists():
                     self.signals.progress.emit(app_key, "success", f"Đã tải {display_name} (portable) thành công!")
-                
+                elif action == "update":
+                    self.signals.progress.emit(app_key, "success", f"Đã cập nhật {display_name} thành công!")
                 else:
                     self.signals.progress.emit(app_key, "failed", f"Không thể xử lý {display_name}: Thiếu tệp hoặc loại không hợp lệ.")
 
