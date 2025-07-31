@@ -28,7 +28,7 @@
     },
     "vlc32": {
       "icon_file": "largeVLC.png",
-      "auto_install": false,
+      "auto_install": true,
       "version": "3.0.21",
       "display_name": "VLC Media Player 32bit"
     },
@@ -39,7 +39,9 @@
       "icon_file": "rufus-128.png"
     },
     "notepadplusplus64": {
-      "icon_file": "logo.svg"
+      "icon_file": "logo.svg",
+      "version": "8.8.3",
+      "display_name": "Notepad++ 64bit"
     },
     "notepadplusplus32": {
       "icon_file": "logo.svg"
