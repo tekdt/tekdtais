@@ -668,18 +668,16 @@ class TekDT_AIS(QMainWindow):
 
     def save_scroll_positions(self):
         """Lưu vị trí hiện tại của các thanh cuộn."""
+        self._scroll_positions['available'] = self.available_list_widget.verticalScrollBar().value()
         if not self.embed_mode:
-            self._scroll_positions['available'] = self.available_list_widget.verticalScrollBar().value()
             self._scroll_positions['selected'] = self.selected_list_widget.verticalScrollBar().value()
 
     def restore_scroll_positions(self):
         """Phục hồi vị trí của các thanh cuộn."""
-        if not self.embed_mode:
-            if 'available' in self._scroll_positions:
-                # Dùng QTimer để đảm bảo list đã được vẽ xong
-                QTimer.singleShot(0, lambda: self.available_list_widget.verticalScrollBar().setValue(self._scroll_positions['available']))
-            if 'selected' in self._scroll_positions:
-                QTimer.singleShot(0, lambda: self.selected_list_widget.verticalScrollBar().setValue(self._scroll_positions['selected']))
+        if 'available' in self._scroll_positions:
+            QTimer.singleShot(0, lambda: self.available_list_widget.verticalScrollBar().setValue(self._scroll_positions['available']))
+        if not self.embed_mode and 'selected' in self._scroll_positions:
+            QTimer.singleShot(0, lambda: self.selected_list_widget.verticalScrollBar().setValue(self._scroll_positions['selected']))
     
     def on_tool_check_finished(self, success, message):
         self.tool_manager_thread.quit()
@@ -1075,7 +1073,7 @@ class TekDT_AIS(QMainWindow):
             self.selected_for_install = valid_selected
             
             for key in self.selected_for_install:
-                 self.move_app_to_selection(key, compatible_apps[key])
+                self.move_app_to_selection(key, compatible_apps[key])
 
         self.update_counts()
         self.restore_scroll_positions()
