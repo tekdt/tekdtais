@@ -1374,7 +1374,6 @@ def handle_auto_install_cli(args):
 
     return True # Đã xử lý lệnh, nên thoát chương trình
 
-# KHỐI MỚI ĐỂ THAY THẾ
 if __name__ == '__main__':
     # Phân tích tham số bằng shlex để hỗ trợ khoảng trắng
     raw_args = ' '.join(sys.argv[1:])
