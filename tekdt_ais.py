@@ -473,8 +473,8 @@ class AppItemWidget(QWidget):
 
     def _on_action_button_clicked(self):
         if self.embed_mode:
-            is_currently_auto_install = self.action_button.text() == "Xoá"
-            new_state = not is_currently_auto_install
+            is_currently_set_for_auto_install = self.action_button.text() == "Xoá"
+            new_state = not is_currently_set_for_auto_install
             self.auto_install_toggled.emit(self.app_key, new_state)
             self.set_auto_install_button_state(new_state)
         else:
@@ -701,8 +701,6 @@ class TekDT_AIS(QMainWindow):
 
     def is_app_downloaded(self, app_key, app_info):
         """Kiểm tra xem tệp cài đặt chính của ứng dụng đã được tải về hay chưa."""
-        if self.local_apps.get(app_key, {}).get('executable'):
-            return True
         download_url = app_info.get('download_url', '')
         if not download_url:
             return False
@@ -738,12 +736,12 @@ class TekDT_AIS(QMainWindow):
         elif is_update_action and not is_install_action: # Chỉ /update
             # Lấy tất cả các app đã được tải về
             for key, info in self.local_apps.items():
-                if info.get('executable'): # Chỉ cập nhật app đã có 'executable'
+                if self.is_app_downloaded(key, info): # Chỉ cập nhật app đã có file
                     target_keys.add(key)
         elif is_install_action: # /install hoặc /install /update không có tên app
             # Lấy các app có auto_install=true và đã được tải về
             for key, info in self.local_apps.items():
-                if info.get('auto_install', False) and info.get('executable'):
+                if info.get('auto_install', False) and self.is_app_downloaded(key, info):
                      target_keys.add(key)
         
         # --- Xây dựng danh sách tác vụ cho Worker ---
@@ -1051,13 +1049,28 @@ class TekDT_AIS(QMainWindow):
         self.update_counts()
 
     def add_app_to_list(self, list_widget, key, info):
-        
         item_widget = AppItemWidget(key, info, embed_mode=self.embed_mode)
-        
+        is_downloaded = self.is_app_downloaded(key, info)
+        local_ver_str = self.local_apps.get(key, {}).get('version', '0')
+        remote_ver_str = self.remote_apps.get('app_items', {}).get(key, {}).get('version', '0')
+        is_update_available = is_downloaded and parse_version(remote_ver_str) > parse_version(local_ver_str)
+
+        # Hủy kết nối mặc định để thiết lập lại
+        item_widget.action_button.clicked.disconnect()
         if self.embed_mode:
             item_widget.auto_install_toggled.connect(self.on_auto_install_toggled)
-            is_auto = self.local_apps.get(key, {}).get('auto_install', False)
-            item_widget.set_auto_install_button_state(is_auto)
+            # Nếu chưa tải về -> Nút "Tải"
+            if not is_downloaded:
+                item_widget.action_button.setText("Tải")
+                item_widget.action_button.setToolTip(f"Tải về {info['display_name']}")
+                item_widget.action_button.setStyleSheet("background-color: #f39c12; color: white;") # Màu cam
+                item_widget.action_button.clicked.connect(lambda _, k=key, i=info, w=item_widget: self.confirm_download(k, i, w))
+            # Nếu đã tải về -> Nút "Thêm"/"Xoá" để bật/tắt auto_install
+            else:
+                is_auto = self.local_apps.get(key, {}).get('auto_install', False)
+                item_widget.set_auto_install_button_state(is_auto)
+                # Kết nối lại với hành vi gốc của widget
+                item_widget.action_button.clicked.connect(item_widget._on_action_button_clicked)
         else:
             item_widget.add_requested.connect(self.move_app_to_selection)
             item_widget.remove_requested.connect(self.remove_app_from_selection)
@@ -1097,6 +1110,26 @@ class TekDT_AIS(QMainWindow):
         self.config['app_items'][key]['auto_install'] = state
         self.save_config()
 
+    def confirm_download(self, key, info, widget):
+        reply = self.show_styled_message_box(
+            QMessageBox.Icon.Question,
+            "Tải phần mềm",
+            f"Bạn có muốn tải về {info['display_name']} không?",
+            buttons=QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+        if reply == QMessageBox.StandardButton.Yes:
+            # Action 'install' cũng có nghĩa là 'download and prepare for install'
+            worker_tasks = {key: {'info': info, 'action': 'install'}}
+            self.install_worker = InstallWorker(worker_tasks)
+            self.install_worker.signals.progress.connect(self.update_install_progress)
+            self.install_worker.signals.finished.connect(self.on_single_download_finished)
+            self.install_worker.signals.error.connect(lambda e: self.show_styled_message_box(QMessageBox.Icon.Critical, "Lỗi Worker", str(e)))
+            if widget:
+                self.install_worker.signals.progress_percentage.connect(widget.update_download_progress)
+            
+            # Cập nhật trạng thái widget ngay lập tức
+            widget.set_status("processing")
+            self.install_worker.start()
     def confirm_update(self, key, info, widget, local_ver, remote_ver):
         reply = self.show_styled_message_box(
             QMessageBox.Icon.Question,
