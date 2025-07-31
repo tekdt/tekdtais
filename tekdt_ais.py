@@ -1105,7 +1105,7 @@ class TekDT_AIS(QMainWindow):
                 item_widget.set_auto_install_button_state(True) # Nút "Xoá"
                 # Hành động Xoá: chỉ cần bật/tắt auto_install
                 item_widget.action_button.clicked.connect(
-                    lambda w=item_widget, k=key: (w.auto_install_toggled.emit(k, False), w.set_auto_install_button_state(False))
+                    lambda _, w=item_widget, k=key: (w.auto_install_toggled.emit(k, False), w.set_auto_install_button_state(False))
                 )
             else:
                 item_widget.set_auto_install_button_state(False) # Nút "Thêm"
@@ -1119,7 +1119,7 @@ class TekDT_AIS(QMainWindow):
                 else:
                     # Nếu không có cập nhật -> thực hiện hành động sau cùng ngay lập tức
                     item_widget.action_button.clicked.connect(
-                        lambda w=item_widget, k=key: (w.auto_install_toggled.emit(k, True), w.set_auto_install_button_state(True))
+                        lambda _, w=item_widget, k=key: (w.auto_install_toggled.emit(k, True), w.set_auto_install_button_state(True))
                     )
             
             item_widget.auto_install_toggled.connect(self.on_auto_install_toggled)
@@ -1138,10 +1138,7 @@ class TekDT_AIS(QMainWindow):
                 # Nếu có cập nhật -> gọi confirm_update với hành động sau cùng là chuyển khung
                 item_widget.action_button.clicked.connect(lambda _, k=key, i=info, w=item_widget, lv=local_ver_str, rv=remote_ver_str, cb=on_complete_action: self.confirm_update(k, i, w, lv, rv, on_complete=cb))
             else:
-                # Nếu không có cập nhật -> chuyển khung ngay lập tức
-                item_widget.action_button.clicked.connect(
-                    lambda w=item_widget, k=key: (w.auto_install_toggled.emit(k, True), w.set_auto_install_button_state(True))
-                )
+                item_widget.action_button.clicked.connect(on_complete_action)
 
         list_item = QListWidgetItem()
         list_item.setSizeHint(QSize(0, 70))
@@ -1158,6 +1155,8 @@ class TekDT_AIS(QMainWindow):
         self.config['app_items'].setdefault(key, {})
         self.config['app_items'][key]['auto_install'] = state
         self.save_config()
+        if self.embed_mode:
+            self.populate_lists()
 
     def confirm_download(self, key, info, widget):
         reply = self.show_styled_message_box(
@@ -1301,12 +1300,10 @@ class TekDT_AIS(QMainWindow):
         key_to_select = None
         on_complete_action = None
         
-        # NEW: Xử lý linh hoạt cho cả string (tải mới) và tuple (cập nhật)
         if isinstance(self._app_to_select_after_action, tuple):
             # Trường hợp cập nhật: (key, on_complete_action)
             key_to_select, on_complete_action = self._app_to_select_after_action
             
-            # <<< START: ĐOẠN CODE THÊM MỚI QUAN TRỌNG >>>
             # Sau khi cập nhật thành công, cập nhật phiên bản trong config
             if key_to_select and key_to_select in self.remote_apps.get('app_items', {}):
                 remote_info = self.remote_apps['app_items'][key_to_select]
@@ -1317,7 +1314,6 @@ class TekDT_AIS(QMainWindow):
                     self.config['app_items'].setdefault(key_to_select, {})['version'] = new_version
                     self.local_apps.setdefault(key_to_select, {})['version'] = new_version
                     self.save_config() # Lưu lại ngay lập tức
-            # <<< END: ĐOẠN CODE THÊM MỚI QUAN TRỌNG >>>
 
         elif isinstance(self._app_to_select_after_action, str):
             # Trường hợp tải mới: chỉ có key

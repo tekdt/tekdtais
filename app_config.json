@@ -68,13 +68,22 @@
       "executable": "npp.8.8.3.Installer.x64.exe",
       "icon_url": "https://notepad-plus-plus.org/images/logo.svg",
       "icon_file": "logo.svg",
-      "auto_install": false
+      "auto_install": true
     },
     "notepadplusplus32": {
-      "icon_file": "logo.svg",
-      "version": "8.8.3",
       "display_name": "Notepad++ 32bit",
-      "auto_install": false
+      "version": "8.8.3",
+      "category": "Lập trình",
+      "description": "Trình soạn thảo mã nguồn và thay thế Notepad hỗ trợ nhiều ngôn ngữ.",
+      "type": "installer",
+      "architecture": "32bit",
+      "compatible_os_arch": "both",
+      "download_url": "https://github.com/notepad-plus-plus/notepad-plus-plus/releases/download/v8.8.3/npp.8.8.3.Installer.exe",
+      "install_params": "/S",
+      "executable": "npp.8.8.3.Installer.exe",
+      "icon_url": "https://notepad-plus-plus.org/images/logo.svg",
+      "icon_file": "logo.svg",
+      "auto_install": true
     },
     "firefox64": {
       "icon_file": "logo.eb1324e44442.svg",
