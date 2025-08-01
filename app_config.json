@@ -1,19 +1,35 @@
 {
-  "settings": {
-    "selected_for_install": []
-  },
+  "settings": {},
   "app_items": {
     "googlechrome64": {
-      "icon_file": "chrome-logo-m100.svg",
-      "version": "138.0.7204.169",
       "display_name": "Google Chrome 64bit",
-      "auto_install": false
+      "version": "138.0.7204.169",
+      "category": "Trình duyệt Web",
+      "description": "Trình duyệt web nhanh, an toàn và miễn phí được xây dựng cho web hiện đại.",
+      "type": "installer",
+      "architecture": "64bit",
+      "compatible_os_arch": "64bit",
+      "download_url": "https://dl.google.com/chrome/install/standalonesetup64.exe",
+      "install_params": "/silent /install",
+      "executable": "standalonesetup64.exe",
+      "icon_url": "https://www.google.com/chrome/static/images/chrome-logo-m100.svg",
+      "icon_file": "chrome-logo-m100.svg",
+      "auto_install": true
     },
     "googlechrome32": {
-      "icon_file": "chrome-logo-m100.svg",
-      "version": "138.0.7204.169",
       "display_name": "Google Chrome 32bit",
-      "auto_install": false
+      "version": "138.0.7204.169",
+      "category": "Trình duyệt Web",
+      "description": "Trình duyệt web nhanh, an toàn và miễn phí được xây dựng cho web hiện đại.",
+      "type": "installer",
+      "architecture": "32bit",
+      "compatible_os_arch": "both",
+      "download_url": "https://dl.google.com/chrome/install/standalonesetup.exe",
+      "install_params": "/silent /install",
+      "executable": "standalonesetup.exe",
+      "icon_url": "https://www.google.com/chrome/static/images/chrome-logo-m100.svg",
+      "icon_file": "chrome-logo-m100.svg",
+      "auto_install": true
     },
     "vlc64": {
       "display_name": "VLC Media Player 64bit",
@@ -28,41 +44,18 @@
       "executable": "vlc-3.0.21-win64.exe",
       "icon_url": "https://images.videolan.org/images/largeVLC.png",
       "icon_file": "largeVLC.png",
-      "auto_install": false
+      "auto_install": true
     },
     "vlc32": {
-      "display_name": "VLC Media Player 32bit",
-      "version": "0.0.21",
-      "category": "Media",
-      "description": "Trình phát đa phương tiện miễn phí, mã nguồn mở, có thể phát hầu hết các định dạng.",
-      "type": "installer",
-      "architecture": "32bit",
-      "compatible_os_arch": "both",
-      "download_url": "https://get.videolan.org/vlc/3.0.21/win32/vlc-3.0.21-win32.exe",
-      "install_params": "/L=1066 /S",
-      "executable": "vlc-3.0.21-win32.exe",
-      "icon_url": "https://images.videolan.org/images/largeVLC.png",
       "icon_file": "largeVLC.png",
-      "auto_install": false
+      "version": "3.0.21",
+      "auto_install": true
     },
     "rufus64": {
-      "icon_file": "rufus-128.png",
-      "version": "4.9",
-      "display_name": "Rufus 64bit"
+      "icon_file": "rufus-128.png"
     },
     "rufus32": {
-      "display_name": "Rufus 32bit",
-      "version": "4.9",
-      "category": "Tiện ích hệ thống",
-      "description": "Công cụ giúp định dạng và tạo ổ đĩa USB có khả năng khởi động.",
-      "type": "portable",
-      "architecture": "32bit",
-      "compatible_os_arch": "both",
-      "download_url": "https://github.com/pbatard/rufus/releases/download/v4.9/rufus-4.9_x86.exe",
-      "executable": "rufus-4.9_x86.exe",
-      "icon_url": "https://rufus.ie/pics/rufus-128.png",
-      "icon_file": "rufus-128.png",
-      "auto_install": true
+      "icon_file": "rufus-128.png"
     },
     "notepadplusplus64": {
       "display_name": "Notepad++ 64bit",
@@ -77,7 +70,7 @@
       "executable": "npp.8.8.3.Installer.x64.exe",
       "icon_url": "https://notepad-plus-plus.org/images/logo.svg",
       "icon_file": "logo.svg",
-      "auto_install": false
+      "auto_install": true
     },
     "notepadplusplus32": {
       "display_name": "Notepad++ 32bit",
@@ -92,17 +85,37 @@
       "executable": "npp.8.8.3.Installer.exe",
       "icon_url": "https://notepad-plus-plus.org/images/logo.svg",
       "icon_file": "logo.svg",
-      "auto_install": false
+      "auto_install": true
     },
     "firefox64": {
-      "icon_file": "logo.eb1324e44442.svg",
+      "display_name": "Mozilla Firefox 64bit",
       "version": "141.0",
-      "display_name": "Mozilla Firefox 64bit"
+      "category": "Trình duyệt Web",
+      "description": "Trải nghiệm một trình duyệt web nhanh, thông minh và cá nhân.",
+      "type": "installer",
+      "architecture": "64bit",
+      "compatible_os_arch": "64bit",
+      "download_url": "https://download.mozilla.org/?product=firefox-msi-latest-ssl&os=win64&lang=en-US",
+      "output_filename": "Firefox_Installer_x64.msi",
+      "install_params": "/quiet",
+      "icon_url": "https://www.firefox.com/media/protocol/img/logos/firefox/browser/logo.eb1324e44442.svg",
+      "icon_file": "logo.eb1324e44442.svg",
+      "auto_install": true
     },
     "firefox32": {
-      "icon_file": "logo.eb1324e44442.svg",
+      "display_name": "Mozilla Firefox 32bit",
       "version": "141.0",
-      "display_name": "Mozilla Firefox 32bit"
+      "category": "Trình duyệt Web",
+      "description": "Trải nghiệm một trình duyệt web nhanh, thông minh và cá nhân.",
+      "type": "installer",
+      "architecture": "32bit",
+      "compatible_os_arch": "both",
+      "download_url": "https://download.mozilla.org/?product=firefox-msi-latest-ssl&os=win&lang=en-US",
+      "output_filename": "Firefox_Installer_x32.msi",
+      "install_params": "/quiet",
+      "icon_url": "https://www.firefox.com/media/protocol/img/logos/firefox/browser/logo.eb1324e44442.svg",
+      "icon_file": "logo.eb1324e44442.svg",
+      "auto_install": true
     }
   }
 }
