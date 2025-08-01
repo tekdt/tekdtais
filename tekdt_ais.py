@@ -30,30 +30,19 @@ APP_NAME = "TekDT AIS"
 APP_VERSION = "1.0.0"
 GITHUB_REPO_URL = "https://github.com/tekdt/tekdtais"
 REMOTE_APP_LIST_URL = "https://raw.githubusercontent.com/tekdt/tekdtais/refs/heads/main/app_list.json"
+    
+APP_DATA_DIR = Path(sys.argv[0]).resolve().parent
 
-# 1. APP_DATA_DIR: Thư mục LÀM VIỆC chính, nơi lưu trữ dữ liệu bền vững (Apps, Tools, Config).
-#    - Khi chạy EXE, nó sẽ là thư mục chứa file .exe.
-#    - Khi chạy script, nó là thư mục chứa file .py.
-# 2. RESOURCE_DIR: Thư mục chứa tài nguyên được ĐÓNG GÓI vào file EXE.
-#    - Khi chạy EXE, nó là thư mục tạm `_MEIPASS`.
-#    - Khi chạy script, nó cũng là thư mục chứa file .py.
 def resource_path(relative_path):
     """ Lấy đường dẫn tuyệt đối đến tài nguyên, hoạt động cho cả script và EXE. """
     try:
         # PyInstaller tạo một thư mục tạm và lưu đường dẫn trong _MEIPASS
         base_path = sys._MEIPASS
     except Exception:
-        # _MEIPASS không tồn tại khi chạy ở dạng script
-        base_path = os.path.abspath(".")
+        # Nuitka và script thông thường sẽ dùng thư mục làm việc hoặc thư mục chứa file script
+        base_path = Path(__file__).resolve().parent
 
     return str(Path(base_path) / relative_path)
-# Xác định thư mục làm việc chính (nơi chứa file .exe hoặc .py)
-if getattr(sys, 'frozen', False):
-    # Chạy dưới dạng file EXE đã biên dịch
-    APP_DATA_DIR = Path(sys.executable).parent
-else:
-    # Chạy dưới dạng file script Python
-    APP_DATA_DIR = Path(__file__).resolve().parent
 
 CONFIG_FILE = APP_DATA_DIR / "app_config.json"
 APPS_DIR = APP_DATA_DIR / "Apps"
@@ -122,35 +111,39 @@ class ToolManager(QObject):
         self.session.headers.update({'User-Agent': 'TekDT-AIS-App'})
 
     def run_checks(self):
-        # Kiểm tra xem công cụ đã có sẵn chưa
         tools_present = ARIA2_EXEC.exists() and SEVENZ_EXEC.exists()
-        
-        if not tools_present:
-            try:
-                self.progress_update.emit("Kiểm tra kết nối internet...")
-                self.session.get("https://www.google.com", timeout=5)
-            except requests.ConnectionError:
-                self.finished.emit(False, "Không có internet và thiếu công cụ. Vui lòng kết nối mạng và khởi động lại.")
-                return
-        
-        # Tiếp tục kiểm tra cập nhật nếu có internet
-        try:
-            self.progress_update.emit("Kiểm tra và cập nhật 7-Zip...")
-            self._check_7zip()
+        is_online = False
 
-            self.progress_update.emit("Kiểm tra và cập nhật aria2...")
-            self._check_aria2()
-            self.finished.emit(True, "Kiểm tra công cụ hoàn tất.")
+        # 1. Kiểm tra kết nối mạng một cách an toàn
+        try:
+            self.progress_update.emit("Kiểm tra kết nối internet...")
+            self.session.get("https://www.google.com", timeout=5)
+            is_online = True
+            self.progress_update.emit("Đã kết nối internet. Kiểm tra cập nhật công cụ...")
         except requests.ConnectionError:
+            self.progress_update.emit("Không có internet. Sử dụng công cụ có sẵn (nếu có).")
+            is_online = False
+
+        # 2. Xử lý logic dựa trên trạng thái online và sự tồn tại của công cụ
+        if is_online:
+            # Nếu online, luôn cố gắng cập nhật công cụ
+            try:
+                self._check_7zip()
+                self._check_aria2()
+                self.finished.emit(True, "Kiểm tra công cụ hoàn tất.")
+            except Exception as e:
+                # Nếu cập nhật thất bại nhưng công cụ đã có sẵn, vẫn có thể tiếp tục
+                if tools_present:
+                    self.finished.emit(True, f"Lỗi khi cập nhật công cụ: {e}. Sử dụng phiên bản có sẵn.")
+                else: # Nếu cập nhật thất bại và cũng không có sẵn công cụ -> Lỗi nghiêm trọng
+                    self.finished.emit(False, f"Lỗi tải công cụ cần thiết: {e}. Vui lòng kiểm tra mạng và thử lại.")
+        else: # Nếu offline
             if tools_present:
-                self.finished.emit(True, "Không có internet, sử dụng công cụ có sẵn.")
+                # Offline nhưng có công cụ -> OK để tiếp tục
+                self.finished.emit(True, "Sử dụng công cụ có sẵn ở chế độ offline.")
             else:
-                self.finished.emit(False, "Không có internet và thiếu công cụ. Vui lòng kết nối mạng và khởi động lại.")
-        except Exception as e:
-            if tools_present:
-                self.finished.emit(True, f"Lỗi khi kiểm tra công cụ: {e}. Sử dụng công cụ có sẵn.")
-            else:
-                self.finished.emit(False, f"Lỗi khi kiểm tra công cụ: {e}. Thiếu công cụ cần thiết.")
+                # Offline và thiếu công cụ -> Lỗi nghiêm trọng
+                self.finished.emit(False, "Thiếu công cụ và không có internet để tải. Vui lòng kết nối mạng và khởi động lại.")
 
     def _check_7zip(self):
         tool_dir = SEVENZ_DIR
@@ -588,9 +581,9 @@ class TekDT_AIS(QMainWindow):
         self._scroll_positions = {}
 
         # Thiết lập biểu tượng cửa sổ
-        icon_path = resource_path("logo.ico")
-        if Path(icon_path).exists():
-            self.setWindowIcon(QIcon(icon_path))
+        # icon_path = resource_path("logo.ico")
+        # if Path(icon_path).exists():
+            # self.setWindowIcon(QIcon(icon_path))
 
         if self.embed_mode:
             self.setup_embed_ui()
@@ -1559,6 +1552,9 @@ if __name__ == '__main__':
             break
 
     app = QApplication(sys.argv)
+    icon_path_main = resource_path("logo.ico")
+    if Path(icon_path_main).exists():
+        app.setWindowIcon(QIcon(icon_path_main))
     main_win = TekDT_AIS(embed_mode=embed_mode, embed_size=embed_size)
 
     # Xử lý /help riêng biệt vì nó không cần giao diện
