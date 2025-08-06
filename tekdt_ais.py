@@ -579,11 +579,7 @@ class TekDT_AIS(QMainWindow):
         self.cli_task_results = {}        
         self._app_to_select_after_action = None 
         self._scroll_positions = {}
-
-        # Thiết lập biểu tượng cửa sổ
-        # icon_path = resource_path("logo.ico")
-        # if Path(icon_path).exists():
-            # self.setWindowIcon(QIcon(icon_path))
+        self.is_cli_mode = False
 
         if self.embed_mode:
             self.setup_embed_ui()
@@ -988,8 +984,10 @@ class TekDT_AIS(QMainWindow):
             status_text = "Tải danh sách thành công. Sẵn sàng."
             if hasattr(self, 'status_label') and self.status_label: self.status_label.setText(status_text)
         except requests.RequestException as e:
-            if not self.embed_mode:
+            if not self.is_cli_mode:
                 self.show_styled_message_box(QMessageBox.Icon.Warning, "Lỗi mạng", f"Không thể tải danh sách phần mềm từ máy chủ: {e}\nChương trình sẽ chỉ hiển thị các phần mềm đã có thông tin cục bộ.")
+            else:
+                print(f"Lưu ý: Không thể tải danh sách phần mềm từ máy chủ. Tiếp tục với dữ liệu cục bộ.")
             self.remote_apps = {"app_items": self.local_apps.copy()}
             if hasattr(self, 'status_label') and self.status_label:
                 self.status_label.setText("Chế độ Offline. Hiển thị các phần mềm đã tải.")
@@ -1595,7 +1593,8 @@ Lưu ý:
     # Các lệnh như /auto_install có thể được xử lý ở đây nếu cần, nhưng hiện tại tập trung vào /install và /update
     
     is_cli_command = any(arg in ['/install', '/update'] for arg in cli_command_args)
-
+    main_win.is_cli_mode = is_cli_command
+    
     if is_cli_command:
         # Chế độ CLI: Chờ tool check xong rồi mới chạy handle_cli_args.
         # handle_cli_args sẽ quyết định mọi thứ, bao gồm hiển thị GUI và thoát.
