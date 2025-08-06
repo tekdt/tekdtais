@@ -975,20 +975,33 @@ class TekDT_AIS(QMainWindow):
             self.selected_for_install = self.config.get("settings", {}).get("selected_for_install", [])
             if not isinstance(self.selected_for_install, list):
                 self.selected_for_install = []
-
+        
+        is_online = False
+        
         try:
             status_text = "Đang tải danh sách phần mềm từ máy chủ..."
             if hasattr(self, 'status_label') and self.status_label: self.status_label.setText(status_text)
             response = self.session.get(REMOTE_APP_LIST_URL, timeout=10)
             response.raise_for_status()
             self.remote_apps = response.json()
+            is_online = True
             status_text = "Tải danh sách thành công. Sẵn sàng."
             if hasattr(self, 'status_label') and self.status_label: self.status_label.setText(status_text)
         except requests.RequestException as e:
-            self.show_styled_message_box(QMessageBox.Icon.Warning, "Lỗi mạng", f"Không thể tải danh sách phần mềm từ máy chủ: {e}\nChương trình sẽ chỉ hiển thị các phần mềm đã có thông tin cục bộ.")
+            if not self.embed_mode:
+                self.show_styled_message_box(QMessageBox.Icon.Warning, "Lỗi mạng", f"Không thể tải danh sách phần mềm từ máy chủ: {e}\nChương trình sẽ chỉ hiển thị các phần mềm đã có thông tin cục bộ.")
             self.remote_apps = {"app_items": self.local_apps.copy()}
             if hasattr(self, 'status_label') and self.status_label:
-                self.status_label.setText("Lỗi mạng. Hiển thị các phần mềm đã biết.")
+                self.status_label.setText("Chế độ Offline. Hiển thị các phần mềm đã tải.")
+        
+        # Nếu đang ở chế độ offline, lọc danh sách để chỉ giữ lại các app đã được tải về.
+        if not is_online:
+            all_local_apps = self.remote_apps.get("app_items", {})
+            downloaded_apps_only = {
+                key: info for key, info in all_local_apps.items()
+                if self.is_app_downloaded(key, info)
+            }
+            self.remote_apps["app_items"] = downloaded_apps_only
         
         # Chỉ populate list nếu được yêu cầu (tránh làm việc thừa khi chạy CLI)
         if populate:
