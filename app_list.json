@@ -153,7 +153,7 @@
       "output_filename": "Firefox Setup 128.13.0esr.exe",
       "install_params": "/S",
       "icon_url": "https://www.firefox.com/media/protocol/img/logos/firefox/browser/logo.eb1324e44442.svg"
-    }
+    },
     "firefox64": {
       "display_name": "Free Download Manager 64Bit",
       "version": "128.13.0",

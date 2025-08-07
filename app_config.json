@@ -1,5 +1,7 @@
 {
-  "settings": {},
+  "settings": {
+    "selected_for_install": []
+  },
   "app_items": {
     "googlechrome64": {
       "display_name": "Google Chrome 64bit",
