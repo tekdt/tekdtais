@@ -165,7 +165,7 @@
       "download_url": "https://files2.freedownloadmanager.org/6/latest/fdm_x64_setup.exe",
       "output_filename": "fdm_x64_setup.exe",
       "install_params": "/SP- /VERYSILENT /SUPPRESSMSGBOXES /NORESTART",
-      "icon_url": "https://images-eds-ssl.xboxlive.com/image?url=4rt9.lXDC4H_93laV1_eHM0OYfiFeMI2p9MWie0CvL99U4GA1gf6_kayTt_kBblFwHwo8BW8JXlqfnYxKPmmBf5ZnXnMl_rd760sCzKS9ENz20qYyOVIE9TfI7WT5WxOgJwtxsqAOGlG5J.uloKJCH348TrrzTWBtLiVsJ9jGSI-&format=source"
+      "icon_url": "https://www.freedownloadmanager.org/favicon.ico"
     },
     "fdm32": {
       "display_name": "Free Download Manager 32Bit",
@@ -178,7 +178,7 @@
       "download_url": "https://files2.freedownloadmanager.org/fdm6_qt5/fdm_x86_setup.exe",
       "output_filename": "fdm_x86_setup.exe",
       "install_params": "/SP- /VERYSILENT /SUPPRESSMSGBOXES /NORESTART",
-      "icon_url": "https://images-eds-ssl.xboxlive.com/image?url=4rt9.lXDC4H_93laV1_eHM0OYfiFeMI2p9MWie0CvL99U4GA1gf6_kayTt_kBblFwHwo8BW8JXlqfnYxKPmmBf5ZnXnMl_rd760sCzKS9ENz20qYyOVIE9TfI7WT5WxOgJwtxsqAOGlG5J.uloKJCH348TrrzTWBtLiVsJ9jGSI-&format=source"
+      "icon_url": "https://www.freedownloadmanager.org/favicon.ico"
     },
     "AvastAVfree": {
       "display_name": "Avast Antivirus Free",
