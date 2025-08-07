@@ -104,29 +104,81 @@
     },
     "firefox64": {
       "display_name": "Mozilla Firefox 64bit",
-      "version": "141.0",
+      "version": "141.0.2",
       "category": "Trình duyệt Web",
       "description": "Trải nghiệm một trình duyệt web nhanh, thông minh và cá nhân.",
       "type": "installer",
       "architecture": "64bit",
       "compatible_os_arch": "64bit",
-      "download_url": "https://download.mozilla.org/?product=firefox-msi-latest-ssl&os=win64&lang=en-US",
-      "output_filename": "Firefox_Installer_x64.msi",
-      "install_params": "/quiet",
+      "download_url": "https://download.mozilla.org/?product=firefox-latest-ssl&os=win64&lang=en-US",
+      "output_filename": "Firefox Setup 141.0.2.exe",
+      "install_params": "/S",
       "icon_url": "https://www.firefox.com/media/protocol/img/logos/firefox/browser/logo.eb1324e44442.svg"
     },
     "firefox32": {
       "display_name": "Mozilla Firefox 32bit",
+      "version": "141.0.2",
+      "category": "Trình duyệt Web",
+      "description": "Trải nghiệm một trình duyệt web nhanh, thông minh và cá nhân.",
+      "type": "installer",
+      "architecture": "32bit",
+      "compatible_os_arch": "both",
+      "download_url": "https://download.mozilla.org/?product=firefox-latest-ssl&os=win&lang=en-US",
+      "output_filename": "Firefox Setup 141.0.2.exe",
+      "install_params": "/S",
+      "icon_url": "https://www.firefox.com/media/protocol/img/logos/firefox/browser/logo.eb1324e44442.svg"
+    },
+    "firefox64": {
+      "display_name": "Mozilla FireFox ESR 64Bit",
+      "version": "128.13.0",
+      "category": "Trình duyệt Web",
+      "description": "Trải nghiệm một trình duyệt web nhanh, thông minh và cá nhân.",
+      "type": "installer",
+      "architecture": "64bit",
+      "compatible_os_arch": "64bit",
+      "download_url": "https://download.mozilla.org/?product=firefox-esr-latest-ssl&os=win64&lang=en-US",
+      "output_filename": "Firefox Setup 128.13.0esr.exe",
+      "install_params": "/S",
+      "icon_url": "https://www.firefox.com/media/protocol/img/logos/firefox/browser/logo.eb1324e44442.svg"
+    },
+    "firefox32": {
+      "display_name": "Mozilla FireFox ESR 32Bit",
       "version": "141.0",
       "category": "Trình duyệt Web",
       "description": "Trải nghiệm một trình duyệt web nhanh, thông minh và cá nhân.",
       "type": "installer",
       "architecture": "32bit",
       "compatible_os_arch": "both",
-      "download_url": "https://download.mozilla.org/?product=firefox-msi-latest-ssl&os=win&lang=en-US",
-      "output_filename": "Firefox_Installer_x32.msi",
-      "install_params": "/quiet",
+      "download_url": "https://download.mozilla.org/?product=firefox-esr-latest-ssl&os=win&lang=en-US",
+      "output_filename": "Firefox Setup 128.13.0esr.exe",
+      "install_params": "/S",
       "icon_url": "https://www.firefox.com/media/protocol/img/logos/firefox/browser/logo.eb1324e44442.svg"
+    }
+    "firefox64": {
+      "display_name": "Free Download Manager 64Bit",
+      "version": "128.13.0",
+      "category": "Trình duyệt Web",
+      "description": "Trải nghiệm một trình duyệt web nhanh, thông minh và cá nhân.",
+      "type": "installer",
+      "architecture": "64bit",
+      "compatible_os_arch": "64bit",
+      "download_url": "https://download.mozilla.org/?product=firefox-esr-latest-ssl&os=win64&lang=en-US",
+      "output_filename": "Firefox Setup 128.13.0esr.exe",
+      "install_params": "/S",
+      "icon_url": "https://www.freedownloadmanager.org/favicon.ico"
+    },
+    "firefox32": {
+      "display_name": "Free Download Manager 32Bit",
+      "version": "141.0",
+      "category": "Trình duyệt Web",
+      "description": "Trải nghiệm một trình duyệt web nhanh, thông minh và cá nhân.",
+      "type": "installer",
+      "architecture": "32bit",
+      "compatible_os_arch": "both",
+      "download_url": "https://download.mozilla.org/?product=firefox-esr-latest-ssl&os=win&lang=en-US",
+      "output_filename": "Firefox Setup 128.13.0esr.exe",
+      "install_params": "/S",
+      "icon_url": "https://www.freedownloadmanager.org/favicon.ico"
     }
   }
 }
