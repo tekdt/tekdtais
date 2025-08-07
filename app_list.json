@@ -258,6 +258,19 @@
       "install_params": "/S",
       "icon_url": "https://m1.daumcdn.net/icon/w/c/13/11/42095036704489703.png"
     },
+    "K-Lite_Standard": {
+      "display_name": "K-Lite Codec Pack Standard",
+      "version": "19.1.0",
+      "category": "Đa phương tiện",
+      "description": "K-Lite Codec Pack là gói phần mềm miễn phí giúp phát lại mọi tệp nhạc và video chất lượng cao.",
+      "type": "installer",
+      "architecture": "32bit",
+      "compatible_os_arch": "both",
+      "download_url": "https://files2.codecguide.com/K-Lite_Codec_Pack_1910_Standard.exe",
+      "output_filename": "K-Lite_Codec_Pack_1910_Standard.exe",
+      "install_params": "/verysilent /norestart",
+      "icon_url": "https://codecguide.com/mpc_logo.png"
+    },
     "ProtonVPN32": {
       "display_name": "Proton VPN 32Bit",
       "version": "2.4.3",
@@ -283,6 +296,97 @@
       "output_filename": "ProtonVPN64.exe",
       "install_params": "/verysilent /norestart",
       "icon_url": "https://protonvpn.com/favicons/apple-touch-icon.png"
+    },
+    "Viber32": {
+      "display_name": "Viber 32Bit",
+      "version": "1.0.0",
+      "category": "Mạng xã hội",
+      "description": "Gọi điện và nhắn tin miễn phí và an toàn tới bất kỳ ai, ở bất kỳ đâu.",
+      "type": "installer",
+      "architecture": "32bit",
+      "compatible_os_arch": "both",
+      "download_url": "https://download.cdn.viber.com/desktop/windows_32/ViberSetup.exe",
+      "output_filename": "ViberSetup32.exe",
+      "install_params": "/S",
+      "icon_url": "https://www.viber.com/app/themes/viber/assets/images/favicon-v2/ms-icon-144x144.png"
+    },
+    "Viber64": {
+      "display_name": "Viber 64Bit",
+      "version": "1.0.0",
+      "category": "Mạng xã hội",
+      "description": "Gọi điện và nhắn tin miễn phí và an toàn tới bất kỳ ai, ở bất kỳ đâu.",
+      "type": "installer",
+      "architecture": "64bit",
+      "compatible_os_arch": "64bit",
+      "download_url": "https://download.cdn.viber.com/desktop/windows/ViberSetup.exe",
+      "output_filename": "ViberSetup64.exe",
+      "install_params": "/S",
+      "icon_url": "https://www.viber.com/app/themes/viber/assets/images/favicon-v2/ms-icon-144x144.png"
+    },
+    "LibreOffice32": {
+      "display_name": "LibreOffice 32Bit",
+      "version": "25.2.5",
+      "category": "Văn phòng",
+      "description": "LibreOffice là một bộ ứng dụng văn phòng riêng, miễn phí và mã nguồn mở – dự án kế thừa của OpenOffice. LibreOffice tương thích với các tệp Microsoft Office/365 (.doc, .docx, .xls, .xlsx, .ppt, .pptx) và được hỗ trợ bởi một tổ chức phi lợi nhuận.",
+      "type": "installer",
+      "architecture": "32bit",
+      "compatible_os_arch": "both",
+      "download_url": "https://www.libreoffice.org/donate/dl/win-x86/25.2.5/en-US/LibreOffice_25.2.5_Win_x86.msi",
+      "output_filename": "LibreOffice_25.2.5_Win_x86.msi",
+      "install_params": "/qn /norestart",
+      "icon_url": "https://www.libreoffice.org/themes/libreofficenew/favicon.ico"
+    },
+    "LibreOffice64": {
+      "display_name": "LibreOffice 64Bit",
+      "version": "25.2.5",
+      "category": "Văn phòng",
+      "description": "LibreOffice là một bộ ứng dụng văn phòng riêng, miễn phí và mã nguồn mở – dự án kế thừa của OpenOffice. LibreOffice tương thích với các tệp Microsoft Office/365 (.doc, .docx, .xls, .xlsx, .ppt, .pptx) và được hỗ trợ bởi một tổ chức phi lợi nhuận.",
+      "type": "installer",
+      "architecture": "64bit",
+      "compatible_os_arch": "both",
+      "download_url": "https://www.libreoffice.org/donate/dl/win-x86_64/25.2.5/en-US/LibreOffice_25.2.5_Win_x86-64.msi",
+      "output_filename": "LibreOffice_25.2.5_Win_x86-64.msi",
+      "install_params": "/qn /norestart",
+      "icon_url": "https://www.libreoffice.org/themes/libreofficenew/favicon.ico"
+    },
+    "OfficeTabFree": {
+      "display_name": "Office Tab",
+      "version": "1.0.0",
+      "category": "Tiện ích",
+      "description": "Thêm tính năng duyệt theo tab, đọc, chỉnh sửa và quản lý tài liệu vào Microsoft Office — mang lại trải nghiệm nhanh hơn, gọn gàng hơn và hiệu quả hơn. Hoàn toàn tương thích với Office 365 và tất cả các phiên bản chính.",
+      "type": "installer",
+      "architecture": "32bit",
+      "compatible_os_arch": "both",
+      "download_url": "https://download.extendoffice.com/downloads/SetupOfficeTab.msi",
+      "output_filename": "SetupOfficeTab.msi",
+      "install_params": "/quiet /norestart",
+      "icon_url": "https://i-cdn.apsgo.com/cdn/HHsdsvy5NrMo67Ng5Xtq8e5X3yCsUFXdwIyWuUW7.webp"
+    },
+    "FurMarkROG": {
+      "display_name": "FurMark 2 ROG Edition",
+      "version": "2.9.0.0",
+      "category": "Công cụ",
+      "description": "FurMark ROG Edition là phiên bản cải tiến mạnh mẽ của công cụ FurMark phổ biến dành cho ASUS. FurMark ROG Edition đi kèm với các bài kiểm tra ứng suất hiện đại và trình quét hiện vật dựa trên OpenGL và Vulkan.",
+      "type": "installer",
+      "architecture": "64bit",
+      "compatible_os_arch": "64bit",
+      "download_url": "https://geeks3d.com/dl/get/820",
+      "output_filename": "FurMark2_ROG_Edition_2.9.0.0_Win64_Setup.exe",
+      "install_params": "/verysilent",
+      "icon_url": "https://geeks3d.com/furmark/rog/gallery/i/asus-rog-logo.png"
+    },
+    "Ultraviewer": {
+      "display_name": "Ultraviewer",
+      "version": "6.6.0",
+      "category": "Điều khiển từ xa",
+      "description": "Phần mềm UltraViewer giúp bạn có thể điều khiển máy tính hỗ trợ khách hàng từ xa như ngồi trước màn hình.",
+      "type": "installer",
+      "architecture": "32bit",
+      "compatible_os_arch": "both",
+      "download_url": "https://dl2.ultraviewer.net/UltraViewer_setup_6.6_vi.exe",
+      "output_filename": "UltraViewer_setup_6.6_vi.exe",
+      "install_params": "-y",
+      "icon_url": "https://www.ultraviewer.net/images/logo.png"
     }
   }
 }

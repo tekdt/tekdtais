@@ -118,6 +118,42 @@
       "icon_url": "https://www.firefox.com/media/protocol/img/logos/firefox/browser/logo.eb1324e44442.svg",
       "icon_file": "logo.eb1324e44442.svg",
       "auto_install": true
+    },
+    "firefoxesr64": {
+      "icon_file": "logo.eb1324e44442.svg"
+    },
+    "firefoxesr32": {
+      "icon_file": "logo.eb1324e44442.svg"
+    },
+    "fdm64": {
+      "icon_file": "favicon.ico"
+    },
+    "fdm32": {
+      "icon_file": "favicon.ico"
+    },
+    "AvastAVfree": {
+      "icon_file": "avast-logo-default.svg"
+    },
+    "AVGAVfree": {
+      "icon_file": "avg-logo-v2.png"
+    },
+    "telegram32": {
+      "icon_file": "icon-192x192.png"
+    },
+    "telegram64": {
+      "icon_file": "icon-192x192.png"
+    },
+    "potplayer32": {
+      "icon_file": "42095036704489703.png"
+    },
+    "potplayer64": {
+      "icon_file": "42095036704489703.png"
+    },
+    "ProtonVPN32": {
+      "icon_file": "apple-touch-icon.png"
+    },
+    "ProtonVPN64": {
+      "icon_file": "apple-touch-icon.png"
     }
   }
 }
