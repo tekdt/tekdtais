@@ -356,26 +356,32 @@ class InstallWorker(QThread):
                         with open(icon_path, 'wb') as f: f.write(icon_response.content)
                     except requests.RequestException:
                         icon_filename = 'default_icon.png'
-                with open(CONFIG_FILE, 'r+', encoding='utf-8') as f:
-                    config = json.load(f)
-                    
-                    # Lấy thông tin cục bộ hiện có để giữ lại các giá trị quan trọng (như auto_install)
-                    existing_item = config.get('app_items', {}).get(app_key, {})
-                    auto_install_value = existing_item.get('auto_install', False) # Mặc định là false
+                # Mở file config để đọc-ghi
+                try:
+                    with open(CONFIG_FILE, 'r+', encoding='utf-8') as f:
+                        # Đọc nội dung, nếu file rỗng thì khởi tạo config mặc định
+                        content = f.read()
+                        config = json.loads(content) if content else {"settings": {}, "app_items": {}}
 
-                    # Bắt đầu với thông tin mới nhất từ server
-                    updated_info = app_info.copy()
-                    
-                    # Cập nhật các thông tin đã xử lý
-                    updated_info['icon_file'] = icon_filename
-                    updated_info['version'] = app_info.get('version')
-                    updated_info['auto_install'] = auto_install_value # Áp dụng lại giá trị auto_install cũ
-                    
-                    # Ghi đè toàn bộ mục ứng dụng với thông tin đã được làm giàu
-                    config.setdefault('app_items', {})[app_key] = updated_info
-                    f.seek(0)
-                    json.dump(config, f, indent=2, ensure_ascii=False)
-                    f.truncate()
+                        # Lấy thông tin hiện có của ứng dụng trong file config (nếu có)
+                        # Dùng setdefault để đảm bảo các khóa cần thiết luôn tồn tại
+                        app_items = config.setdefault('app_items', {})
+                        existing_item_info = app_items.setdefault(app_key, {})
+
+                        # 1. Cập nhật thông tin hiện có với tất cả thông tin mới từ server (app_info)
+                        #    Việc này sẽ cập nhật các key như 'version', 'description', 'download_url', etc.
+                        existing_item_info.update(app_info)
+
+                        # 2. Thêm hoặc cập nhật thông tin đã được xử lý cục bộ (tên file icon)
+                        existing_item_info['icon_file'] = icon_filename
+
+                        # 3. Ghi lại toàn bộ file config đã được cập nhật
+                        f.seek(0) # Đưa con trỏ về đầu file
+                        json.dump(config, f, indent=2, ensure_ascii=False)
+                        f.truncate() # Xóa phần nội dung thừa nếu file mới ngắn hơn file cũ
+                except (IOError, json.JSONDecodeError) as e:
+                    # Ghi lại lỗi nếu không thể đọc/ghi file config
+                    self.signals.error.emit(f"Lỗi khi cập nhật file config cho {app_key}: {e}")
                 
                 # --- Cài đặt ---
                 if action == "download":
@@ -1424,13 +1430,13 @@ class TekDT_AIS(QMainWindow):
         apps_to_process = {}
         for key in self.selected_for_install:
             if key in self.remote_apps.get('app_items', {}):
-                 remote_info = self.remote_apps['app_items'][key]
-                 local_info = self.local_apps.get(key, {})
-                 # Mặc định là 'install', nhưng nếu có phiên bản mới thì là 'update'
-                 action = 'install'
-                 if self.is_app_downloaded(key, remote_info) and parse_version(remote_info.get('version', '0')) > parse_version(local_info.get('version', '0')):
-                     action = 'update'
-                 apps_to_process[key] = {'info': remote_info, 'action': action}
+                remote_info = self.remote_apps['app_items'][key]
+                # local_info = self.local_apps.get(key, {})
+                # # Mặc định là 'install', nhưng nếu có phiên bản mới thì là 'update'
+                # action = 'install'
+                # if self.is_app_downloaded(key, remote_info) and parse_version(remote_info.get('version', '0')) > parse_version(local_info.get('version', '0')):
+                    # action = 'update'
+                apps_to_process[key] = {'info': remote_info, 'action': action}
 
 
         if not apps_to_process:

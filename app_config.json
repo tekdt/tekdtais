@@ -1,4 +1,175 @@
 {
-  "settings": {},
-  "app_items": {}
+  "settings": {
+    "selected_for_install": []
+  },
+  "app_items": {
+    "googlechrome64": {
+      "icon_file": "chrome-logo-m100.svg"
+    },
+    "googlechrome32": {
+      "icon_file": "chrome-logo-m100.svg"
+    },
+    "vlc64": {
+      "display_name": "VLC Media Player 64bit",
+      "version": "3.0.21",
+      "category": "Media",
+      "description": "Trình phát đa phương tiện miễn phí, mã nguồn mở, có thể phát hầu hết các định dạng.",
+      "type": "installer",
+      "architecture": "64bit",
+      "compatible_os_arch": "64bit",
+      "download_url": "https://get.videolan.org/vlc/3.0.21/win64/vlc-3.0.21-win64.exe",
+      "install_params": "/L=1066 /S",
+      "executable": "vlc-3.0.21-win64.exe",
+      "icon_url": "https://images.videolan.org/images/largeVLC.png",
+      "icon_file": "largeVLC.png",
+      "auto_install": false
+    },
+    "vlc32": {
+      "icon_file": "largeVLC.png"
+    },
+    "rufus64": {
+      "icon_file": "rufus-128.png"
+    },
+    "rufus32": {
+      "icon_file": "rufus-128.png"
+    },
+    "notepadplusplus64": {
+      "display_name": "Notepad++ 64bit",
+      "version": "8.8.3",
+      "category": "Lập trình",
+      "description": "Trình soạn thảo mã nguồn và thay thế Notepad hỗ trợ nhiều ngôn ngữ.",
+      "type": "installer",
+      "architecture": "64bit",
+      "compatible_os_arch": "64bit",
+      "download_url": "https://github.com/notepad-plus-plus/notepad-plus-plus/releases/download/v8.8.3/npp.8.8.3.Installer.x64.exe",
+      "install_params": "/S",
+      "executable": "npp.8.8.3.Installer.x64.exe",
+      "icon_url": "https://notepad-plus-plus.org/images/logo.svg",
+      "icon_file": "logo.svg",
+      "auto_install": false
+    },
+    "notepadplusplus32": {
+      "icon_file": "logo.svg"
+    },
+    "firefox64": {
+      "icon_file": "logo.eb1324e44442.svg"
+    },
+    "firefox32": {
+      "icon_file": "logo.eb1324e44442.svg"
+    },
+    "firefoxesr64": {
+      "icon_file": "logo.eb1324e44442.svg"
+    },
+    "firefoxesr32": {
+      "icon_file": "logo.eb1324e44442.svg"
+    },
+    "fdm64": {
+      "icon_file": "favicon.ico"
+    },
+    "fdm32": {
+      "icon_file": "favicon.ico"
+    },
+    "AvastAVfree": {
+      "icon_file": "avast-logo-default.svg"
+    },
+    "AVGAVfree": {
+      "icon_file": "avg-logo-v2.png"
+    },
+    "telegram32": {
+      "icon_file": "icon-192x192.png"
+    },
+    "telegram64": {
+      "icon_file": "icon-192x192.png"
+    },
+    "potplayer32": {
+      "icon_file": "42095036704489703.png"
+    },
+    "potplayer64": {
+      "icon_file": "42095036704489703.png"
+    },
+    "K-Lite_Standard": {
+      "icon_file": "mpc_logo.png"
+    },
+    "ProtonVPN32": {
+      "icon_file": "apple-touch-icon.png"
+    },
+    "ProtonVPN64": {
+      "icon_file": "apple-touch-icon.png"
+    },
+    "Viber32": {
+      "icon_file": "ms-icon-144x144.png"
+    },
+    "Viber64": {
+      "icon_file": "ms-icon-144x144.png"
+    },
+    "LibreOffice32": {
+      "icon_file": "favicon.ico"
+    },
+    "LibreOffice64": {
+      "icon_file": "favicon.ico"
+    },
+    "FileZilla32": {
+      "icon_file": "800px-FileZilla_logo.svg.png"
+    },
+    "FileZilla64": {
+      "icon_file": "800px-FileZilla_logo.svg.png"
+    },
+    "OfficeTabFree": {
+      "icon_file": "HHsdsvy5NrMo67Ng5Xtq8e5X3yCsUFXdwIyWuUW7.webp"
+    },
+    "FurMarkROG": {
+      "display_name": "FurMark 2 ROG Edition",
+      "version": "2.9.0.0",
+      "category": "Công cụ",
+      "description": "FurMark ROG Edition là phiên bản cải tiến mạnh mẽ của công cụ FurMark phổ biến dành cho ASUS. FurMark ROG Edition đi kèm với các bài kiểm tra ứng suất hiện đại và trình quét hiện vật dựa trên OpenGL và Vulkan.",
+      "type": "installer",
+      "architecture": "64bit",
+      "compatible_os_arch": "64bit",
+      "download_url": "https://geeks3d.com/dl/get/820",
+      "output_filename": "FurMark2_ROG_Edition_2.9.0.0_Win64_Setup.exe",
+      "install_params": "/verysilent",
+      "icon_url": "https://geeks3d.com/furmark/rog/gallery/i/asus-rog-logo.png",
+      "icon_file": "asus-rog-logo.png",
+      "auto_install": false
+    },
+    "Ultraviewer": {
+      "icon_file": "logo.png"
+    },
+    "VisualC++2015-2022_32": {
+      "icon_file": "1200px-Visual_Studio_Icon_2022.svg.png"
+    },
+    "VisualC++2015-2022_64": {
+      "icon_file": "1200px-Visual_Studio_Icon_2022.svg.png"
+    },
+    "VisualC++2013_32": {
+      "icon_file": "1200px-Visual_Studio_Icon_2022.svg.png"
+    },
+    "VisualC++2013_64": {
+      "icon_file": "1200px-Visual_Studio_Icon_2022.svg.png"
+    },
+    "VisualC++2012_32": {
+      "icon_file": "1200px-Visual_Studio_Icon_2022.svg.png"
+    },
+    "VisualC++2012_64": {
+      "icon_file": "1200px-Visual_Studio_Icon_2022.svg.png"
+    },
+    "VisualC++2010_32": {
+      "icon_file": "1200px-Visual_Studio_Icon_2022.svg.png"
+    },
+    "VisualC++2010_64": {
+      "icon_file": "1200px-Visual_Studio_Icon_2022.svg.png"
+    },
+    "VisualC++2008_32": {
+      "icon_file": "1200px-Visual_Studio_Icon_2022.svg.png"
+    },
+    "VisualC++2008_64": {
+      "icon_file": "1200px-Visual_Studio_Icon_2022.svg.png"
+    },
+    "VisualC++2005_32": {
+      "icon_file": "1200px-Visual_Studio_Icon_2022.svg.png"
+    },
+    "VisualC++2005_64": {
+      "icon_file": "1200px-Visual_Studio_Icon_2022.svg.png"
+    }
+  }
 }
