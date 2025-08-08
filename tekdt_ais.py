@@ -249,6 +249,7 @@ class WorkerSignals(QObject):
     error = pyqtSignal(str)
     progress_percentage = pyqtSignal(str, float)
     update_widget_status = pyqtSignal(str, str)
+    task_completed = pyqtSignal(str, dict)
 
 class InstallWorker(QThread):
     def __init__(self, worker_tasks):
@@ -379,6 +380,7 @@ class InstallWorker(QThread):
                         f.seek(0) # Đưa con trỏ về đầu file
                         json.dump(config, f, indent=2, ensure_ascii=False)
                         f.truncate() # Xóa phần nội dung thừa nếu file mới ngắn hơn file cũ
+                        self.signals.task_completed.emit(app_key, existing_item_info)
                 except (IOError, json.JSONDecodeError) as e:
                     # Ghi lại lỗi nếu không thể đọc/ghi file config
                     self.signals.error.emit(f"Lỗi khi cập nhật file config cho {app_key}: {e}")
@@ -743,6 +745,12 @@ class TekDT_AIS(QMainWindow):
         main_layout.addWidget(self.search_box)
         main_layout.addWidget(self.available_list_widget)
 
+    def on_task_completed(self, app_key, new_info):
+        """Cập nhật thông tin của một phần mềm trong bộ nhớ đệm."""
+        self.local_apps[app_key] = new_info
+        # Cập nhật cả trong config đang chạy để đồng bộ
+        self.config['app_items'][app_key] = new_info
+    
     def is_app_downloaded(self, app_key, app_info):
         """Kiểm tra xem tệp cài đặt chính của ứng dụng đã được tải về hay chưa."""
         download_url = app_info.get('download_url', '')
@@ -877,6 +885,7 @@ class TekDT_AIS(QMainWindow):
         self.install_worker.signals.finished.connect(on_cli_finished)
         self.install_worker.signals.error.connect(lambda e: self.show_styled_message_box(QMessageBox.Icon.Critical, "Lỗi Worker", str(e)))
         self.install_worker.signals.update_widget_status.connect(self.update_widget_status)
+        self.install_worker.signals.task_completed.connect(self.on_task_completed)
         self.install_worker.start()
 
     def update_and_record_progress(self, app_key, status, message):
@@ -1231,6 +1240,7 @@ class TekDT_AIS(QMainWindow):
             self.install_worker.signals.finished.connect(self.on_single_download_finished)
             self.install_worker.signals.error.connect(lambda e: self.show_styled_message_box(QMessageBox.Icon.Critical, "Lỗi Worker", str(e)))
             self.install_worker.signals.update_widget_status.connect(self.update_widget_status)
+            self.install_worker.signals.task_completed.connect(self.on_task_completed)
             if widget:
                 self.install_worker.signals.progress_percentage.connect(widget.update_download_progress)
             self.install_worker.start()
@@ -1261,6 +1271,7 @@ class TekDT_AIS(QMainWindow):
             self.install_worker.signals.finished.connect(self.on_single_download_finished)
             self.install_worker.signals.error.connect(lambda e: self.show_styled_message_box(QMessageBox.Icon.Critical, "Lỗi Worker", str(e)))
             self.install_worker.signals.update_widget_status.connect(self.update_widget_status)
+            self.install_worker.signals.task_completed.connect(self.on_task_completed)
             if widget:
                 self.install_worker.signals.progress_percentage.connect(widget.update_download_progress)
             # widget.set_status("processing")
@@ -1351,42 +1362,64 @@ class TekDT_AIS(QMainWindow):
                             widget.action_button.clicked.connect(on_complete_action)
                 break
 
+    # def on_single_download_finished(self):
+        # """Được gọi khi một tác vụ tải/cập nhật đơn lẻ hoàn tất."""
+        # key_to_select = None
+        # on_complete_action = None
+        
+        # if isinstance(self._app_to_select_after_action, tuple):
+            # # Trường hợp cập nhật: (key, on_complete_action)
+            # key_to_select, on_complete_action = self._app_to_select_after_action
+            
+            # # Sau khi cập nhật thành công, cập nhật phiên bản trong config
+            # if key_to_select and key_to_select in self.remote_apps.get('app_items', {}):
+                # remote_info = self.remote_apps['app_items'][key_to_select]
+                # new_version = remote_info.get('version')
+                
+                # # Cập nhật cả trong config và trong bộ nhớ local_apps
+                # if new_version:
+                    # self.config['app_items'].setdefault(key_to_select, {})['version'] = new_version
+                    # self.local_apps.setdefault(key_to_select, {})['version'] = new_version
+                    # self.save_config() # Lưu lại ngay lập tức
+
+        # elif isinstance(self._app_to_select_after_action, str):
+            # # Trường hợp tải mới: chỉ có key
+            # key_to_select = self._app_to_select_after_action
+
+        # self._app_to_select_after_action = None # Reset lại
+        # self.install_worker = None
+
+        # # Tải lại toàn bộ danh sách để phản ánh các thay đổi (vd: phiên bản mới)
+        # # Vì đã cập nhật config và local_apps, lần tải lại này sẽ hiển thị đúng trạng thái.
+        # self.is_processing = False
+        # self.load_config_and_apps()
+
+        # # Nếu có một hành động sau cùng cần thực hiện (ví dụ: chuyển sang khung bên phải)
+        # if on_complete_action:
+            # on_complete_action()
+
     def on_single_download_finished(self):
         """Được gọi khi một tác vụ tải/cập nhật đơn lẻ hoàn tất."""
-        key_to_select = None
         on_complete_action = None
-        
+        key_to_process = None
+
         if isinstance(self._app_to_select_after_action, tuple):
-            # Trường hợp cập nhật: (key, on_complete_action)
-            key_to_select, on_complete_action = self._app_to_select_after_action
-            
-            # Sau khi cập nhật thành công, cập nhật phiên bản trong config
-            if key_to_select and key_to_select in self.remote_apps.get('app_items', {}):
-                remote_info = self.remote_apps['app_items'][key_to_select]
-                new_version = remote_info.get('version')
-                
-                # Cập nhật cả trong config và trong bộ nhớ local_apps
-                if new_version:
-                    self.config['app_items'].setdefault(key_to_select, {})['version'] = new_version
-                    self.local_apps.setdefault(key_to_select, {})['version'] = new_version
-                    self.save_config() # Lưu lại ngay lập tức
-
+            key_to_process, on_complete_action = self._app_to_select_after_action
         elif isinstance(self._app_to_select_after_action, str):
-            # Trường hợp tải mới: chỉ có key
-            key_to_select = self._app_to_select_after_action
+            key_to_process = self._app_to_select_after_action
 
-        self._app_to_select_after_action = None # Reset lại
+        self._app_to_select_after_action = None
         self.install_worker = None
-
-        # Tải lại toàn bộ danh sách để phản ánh các thay đổi (vd: phiên bản mới)
-        # Vì đã cập nhật config và local_apps, lần tải lại này sẽ hiển thị đúng trạng thái.
         self.is_processing = False
-        self.load_config_and_apps()
 
-        # Nếu có một hành động sau cùng cần thực hiện (ví dụ: chuyển sang khung bên phải)
+        # Chỉ cần làm mới danh sách hiển thị, không cần đọc lại file config
+        # vì bộ nhớ self.local_apps đã được cập nhật qua tín hiệu.
+        self.populate_lists()
+
+        # Nếu có hành động sau cùng cần thực hiện (ví dụ: chuyển sang khung bên phải)
         if on_complete_action:
             on_complete_action()
-
+    
     def filter_apps(self, text):
         text = text.lower().strip()
         min_chars = 1 if self.embed_mode else 2
@@ -1436,7 +1469,7 @@ class TekDT_AIS(QMainWindow):
                 # action = 'install'
                 # if self.is_app_downloaded(key, remote_info) and parse_version(remote_info.get('version', '0')) > parse_version(local_info.get('version', '0')):
                     # action = 'update'
-                apps_to_process[key] = {'info': remote_info, 'action': action}
+                apps_to_process[key] = {'info': remote_info, 'action': 'install'}
 
 
         if not apps_to_process:
@@ -1455,6 +1488,7 @@ class TekDT_AIS(QMainWindow):
         self.install_worker.signals.finished.connect(self.on_installation_finished)
         self.install_worker.signals.error.connect(lambda e: self.show_styled_message_box(QMessageBox.Icon.Critical, "Lỗi Worker", str(e)))
         self.install_worker.signals.update_widget_status.connect(self.update_widget_status)
+        self.install_worker.signals.task_completed.connect(self.on_task_completed)
         self.install_worker.start()
         
     def update_download_progress_selected(self, app_key, percentage):
