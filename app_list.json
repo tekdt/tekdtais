@@ -569,6 +569,71 @@
       "output_filename": "vcredist_2005_x64.exe",
       "install_params": "/Q",
       "icon_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2c/Visual_Studio_Icon_2022.svg/1200px-Visual_Studio_Icon_2022.svg.png"
+    },
+    "Teamviewer32": {
+      "display_name": "TeamViewer 32Bit",
+      "version": "1.0.0",
+      "category": "Điều khiển từ xa",
+      "description": "Truy cập và hỗ trợ từ xa liền mạch với TeamViewer. Giải pháp mạnh mẽ dành cho các nhóm và chuyên gia CNTT.",
+      "type": "installer",
+      "architecture": "32bit",
+      "compatible_os_arch": "both",
+      "download_url": "https://download.teamviewer.com/download/TeamViewer_Setup.exe",
+      "output_filename": "TeamViewer_Setup.exe",
+      "install_params": "/S",
+      "icon_url": "https://www.teamviewer.com/etc.clientlibs/teamviewer/clientlibs/clientlib-resources/resources/favicon.png"
+    },
+    "Teamviewer64": {
+      "display_name": "TeamViewer 64Bit",
+      "version": "1.0.0",
+      "category": "Điều khiển từ xa",
+      "description": "Truy cập và hỗ trợ từ xa liền mạch với TeamViewer. Giải pháp mạnh mẽ dành cho các nhóm và chuyên gia CNTT.",
+      "type": "installer",
+      "architecture": "64bit",
+      "compatible_os_arch": "64bit",
+      "download_url": "https://download.teamviewer.com/download/TeamViewer_Setup_x64.exe",
+      "output_filename": "TeamViewer_Setup_x64.exe",
+      "install_params": "/S",
+      "icon_url": "https://www.teamviewer.com/etc.clientlibs/teamviewer/clientlibs/clientlib-resources/resources/favicon.png"
+    },
+    "7z32": {
+      "display_name": "7-Zip 32Bit",
+      "version": "25.01",
+      "category": "Nén và Giải nén",
+      "description": "7-Zip là phần mềm lưu trữ tệp có tỷ lệ nén cao.",
+      "type": "installer",
+      "architecture": "32bit",
+      "compatible_os_arch": "both",
+      "download_url": "https://www.7-zip.org/a/7z2501.exe",
+      "output_filename": "7z2501.exe",
+      "install_params": "/S",
+      "icon_url": "https://www.7-zip.org/7ziplogo.png"
+    },
+    "7z64": {
+      "display_name": "7-Zip 64Bit",
+      "version": "25.01",
+      "category": "Nén và Giải nén",
+      "description": "7-Zip là phần mềm lưu trữ tệp có tỷ lệ nén cao.",
+      "type": "installer",
+      "architecture": "64bit",
+      "compatible_os_arch": "64bit",
+      "download_url": "https://www.7-zip.org/a/7z2501-x64.exe",
+      "output_filename": "7z2501-x64.exe",
+      "install_params": "/S",
+      "icon_url": "https://www.7-zip.org/7ziplogo.png"
+    },
+    "WinRAR64": {
+      "display_name": "7-Zip 64Bit",
+      "version": "25.01",
+      "category": "Nén và Giải nén",
+      "description": "7-Zip là phần mềm lưu trữ tệp có tỷ lệ nén cao.",
+      "type": "installer",
+      "architecture": "64bit",
+      "compatible_os_arch": "64bit",
+      "download_url": "https://www.rarlab.com/rar/winrar-x64-713.exe",
+      "output_filename": "winrar-x64-713.exe",
+      "install_params": "/S",
+      "icon_url": "https://www.rarlab.com/logos/raricon48.png"
     }
   }
 }
