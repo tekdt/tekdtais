@@ -248,6 +248,7 @@ class WorkerSignals(QObject):
     progress = pyqtSignal(str, str, str)
     error = pyqtSignal(str)
     progress_percentage = pyqtSignal(str, float)
+    update_widget_status = pyqtSignal(str, str)
 
 class InstallWorker(QThread):
     def __init__(self, worker_tasks):
@@ -265,6 +266,7 @@ class InstallWorker(QThread):
         try:
             for app_key, task_def in self.worker_tasks.items():
                 if self._is_stopped:
+                    self.signals.update_widget_status.emit(app_key, "failed")
                     self.signals.progress.emit(app_key, "stopped", "Tác vụ đã bị dừng.")
                     continue
 
@@ -272,11 +274,13 @@ class InstallWorker(QThread):
                 app_info = task_def['info']
                 display_name = app_info.get('display_name', app_key)
 
+                self.signals.update_widget_status.emit(app_key, "processing")
                 self.signals.progress.emit(app_key, "processing", f"Chuẩn bị xử lý {display_name}...")
 
                 # --- Tải xuống ---
                 download_url = app_info.get('download_url')
                 if not download_url:
+                    self.signals.update_widget_status.emit(app_key, "failed")
                     self.signals.progress.emit(app_key, "failed", f"Lỗi: Thiếu 'download_url' cho {display_name}.")
                     continue
 
@@ -292,12 +296,15 @@ class InstallWorker(QThread):
                     try:
                         download_path.unlink()
                         needs_download = True
+                        self.signals.update_widget_status.emit(app_key, "processing")
                         self.signals.progress.emit(app_key, "processing", f"Đã xóa phiên bản cũ của {display_name}.")
                     except OSError as e:
+                        self.signals.update_widget_status.emit(app_key, "failed")
                         self.signals.progress.emit(app_key, "failed", f"Không thể xóa file cũ: {e}")
                         continue
 
                 if needs_download:
+                    self.signals.update_widget_status.emit(app_key, "processing")
                     self.signals.progress.emit(app_key, "processing", f"Đang tải {display_name}...")
                     command = [
                         str(ARIA2_EXEC), "--dir", str(app_dir), "--out", file_name,
@@ -325,12 +332,14 @@ class InstallWorker(QThread):
                                 self.signals.progress_percentage.emit(app_key, float(match.group(1)))
                     
                     if self._is_stopped:
+                        self.signals.update_widget_status.emit(app_key, "failed")
                         self.signals.progress.emit(app_key, "stopped", "Tải xuống đã bị dừng.")
                         continue
 
                     process.wait()
                     if process.returncode != 0:
                         stderr = process.stderr.read()
+                        self.signals.update_widget_status.emit(app_key, "failed")
                         self.signals.progress.emit(app_key, "failed", f"Tải thất bại: {stderr}")
                         continue
                 
@@ -369,10 +378,14 @@ class InstallWorker(QThread):
                     f.truncate()
                 
                 # --- Cài đặt ---
-                if action == "install" and app_info.get('type') == 'installer' and download_path.exists():
+                if action == "download":
+                    self.signals.progress.emit(app_key, "success", f"Đã tải {display_name} thành công!")
+                elif action == "install" and app_info.get('type') == 'installer' and download_path.exists():
+                    self.signals.update_widget_status.emit(app_key, "installing")
                     self.signals.progress.emit(app_key, "installing", f"Đang cài đặt {display_name}...")
                     install_params = app_info.get('install_params', '')
                     if not install_params:
+                        self.signals.update_widget_status.emit(app_key, "failed")
                         self.signals.progress.emit(app_key, "failed", f"Lỗi: Thiếu 'install_params' cho {display_name}.")
                         continue
                     
@@ -383,17 +396,23 @@ class InstallWorker(QThread):
                         install_process.wait() # Chờ quá trình cài đặt hoàn tất
                         
                         if install_process.returncode == 0:
+                            self.signals.update_widget_status.emit(app_key, "success")
                             self.signals.progress.emit(app_key, "success", f"Đã xử lý {display_name} thành công!")
                         else:
+                            self.signals.update_widget_status.emit(app_key, "failed")
                             self.signals.progress.emit(app_key, "failed", f"Cài đặt {display_name} thất bại (mã lỗi: {install_process.returncode}).")
                     except Exception as e:
+                        self.signals.update_widget_status.emit(app_key, "failed")
                         self.signals.progress.emit(app_key, "failed", f"Lỗi khi chạy cài đặt: {e}")
                 
                 elif app_info.get('type') == 'portable' and download_path.exists():
+                    self.signals.update_widget_status.emit(app_key, "success")
                     self.signals.progress.emit(app_key, "success", f"Đã tải {display_name} (portable) thành công!")
                 elif action == "update":
+                    self.signals.update_widget_status.emit(app_key, "success")
                     self.signals.progress.emit(app_key, "success", f"Đã cập nhật {display_name} thành công!")
                 else:
+                    self.signals.update_widget_status.emit(app_key, "failed")
                     self.signals.progress.emit(app_key, "failed", f"Không thể xử lý {display_name}: Thiếu tệp hoặc loại không hợp lệ.")
 
         except Exception as e:
@@ -580,6 +599,7 @@ class TekDT_AIS(QMainWindow):
         self._app_to_select_after_action = None 
         self._scroll_positions = {}
         self.is_cli_mode = False
+        self.is_processing = False
 
         if self.embed_mode:
             self.setup_embed_ui()
@@ -850,7 +870,7 @@ class TekDT_AIS(QMainWindow):
         self.install_worker.signals.progress_percentage.connect(self.update_download_progress_selected)
         self.install_worker.signals.finished.connect(on_cli_finished)
         self.install_worker.signals.error.connect(lambda e: self.show_styled_message_box(QMessageBox.Icon.Critical, "Lỗi Worker", str(e)))
-        
+        self.install_worker.signals.update_widget_status.connect(self.update_widget_status)
         self.install_worker.start()
 
     def update_and_record_progress(self, app_key, status, message):
@@ -1006,6 +1026,8 @@ class TekDT_AIS(QMainWindow):
             self.populate_lists()
         
     def populate_lists(self):
+        if self.is_processing:
+            return
         self.save_scroll_positions()
         self.available_list_widget.clear()
         if not self.embed_mode:
@@ -1165,6 +1187,27 @@ class TekDT_AIS(QMainWindow):
         if self.embed_mode:
             self.populate_lists()
 
+    def find_widget_by_key(self, app_key):
+        """Tìm widget trong available_list_widget hoặc selected_list_widget theo app_key."""
+        for i in range(self.available_list_widget.count()):
+            item = self.available_list_widget.item(i)
+            widget = self.available_list_widget.itemWidget(item)
+            if hasattr(widget, 'app_key') and widget.app_key == app_key:
+                return widget
+        if not self.embed_mode:
+            for i in range(self.selected_list_widget.count()):
+                item = self.selected_list_widget.item(i)
+                widget = self.selected_list_widget.itemWidget(item)
+                if hasattr(widget, 'app_key') and widget.app_key == app_key:
+                    return widget
+        return None
+    
+    def update_widget_status(self, app_key, status):
+        """Xử lý signal cập nhật trạng thái widget."""
+        widget = self.find_widget_by_key(app_key)
+        if widget and widget.parent():  # Kiểm tra widget còn tồn tại và có parent
+            widget.set_status(status)
+    
     def confirm_download(self, key, info, widget):
         reply = self.show_styled_message_box(
             QMessageBox.Icon.Question,
@@ -1173,18 +1216,17 @@ class TekDT_AIS(QMainWindow):
             buttons=QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         )
         if reply == QMessageBox.StandardButton.Yes:
+            self.is_processing = True
             self._app_to_select_after_action = key
             # Action 'install' cũng có nghĩa là 'download and prepare for install'
-            worker_tasks = {key: {'info': info, 'action': 'install'}}
+            worker_tasks = {key: {'info': info, 'action': 'download'}}
             self.install_worker = InstallWorker(worker_tasks)
             self.install_worker.signals.progress.connect(self.update_install_progress)
             self.install_worker.signals.finished.connect(self.on_single_download_finished)
             self.install_worker.signals.error.connect(lambda e: self.show_styled_message_box(QMessageBox.Icon.Critical, "Lỗi Worker", str(e)))
+            self.install_worker.signals.update_widget_status.connect(self.update_widget_status)
             if widget:
                 self.install_worker.signals.progress_percentage.connect(widget.update_download_progress)
-            
-            # Cập nhật trạng thái widget ngay lập tức
-            widget.set_status("processing")
             self.install_worker.start()
     
     def confirm_update(self, key, info, widget, local_ver, remote_ver, on_complete):
@@ -1212,9 +1254,10 @@ class TekDT_AIS(QMainWindow):
             self.install_worker.signals.progress.connect(self.update_install_progress)
             self.install_worker.signals.finished.connect(self.on_single_download_finished)
             self.install_worker.signals.error.connect(lambda e: self.show_styled_message_box(QMessageBox.Icon.Critical, "Lỗi Worker", str(e)))
+            self.install_worker.signals.update_widget_status.connect(self.update_widget_status)
             if widget:
                 self.install_worker.signals.progress_percentage.connect(widget.update_download_progress)
-            widget.set_status("processing")
+            # widget.set_status("processing")
             self.install_worker.start()
 
     def move_app_to_selection(self, key, info):
@@ -1331,6 +1374,7 @@ class TekDT_AIS(QMainWindow):
 
         # Tải lại toàn bộ danh sách để phản ánh các thay đổi (vd: phiên bản mới)
         # Vì đã cập nhật config và local_apps, lần tải lại này sẽ hiển thị đúng trạng thái.
+        self.is_processing = False
         self.load_config_and_apps()
 
         # Nếu có một hành động sau cùng cần thực hiện (ví dụ: chuyển sang khung bên phải)
@@ -1404,13 +1448,14 @@ class TekDT_AIS(QMainWindow):
         self.install_worker.signals.progress_percentage.connect(self.update_download_progress_selected)
         self.install_worker.signals.finished.connect(self.on_installation_finished)
         self.install_worker.signals.error.connect(lambda e: self.show_styled_message_box(QMessageBox.Icon.Critical, "Lỗi Worker", str(e)))
+        self.install_worker.signals.update_widget_status.connect(self.update_widget_status)
         self.install_worker.start()
         
     def update_download_progress_selected(self, app_key, percentage):
         for i in range(self.selected_list_widget.count()):
             item = self.selected_list_widget.item(i)
             widget = self.selected_list_widget.itemWidget(item)
-            if hasattr(widget, 'app_key') and widget.app_key == app_key:
+            if hasattr(widget, 'app_key') and widget.app_key == app_key and widget.parent():
                 widget.update_download_progress(app_key, percentage)
                 break
 
@@ -1430,7 +1475,7 @@ class TekDT_AIS(QMainWindow):
                     target_widget = widget
                     break
 
-        if target_widget:
+        if target_widget and target_widget.parent():
             display_name = target_widget.app_info.get('display_name', app_key)
             status_text = f"{display_name}: {message}"
             if hasattr(self, 'status_label') and self.status_label:
