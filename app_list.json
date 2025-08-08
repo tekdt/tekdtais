@@ -411,7 +411,7 @@
       "compatible_os_arch": "both",
       "download_url": "https://dl2.ultraviewer.net/UltraViewer_setup_6.6_vi.exe",
       "output_filename": "UltraViewer_setup_6.6_vi.exe",
-      "install_params": "/SP- /VERYSILENT /SUPPRESSMSGBOXES /NORESTART",
+      "install_params": "/SP- /VERYSILENT",
       "icon_url": "https://www.ultraviewer.net/images/logo.png"
     },
     "VisualC++2015-2022_32": {
