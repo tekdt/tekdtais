@@ -634,6 +634,19 @@
       "output_filename": "winrar-x64-713.exe",
       "install_params": "/S",
       "icon_url": "https://www.rarlab.com/logos/raricon48.png"
+    },
+    "FoxitPDFReader": {
+      "display_name": "Foxit PDF Reader",
+      "version": "1.0.0",
+      "category": "Văn phòng",
+      "description": "Trình đọc PDF Giải pháp đọc PDF mạnh mẽ nhất trong ngành.",
+      "type": "installer",
+      "architecture": "32bit",
+      "compatible_os_arch": "both",
+      "download_url": "https://www.foxit.com/downloads/latest.html?product=Foxit-Reader&platform=Windows&version=&package_type=&language=English&distID=",
+      "output_filename": "FoxitPDFReader_enu_Setup_Prom.exe",
+      "install_params": "/S",
+      "icon_url": "https://www.foxit.com/static/company/images/icons/foxit-pdf-reader-logo-500x500.png"
     }
   }
 }
