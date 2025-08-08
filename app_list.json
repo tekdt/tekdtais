@@ -623,10 +623,10 @@
       "icon_url": "https://www.7-zip.org/7ziplogo.png"
     },
     "WinRAR64": {
-      "display_name": "7-Zip 64Bit",
+      "display_name": "WinRAR 64Bit",
       "version": "25.01",
       "category": "Nén và Giải nén",
-      "description": "7-Zip là phần mềm lưu trữ tệp có tỷ lệ nén cao.",
+      "description": "WinRAR là một công cụ giải nén mạnh mẽ và có thể mở tất cả các định dạng tệp phổ biến.",
       "type": "installer",
       "architecture": "64bit",
       "compatible_os_arch": "64bit",
