@@ -24,7 +24,7 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QH
                              QMessageBox, QSizePolicy, QTextEdit)
 from PyQt6.QtGui import QIcon, QPixmap, QColor, QPalette, QFont, QMovie
 from PyQt6.QtCore import (Qt, QSize, QThread, pyqtSignal, QObject, QPropertyAnimation,
-                          QEasingCurve, QTimer, QRect)
+                          QEasingCurve, QTimer, QRect, QCoreApplication)
 
 # --- CÁC HẰNG SỐ VÀ CẤU HÌNH ---
 APP_NAME = "TekDT AIS"
