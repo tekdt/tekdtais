@@ -14,6 +14,7 @@ import re
 import shlex
 import signal
 import threading
+import queue
 import time
 from packaging.version import parse as parse_version
 
@@ -267,31 +268,77 @@ class AriaDownloader(QThread):
     def stop(self):
         self._is_stopped = True
         if self.process:
-            self.process.terminate()
+            # Gửi tín hiệu terminate đến tiến trình aria2
+            try:
+                self.process.terminate()
+            except ProcessLookupError:
+                pass # Tiến trình có thể đã kết thúc rồi
+
+    def _enqueue_output(self, pipe, q):
+        """
+        Hàm này chạy trong một luồng riêng, chỉ đọc output từ pipe
+        và đưa vào queue.
+        """
+        try:
+            # Dùng iter để đọc từng dòng cho đến khi pipe được đóng
+            for line in iter(pipe.readline, b''):
+                q.put(line)
+        finally:
+            pipe.close()
 
     def run(self):
         try:
             self.process = subprocess.Popen(
                 self.command,
                 stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True, encoding='utf-8', errors='ignore',
+                stderr=subprocess.PIPE, # Bắt cả stderr để gỡ lỗi
                 cwd=self.cwd,
+                # Quan trọng: không dùng text=True, chúng ta sẽ tự decode
                 creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NO_WINDOW
             )
 
-            percentage_pattern = re.compile(r'\[.*?\((\d+)%\)')
+            # Tạo một queue để giao tiếp giữa luồng đọc và luồng chính
+            q = queue.Queue()
 
-            # Dùng iter(process.stdout.readline, '') để tránh treo khi tiến trình kết thúc
-            for line in iter(self.process.stdout.readline, ''):
+            # Tạo và bắt đầu luồng đọc output (stdout)
+            reader_thread = threading.Thread(target=self._enqueue_output, args=(self.process.stdout, q))
+            reader_thread.daemon = True # Luồng sẽ tự thoát khi chương trình chính thoát
+            reader_thread.start()
+            
+            # Tạo luồng đọc lỗi (stderr) để gỡ lỗi tốt hơn
+            error_q = queue.Queue()
+            error_reader_thread = threading.Thread(target=self._enqueue_output, args=(self.process.stderr, error_q))
+            error_reader_thread.daemon = True
+            error_reader_thread.start()
+
+            percentage_pattern = re.compile(r'\[.*?\((\d+)%\)')
+            
+            # Vòng lặp chính: xử lý dữ liệu từ queue và kiểm tra trạng thái tiến trình
+            # Vòng lặp này không bị block bởi I/O
+            while self.process.poll() is None:
                 if self._is_stopped:
                     break
-                if line:
-                    match = percentage_pattern.search(line)
+
+                try:
+                    # Lấy một dòng từ queue, không block.
+                    # Nếu queue rỗng, nó sẽ ném ra lỗi queue.Empty
+                    line_bytes = q.get_nowait()
+                    line_str = line_bytes.decode('utf-8', errors='ignore')
+                    
+                    match = percentage_pattern.search(line_str)
                     if match:
                         self.progress_percentage.emit(self.app_key, float(match.group(1)))
+
+                except queue.Empty:
+                    # Queue rỗng, không sao cả, đợi một chút rồi thử lại
+                    time.sleep(0.1)
             
-            self.process.wait()
+            # Đợi các luồng đọc kết thúc
+            reader_thread.join(timeout=1)
+            error_reader_thread.join(timeout=1)
+
+            # Sau khi tiến trình kết thúc, thu thập lỗi nếu có
+            error_output = "".join(line.decode('utf-8', errors='ignore') for line in list(error_q.queue))
 
             if self._is_stopped:
                 self.finished.emit(self.app_key, False)
@@ -301,9 +348,7 @@ class AriaDownloader(QThread):
                 self.progress_percentage.emit(self.app_key, 100.0)
                 self.finished.emit(self.app_key, True)
             else:
-                # In lỗi ra console để debug
-                stderr = self.process.stderr.read()
-                print(f"Lỗi tải {self.app_key}: {stderr}")
+                print(f"Lỗi tải {self.app_key} (mã lỗi: {self.process.returncode}): {error_output}")
                 self.finished.emit(self.app_key, False)
 
         except Exception as e:
