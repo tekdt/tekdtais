@@ -23,11 +23,11 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QH
                              QMessageBox, QSizePolicy, QTextEdit)
 from PyQt6.QtGui import QIcon, QPixmap, QColor, QPalette, QFont, QMovie
 from PyQt6.QtCore import (Qt, QSize, QThread, pyqtSignal, QObject, QPropertyAnimation,
-                          QEasingCurve, QTimer)
+                          QEasingCurve, QTimer, QRect)
 
 # --- CÁC HẰNG SỐ VÀ CẤU HÌNH ---
 APP_NAME = "TekDT AIS"
-APP_VERSION = "1.0.0"
+APP_VERSION = "1.0.1"
 GITHUB_REPO_URL = "https://github.com/tekdt/tekdtais"
 REMOTE_APP_LIST_URL = "https://raw.githubusercontent.com/tekdt/tekdtais/refs/heads/main/app_list.json"
     
@@ -249,184 +249,355 @@ class WorkerSignals(QObject):
     error = pyqtSignal(str)
     progress_percentage = pyqtSignal(str, float)
     update_widget_status = pyqtSignal(str, str)
-    task_completed = pyqtSignal(str, dict)
+    tasks_batch_completed = pyqtSignal(dict) 
+
+class AriaDownloader(QThread):
+    # Tín hiệu trả về app_key để biết tiến trình của app nào
+    progress_percentage = pyqtSignal(str, float)
+    finished = pyqtSignal(str, bool) # app_key, success
+
+    def __init__(self, app_key, command, cwd):
+        super().__init__()
+        self.app_key = app_key
+        self.command = command
+        self.cwd = cwd
+        self._is_stopped = False
+        self.process = None
+
+    def stop(self):
+        self._is_stopped = True
+        if self.process:
+            self.process.terminate()
+
+    def run(self):
+        try:
+            self.process = subprocess.Popen(
+                self.command,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True, encoding='utf-8', errors='ignore',
+                cwd=self.cwd,
+                creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NO_WINDOW
+            )
+
+            percentage_pattern = re.compile(r'\[.*?\((\d+)%\)')
+
+            # Dùng iter(process.stdout.readline, '') để tránh treo khi tiến trình kết thúc
+            for line in iter(self.process.stdout.readline, ''):
+                if self._is_stopped:
+                    break
+                if line:
+                    match = percentage_pattern.search(line)
+                    if match:
+                        self.progress_percentage.emit(self.app_key, float(match.group(1)))
+            
+            self.process.wait()
+
+            if self._is_stopped:
+                self.finished.emit(self.app_key, False)
+                return
+
+            if self.process.returncode == 0:
+                self.progress_percentage.emit(self.app_key, 100.0)
+                self.finished.emit(self.app_key, True)
+            else:
+                # In lỗi ra console để debug
+                stderr = self.process.stderr.read()
+                print(f"Lỗi tải {self.app_key}: {stderr}")
+                self.finished.emit(self.app_key, False)
+
+        except Exception as e:
+            print(f"Ngoại lệ trong AriaDownloader cho {self.app_key}: {e}")
+            self.finished.emit(self.app_key, False)
 
 class InstallWorker(QThread):
     def __init__(self, worker_tasks):
         super().__init__()
+        self.main_win = main_win
         self.signals = WorkerSignals()
-        self.worker_tasks = worker_tasks
+        self.worker_tasks = worker_tasks # {app_key: {'action': ..., 'info': ...}}
         self._is_stopped = False
+        
         self.session = requests.Session()
         self.session.headers.update({'User-Agent': 'TekDT-AIS-App'})
 
+        # Các biến quản lý trạng thái
+        self.downloaders = []
+        self.tasks_to_process_after_download = {}
+        self.active_downloads = 0
+        self.lock = threading.Lock() # Để bảo vệ việc truy cập self.active_downloads
+        self.config_lock = threading.Lock()
+
     def stop(self):
         self._is_stopped = True
+        for downloader in self.downloaders:
+            downloader.stop()
 
     def run(self):
         try:
-            for app_key, task_def in self.worker_tasks.items():
-                if self._is_stopped:
-                    self.signals.update_widget_status.emit(app_key, "failed")
-                    self.signals.progress.emit(app_key, "stopped", "Tác vụ đã bị dừng.")
-                    continue
-
-                action = task_def['action']
-                app_info = task_def['info']
-                display_name = app_info.get('display_name', app_key)
-
-                self.signals.update_widget_status.emit(app_key, "processing")
-                self.signals.progress.emit(app_key, "processing", f"Chuẩn bị xử lý {display_name}...")
-
-                # --- Tải xuống ---
-                download_url = app_info.get('download_url')
-                if not download_url:
-                    self.signals.update_widget_status.emit(app_key, "failed")
-                    self.signals.progress.emit(app_key, "failed", f"Lỗi: Thiếu 'download_url' cho {display_name}.")
-                    continue
-
-                file_name = app_info.get('output_filename', Path(download_url).name)
-                app_dir = APPS_DIR / app_key
-                app_dir.mkdir(exist_ok=True)
-                download_path = app_dir / file_name
-
-                # Đối với 'update', luôn xóa file cũ để tải lại phiên bản mới.
-                # Đối với 'install', chỉ tải nếu file chưa tồn tại.
-                needs_download = not download_path.exists()
-                if action == "update" and download_path.exists():
-                    try:
-                        download_path.unlink()
-                        needs_download = True
-                        self.signals.update_widget_status.emit(app_key, "processing")
-                        self.signals.progress.emit(app_key, "processing", f"Đã xóa phiên bản cũ của {display_name}.")
-                    except OSError as e:
-                        self.signals.update_widget_status.emit(app_key, "failed")
-                        self.signals.progress.emit(app_key, "failed", f"Không thể xóa file cũ: {e}")
-                        continue
-
+            # --- BƯỚC 1: LỌC VÀ KHỞI CHẠY CÁC TÁC VỤ TẢI XUỐNG ĐỒNG THỜI ---
+            download_tasks = {}
+            for key, task in self.worker_tasks.items():
+                app_info = task['info']
+                download_path = APPS_DIR / key / app_info.get('output_filename', Path(app_info.get('download_url', '')).name)
+                
+                # Chỉ tải nếu file chưa tồn tại, hoặc nếu hành động là 'update'
+                needs_download = not download_path.exists() or task['action'] == 'update'
+                
                 if needs_download:
-                    self.signals.update_widget_status.emit(app_key, "processing")
-                    self.signals.progress.emit(app_key, "processing", f"Đang tải {display_name}...")
-                    command = [
-                        str(ARIA2_EXEC), "--dir", str(app_dir), "--out", file_name,
-                        "--max-connection-per-server=16", "--split=16", "--min-split-size=1M",
-                        "--show-console-readout=false", "--summary-interval=1",
-                        download_url
-                    ]
-                    if 'referer' in app_info:
-                        command.extend(["--header", f"Referer: {app_info['referer']}"])
-
-                    process = subprocess.Popen(
-                        command, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                        text=True, creationflags=subprocess.CREATE_NO_WINDOW
-                    )
-                    percentage_pattern = re.compile(r'\[.*?\((\d+)%\)')
-                    
-                    while process.poll() is None:
-                        if self._is_stopped:
-                            process.terminate()
-                            break
-                        line = process.stdout.readline()
-                        if line:
-                            match = percentage_pattern.search(line)
-                            if match:
-                                self.signals.progress_percentage.emit(app_key, float(match.group(1)))
-                    
-                    if self._is_stopped:
-                        self.signals.update_widget_status.emit(app_key, "failed")
-                        self.signals.progress.emit(app_key, "stopped", "Tải xuống đã bị dừng.")
-                        continue
-
-                    process.wait()
-                    if process.returncode != 0:
-                        stderr = process.stderr.read()
-                        self.signals.update_widget_status.emit(app_key, "failed")
-                        self.signals.progress.emit(app_key, "failed", f"Tải thất bại: {stderr}")
-                        continue
-                
-                self.signals.progress_percentage.emit(app_key, 100.0)
-
-                # --- Tải Icon ---
-                icon_url = app_info.get('icon_url')
-                icon_filename = Path(icon_url).name if icon_url else 'default_icon.png'
-                icon_path = app_dir / icon_filename
-                if icon_url and not icon_path.exists():
-                    try:
-                        icon_response = self.session.get(icon_url, timeout=10)
-                        icon_response.raise_for_status()
-                        with open(icon_path, 'wb') as f: f.write(icon_response.content)
-                    except requests.RequestException:
-                        icon_filename = 'default_icon.png'
-                # Mở file config để đọc-ghi
-                try:
-                    with open(CONFIG_FILE, 'r+', encoding='utf-8') as f:
-                        # Đọc nội dung, nếu file rỗng thì khởi tạo config mặc định
-                        content = f.read()
-                        config = json.loads(content) if content else {"settings": {}, "app_items": {}}
-
-                        # Lấy thông tin hiện có của ứng dụng trong file config (nếu có)
-                        # Dùng setdefault để đảm bảo các khóa cần thiết luôn tồn tại
-                        app_items = config.setdefault('app_items', {})
-                        existing_item_info = app_items.setdefault(app_key, {})
-
-                        # 1. Cập nhật thông tin hiện có với tất cả thông tin mới từ server (app_info)
-                        #    Việc này sẽ cập nhật các key như 'version', 'description', 'download_url', etc.
-                        existing_item_info.update(app_info)
-
-                        # 2. Thêm hoặc cập nhật thông tin đã được xử lý cục bộ (tên file icon)
-                        existing_item_info['icon_file'] = icon_filename
-
-                        # 3. Ghi lại toàn bộ file config đã được cập nhật
-                        f.seek(0) # Đưa con trỏ về đầu file
-                        json.dump(config, f, indent=2, ensure_ascii=False)
-                        f.truncate() # Xóa phần nội dung thừa nếu file mới ngắn hơn file cũ
-                        self.signals.task_completed.emit(app_key, existing_item_info)
-                except (IOError, json.JSONDecodeError) as e:
-                    # Ghi lại lỗi nếu không thể đọc/ghi file config
-                    self.signals.error.emit(f"Lỗi khi cập nhật file config cho {app_key}: {e}")
-                
-                # --- Cài đặt ---
-                if action == "download":
-                    self.signals.progress.emit(app_key, "success", f"Đã tải {display_name} thành công!")
-                elif action == "install" and app_info.get('type') == 'installer' and download_path.exists():
-                    self.signals.update_widget_status.emit(app_key, "installing")
-                    self.signals.progress.emit(app_key, "installing", f"Đang cài đặt {display_name}...")
-                    install_params = app_info.get('install_params', '')
-                    if not install_params:
-                        self.signals.update_widget_status.emit(app_key, "failed")
-                        self.signals.progress.emit(app_key, "failed", f"Lỗi: Thiếu 'install_params' cho {display_name}.")
-                        continue
-                    
-                    install_command = [str(download_path)] + shlex.split(install_params)
-                    try:
-                        # Sử dụng Popen để không block và cho phép giao diện người dùng quan sát
-                        install_process = subprocess.Popen(install_command, creationflags=subprocess.CREATE_NO_WINDOW)
-                        install_process.wait() # Chờ quá trình cài đặt hoàn tất
-                        
-                        if install_process.returncode == 0:
-                            self.signals.update_widget_status.emit(app_key, "success")
-                            self.signals.progress.emit(app_key, "success", f"Đã xử lý {display_name} thành công!")
-                        else:
-                            self.signals.update_widget_status.emit(app_key, "failed")
-                            self.signals.progress.emit(app_key, "failed", f"Cài đặt {display_name} thất bại (mã lỗi: {install_process.returncode}).")
-                    except Exception as e:
-                        self.signals.update_widget_status.emit(app_key, "failed")
-                        self.signals.progress.emit(app_key, "failed", f"Lỗi khi chạy cài đặt: {e}")
-                
-                elif app_info.get('type') == 'portable' and download_path.exists():
-                    self.signals.update_widget_status.emit(app_key, "success")
-                    self.signals.progress.emit(app_key, "success", f"Đã tải {display_name} (portable) thành công!")
-                elif action == "update":
-                    self.signals.update_widget_status.emit(app_key, "success")
-                    self.signals.progress.emit(app_key, "success", f"Đã cập nhật {display_name} thành công!")
+                    download_tasks[key] = task
                 else:
-                    self.signals.update_widget_status.emit(app_key, "failed")
-                    self.signals.progress.emit(app_key, "failed", f"Không thể xử lý {display_name}: Thiếu tệp hoặc loại không hợp lệ.")
+                    # Nếu không cần tải, đưa thẳng vào danh sách xử lý sau
+                    self.tasks_to_process_after_download[key] = task
+
+            if not download_tasks and not self.tasks_to_process_after_download:
+                pass
+
+            elif download_tasks:
+                self.active_downloads = len(download_tasks)
+                for app_key, task_def in download_tasks.items():
+                    if self._is_stopped: break
+                    
+                    self.signals.progress.emit(app_key, "processing", f"Chuẩn bị tải...")
+                    app_info = task_def['info']
+                    app_dir = APPS_DIR / app_key
+                    app_dir.mkdir(exist_ok=True)
+                    
+                    if task_def['action'] == 'update':
+                        # Xóa file cũ trước khi tạo lệnh tải mới
+                        file_name = app_info.get('output_filename', Path(app_info['download_url']).name)
+                        if (app_dir / file_name).exists():
+                            (app_dir / file_name).unlink()
+                    
+                    command = self._build_aria_command(app_info, app_dir)
+                    downloader = AriaDownloader(app_key, command, app_dir)
+                    
+                    # Kết nối tín hiệu từ downloader con đến tín hiệu của worker chính
+                    downloader.progress_percentage.connect(self.signals.progress_percentage)
+                    downloader.finished.connect(self._on_download_finished)
+                    
+                    self.downloaders.append(downloader)
+                    downloader.start()
+            else:
+                # Nếu không có gì để tải, chuyển ngay đến bước xử lý sau
+                self._process_remaining_tasks()
 
         except Exception as e:
-            self.signals.error.emit(f"Lỗi nghiêm trọng trong Worker: {e}")
+            self.signals.error.emit(f"Lỗi nghiêm trọng khi khởi tạo Worker: {e}")
         finally:
+            # Chỉ phát tín hiệu finished nếu không có tác vụ tải nào đang hoạt động.
+            # Nếu có, hàm _on_download_finished sẽ tự xử lý việc này sau.
+            with self.lock:
+                if self.active_downloads == 0:
+                    self.signals.finished.emit()
+
+    def _build_aria_command(self, app_info, app_dir):
+        download_url = app_info['download_url']
+        file_name = app_info.get('output_filename', Path(download_url).name)
+        command = [
+            str(ARIA2_EXEC), "--dir", str(app_dir), "--out", file_name,
+            "--max-connection-per-server=16", "--split=16", "--min-split-size=1M",
+            "--show-console-readout=false", "--summary-interval=1",
+            download_url
+        ]
+        if 'referer' in app_info:
+            command.extend(["--header", f"Referer: {app_info['referer']}"])
+        return command
+
+    def _on_download_finished(self, app_key, success):
+        """Slot được gọi khi một AriaDownloader hoàn thành."""
+        with self.lock:
+            if success:
+                # Process ngay per task thay vì đợi all
+                self._process_single_task(app_key, self.worker_tasks[app_key])
+            else:
+                status = "stopped" if self._is_stopped else "failed"
+                self.signals.update_widget_status.emit(app_key, "failed")
+                self.signals.progress.emit(app_key, status, f"Tải thất bại.")
+
+            self.active_downloads -= 1
+            if self.active_downloads == 0:
+                self.signals.finished.emit()  # Chỉ finished khi all done, nhưng process per task
+
+    def _process_single_task(self, app_key, task_def):
+        if self._is_stopped: return
+
+        app_info = task_def['info']
+        action = task_def['action']
+        display_name = app_info.get('display_name', app_key)
+        task_successful = False
+
+        # --- Tải Icon (luôn thực hiện) ---
+        self._download_icon_if_needed(app_key, app_info)
+
+        # --- Xử lý Cài đặt/Tải về ---
+        if action == "download" or app_info.get('type') == 'portable':
+            # Với 'download' hoặc portable, chỉ cần tải xong là thành công
+            self.signals.update_widget_status.emit(app_key, "success")
+            self.signals.progress.emit(app_key, "success", f"Đã xử lý {display_name} thành công!")
+            task_successful = True
+
+        elif (action == "install" or action == "update") and app_info.get('type') == 'installer':
+            download_path = APPS_DIR / app_key / app_info.get('output_filename', Path(app_info['download_url']).name)
+            if not download_path.exists():
+                self.signals.update_widget_status.emit(app_key, "failed")
+                self.signals.progress.emit(app_key, "failed", f"Lỗi: Không tìm thấy file đã tải của {display_name}.")
+                return
+
+            self.signals.update_widget_status.emit(app_key, "installing")
+            self.signals.progress.emit(app_key, "installing", f"Đang cài đặt {display_name}...")
+
+            install_params = app_info.get('install_params', '')
+            install_command = [str(download_path)] + shlex.split(install_params)
+            try:
+                install_process = subprocess.Popen(install_command, creationflags=subprocess.CREATE_NO_WINDOW)
+                install_process.wait(timeout=600)
+
+                if install_process.returncode == 0:
+                    self.signals.update_widget_status.emit(app_key, "success")
+                    self.signals.progress.emit(app_key, "success", f"Đã xử lý {display_name} thành công!")
+                    task_successful = True
+                else:
+                    self.signals.update_widget_status.emit(app_key, "failed")
+                    self.signals.progress.emit(app_key, "failed", f"Cài đặt thất bại (mã lỗi: {install_process.returncode}).")
+            except subprocess.TimeoutExpired:
+                self.signals.update_widget_status.emit(app_key, "failed")
+                self.signals.progress.emit(app_key, "failed", f"Cài đặt quá thời gian cho phép.")
+            except Exception as e:
+                self.signals.update_widget_status.emit(app_key, "failed")
+                self.signals.progress.emit(app_key, "failed", f"Lỗi khi chạy cài đặt: {e}")
+
+        # Nếu thành công, ghi config ngay per task
+        if task_successful:
+            self._commit_config_changes({app_key: task_def})  # Gọi với dict chỉ 1 task
+    
+    def _process_remaining_tasks(self):
+        """Xử lý các tác vụ còn lại như cài đặt, cập nhật icon..."""
+        if self._is_stopped:
             self.signals.finished.emit()
+            return
+
+        successful_tasks = {} #CHANGED: Lưu các tác vụ thành công để xử lý config một lần
+
+        for app_key, task_def in self.tasks_to_process_after_download.items():
+            if self._is_stopped: break
+
+            app_info = task_def['info']
+            action = task_def['action']
+            display_name = app_info.get('display_name', app_key)
+            task_successful = False
+
+            # --- Tải Icon (luôn thực hiện) ---
+            self._download_icon_if_needed(app_key, app_info)
+
+            # --- Xử lý Cài đặt/Tải về ---
+            if action == "download" or app_info.get('type') == 'portable':
+                # Với 'download' hoặc portable, chỉ cần tải xong là thành công
+                self.signals.update_widget_status.emit(app_key, "success")
+                self.signals.progress.emit(app_key, "success", f"Đã xử lý {display_name} thành công!")
+                task_successful = True
+
+            elif (action == "install" or action == "update") and app_info.get('type') == 'installer':
+                download_path = APPS_DIR / app_key / app_info.get('output_filename', Path(app_info['download_url']).name)
+                if not download_path.exists():
+                    self.signals.update_widget_status.emit(app_key, "failed")
+                    self.signals.progress.emit(app_key, "failed", f"Lỗi: Không tìm thấy file đã tải của {display_name}.")
+                    continue # Bỏ qua tác vụ này
+
+                self.signals.update_widget_status.emit(app_key, "installing")
+                self.signals.progress.emit(app_key, "installing", f"Đang cài đặt {display_name}...")
+
+                install_params = app_info.get('install_params', '')
+                install_command = [str(download_path)] + shlex.split(install_params)
+                try:
+                    # Sử dụng Popen.wait() với timeout để tránh bị treo vô hạn
+                    install_process = subprocess.Popen(install_command, creationflags=subprocess.CREATE_NO_WINDOW)
+                    install_process.wait(timeout=600) # Timeout 10 phút
+
+                    if install_process.returncode == 0:
+                        self.signals.update_widget_status.emit(app_key, "success")
+                        self.signals.progress.emit(app_key, "success", f"Đã xử lý {display_name} thành công!")
+                        task_successful = True
+                    else:
+                        self.signals.update_widget_status.emit(app_key, "failed")
+                        self.signals.progress.emit(app_key, "failed", f"Cài đặt thất bại (mã lỗi: {install_process.returncode}).")
+                except subprocess.TimeoutExpired:
+                    self.signals.update_widget_status.emit(app_key, "failed")
+                    self.signals.progress.emit(app_key, "failed", f"Cài đặt quá thời gian cho phép.")
+                except Exception as e:
+                    self.signals.update_widget_status.emit(app_key, "failed")
+                    self.signals.progress.emit(app_key, "failed", f"Lỗi khi chạy cài đặt: {e}")
+
+            # CHANGED: Nếu tác vụ thành công, thêm vào danh sách để cập nhật config
+            if task_successful:
+                successful_tasks[app_key] = task_def
+
+        # Sau khi vòng lặp kết thúc, ghi tất cả thay đổi vào config MỘT LẦN
+        if successful_tasks:
+            self._commit_config_changes(successful_tasks)
+
+    def _download_icon_if_needed(self, app_key, app_info):
+        """Hàm helper chỉ để tải icon."""
+        icon_url = app_info.get('icon_url')
+        if not icon_url: return
+        
+        icon_filename = Path(icon_url).name
+        icon_path = APPS_DIR / app_key / icon_filename
+        if not icon_path.exists():
+            try:
+                icon_response = self.session.get(icon_url, timeout=10)
+                icon_response.raise_for_status()
+                with open(icon_path, 'wb') as f: f.write(icon_response.content)
+            except requests.RequestException:
+                pass # Bỏ qua nếu tải icon lỗi
+    
+    def _commit_config_changes(self, completed_tasks):
+        """
+        Tổng hợp tất cả thay đổi từ các tác vụ đã hoàn thành,
+        ghi vào file config và gửi một tín hiệu duy nhất chứa tất cả dữ liệu.
+        """
+        with self.config_lock:
+            try:
+                config = {}
+                if CONFIG_FILE.exists():
+                    with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                        if content: config = json.loads(content)
+
+                config.setdefault('app_items', {})
+
+                updated_items_for_signal = {} # Chuẩn bị dữ liệu để gửi đi
+
+                # Duyệt qua các tác vụ đã hoàn thành thành công
+                for app_key, task_def in completed_tasks.items():
+                    app_info = task_def['info']
+                    icon_filename = Path(app_info.get('icon_url', '')).name or 'default_icon.png'
+
+                    # Cập nhật thông tin mới (quan trọng nhất là version) vào config
+                    existing_item_info = config['app_items'].setdefault(app_key, {})
+                    existing_item_info.update(app_info) 
+                    existing_item_info['icon_file'] = icon_filename
+
+                    # Thêm: Nếu action là 'download' (tải mới), force update version từ remote để tránh '0'
+                    if task_def['action'] == 'download':
+                        remote_version = app_info.get('version', '0')
+                        existing_item_info['version'] = remote_version
+
+                    # Thêm: Cập nhật ngay local_apps để đồng bộ bộ nhớ (tránh đè khi populate)
+                    self.main_win.local_apps.setdefault(app_key, {}).update(existing_item_info)  # Giả sử self.parent là main_win, điều chỉnh nếu khác
+
+                    # Thêm vào dictionary để gửi đi qua tín hiệu
+                    updated_items_for_signal[app_key] = existing_item_info
+
+                with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
+                    json.dump(config, f, indent=2, ensure_ascii=False)
+
+                # Phát tín hiệu MỘT LẦN với TẤT CẢ các mục đã cập nhật
+                if updated_items_for_signal:
+                    self.signals.tasks_batch_completed.emit(updated_items_for_signal)
+
+            except (IOError, json.JSONDecodeError) as e:
+                self.signals.error.emit(f"Lỗi nghiêm trọng khi ghi file config: {e}")
 
 # --- WIDGET TÙY CHỈNH CHO MỖI PHẦN MỀM ---
 class AppItemWidget(QWidget):
@@ -499,7 +670,9 @@ class AppItemWidget(QWidget):
         self.progress_overlay.setStyleSheet("background-color: rgba(76, 175, 80, 100);")
         self.progress_overlay.setGeometry(0, 0, 0, self.height())
         self.progress_overlay.hide()
-        self.progress_overlay.setAutoFillBackground(True)
+        self._progress_animation = QPropertyAnimation(self.progress_overlay, b"geometry", self)
+        self._progress_animation.setDuration(500) # Thời gian chuyển động ngắn để tạo cảm giác real-time
+        self._progress_animation.setEasingCurve(QEasingCurve.Type.Linear)
         
         self.setToolTip(app_info.get('description', 'Không có mô tả.'))
 
@@ -539,13 +712,16 @@ class AppItemWidget(QWidget):
         self.status_label.setPixmap(QPixmap())
 
         if status == "success":
+            self._progress_animation.stop()
             self.status_label.setPixmap(QPixmap(resource_path('Images/success.png')).scaled(24, 24, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
             self.name_label.setStyleSheet("color: #4CAF50; font-weight: bold; font-size: 12pt;")
             self.action_button.setEnabled(True) # Re-enable after process
             self._current_progress = 0
             self.progress_overlay.hide()
+            self.progress_overlay.setGeometry(0, 0, 0, self.height())
             self.status_label.show()
         elif status == "failed":
+            self._progress_animation.stop()
             self.status_label.setPixmap(QPixmap(resource_path('Images/failed.png')).scaled(24, 24, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
             self.name_label.setStyleSheet("color: #F44336; font-weight: bold; font-size: 12pt;")
             self.action_button.setEnabled(True) # Re-enable after process
@@ -574,17 +750,40 @@ class AppItemWidget(QWidget):
     def update_download_progress(self, app_key, percentage):
         if app_key != self.app_key:
             return
-        
+
         self._current_progress = float(percentage)
-        overlay_width = int(self.width() * (self._current_progress / 100.0))
-        self.progress_overlay.setGeometry(0, 0, overlay_width, self.height())
-        
-        if self._current_progress > 0:
+
+        if self.width() <= 0:
+            return
+
+        if not self.progress_overlay.isVisible():
             self.progress_overlay.show()
             self.progress_overlay.raise_()
+
+        start_rect = self.progress_overlay.geometry()
+        target_width = int(self.width() * (self._current_progress / 100.0))
+        end_rect = QRect(0, 0, target_width, self.height())
+
+        # Dừng animation cũ nếu đang chạy
+        self._progress_animation.stop()
+        # Thiết lập giá trị bắt đầu và kết thúc cho animation
+        self._progress_animation.setStartValue(start_rect)
+        self._progress_animation.setEndValue(end_rect)
+        # Bắt đầu animation mới
+        self._progress_animation.start()
+
+        # Throttle update bằng QTimer để tránh overload khi batch (chỉ update mỗi 200ms)
+        if not hasattr(self, '_progress_timer') or not self._progress_timer.isActive():
+            self._progress_timer = QTimer(self)
+            self._progress_timer.setSingleShot(True)
+            self._progress_timer.timeout.connect(self._progress_animation.start)
+            self._progress_timer.start(200)  # Giới hạn update mỗi 200ms
         else:
-            self.progress_overlay.hide()
-        self.update()
+            self._progress_timer.start(200)  # Reset timer nếu đang chạy
+
+        if self._current_progress >= 100:
+            # Nếu đạt 100%, đảm bảo nó lấp đầy ngay lập tức
+            QTimer.singleShot(self._progress_animation.duration(), lambda: self.progress_overlay.setGeometry(0, 0, self.width(), self.height()))
 
 # --- CỬA SỔ CHÍNH ---
 class TekDT_AIS(QMainWindow):
@@ -598,28 +797,33 @@ class TekDT_AIS(QMainWindow):
         self.remote_apps = {}
         self.local_apps = {}
         self.selected_for_install = []
-        self.install_worker = None
+        self.active_workers = {}
         self.startup_label = None
         self.system_arch = platform.architecture()[0]
         self.session = requests.Session()
         self.session.headers.update({'User-Agent': 'TekDT-AIS-App'})
         self.cli_task_results = {}        
-        self._app_to_select_after_action = None 
         self._scroll_positions = {}
         self.is_cli_mode = False
         self.is_processing = False
+        self.central_widget_ref = None
 
         if self.embed_mode:
             self.setup_embed_ui()
         else:
             self.setup_ui()
+            
+        # Vô hiệu hóa UI và hiển thị trạng thái khởi động
+        self.central_widget_ref = self.centralWidget()
+        self.central_widget_ref.setEnabled(False)
+        self.show_startup_status("Đang khởi tạo...")
+        
         self.tool_manager_thread = QThread()
         self.tool_manager = ToolManager()
         self.tool_manager.moveToThread(self.tool_manager_thread)
         self.tool_manager.finished.connect(self.on_tool_check_finished)
         self.tool_manager_thread.started.connect(self.tool_manager.run_checks)
         
-        self.show_startup_status("Đang khởi tạo...")
         self.tool_manager_thread.start()
 
     def show_styled_message_box(self, icon, title, text, detailed_text="", buttons=QMessageBox.StandardButton.Ok):
@@ -667,22 +871,69 @@ class TekDT_AIS(QMainWindow):
         return msg_box.exec()
 
     def show_startup_status(self, message):
-        if not self.startup_label:
-            self.startup_label = QLabel(message, self)
-            self.startup_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        # if not self.startup_label:
+            # self.startup_label = QLabel(message, self)
+            # self.startup_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             
-            self.startup_label.setStyleSheet("background-color: rgba(0, 0, 0, 0.7); color: white; font-size: 14pt; border-radius: 10px; padding: 20px;")
-            self.startup_label.setWordWrap(True)
-            self.startup_label.setMinimumWidth(400)
-            self.startup_label.setMinimumHeight(100)
-            self.tool_manager.progress_update.connect(lambda msg: self.startup_label.setText(msg))
+            # self.startup_label.setStyleSheet("background-color: rgba(0, 0, 0, 0.7); color: white; font-size: 14pt; border-radius: 10px; padding: 20px;")
+            # self.startup_label.setWordWrap(True)
+            # self.startup_label.setMinimumWidth(400)
+            # self.startup_label.setMinimumHeight(100)
+            # self.tool_manager.progress_update.connect(lambda msg: self.startup_label.setText(msg))
         
+        # self.startup_label.setText(message)
+        # self.startup_label.adjustSize()
+        # self.startup_label.move(int((self.width() - self.startup_label.width()) / 2), int((self.height() - self.startup_label.height()) / 2))
+        # self.startup_label.show()
+        # self.startup_label.raise_()
+        
+        if not self.startup_label:
+            # Tạo một widget container cho overlay
+            self.startup_overlay = QWidget(self)
+            self.startup_overlay.setStyleSheet("background-color: rgba(0, 0, 0, 0.7);")
+            self.startup_overlay.setAutoFillBackground(True)
+            
+            overlay_layout = QVBoxLayout(self.startup_overlay)
+            overlay_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+            # Thêm ảnh GIF
+            self.loading_movie_label = QLabel()
+            movie = QMovie(resource_path('Images/loading.gif')) # Thay bằng tên GIF của bạn
+            gif_size = QSize(128, 128)
+            self.loading_movie_label.setFixedSize(gif_size)
+            movie.setScaledSize(gif_size)
+            self.loading_movie_label.setMovie(movie)
+            self.loading_movie_label.setStyleSheet("background-color: transparent;")
+            movie.start()
+            
+            # Label cho thông điệp
+            self.startup_label = QLabel(message)
+            self.startup_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.startup_label.setStyleSheet("background-color: transparent; color: white; font-size: 14pt; padding: 10px;")
+            self.startup_label.setWordWrap(True)
+
+            overlay_layout.addWidget(self.loading_movie_label)
+            overlay_layout.addWidget(self.startup_label)
+        
+        # Cập nhật kích thước và vị trí của overlay để lấp đầy cửa sổ
+        self.startup_overlay.setGeometry(self.rect())
         self.startup_label.setText(message)
         self.startup_label.adjustSize()
         self.startup_label.move(int((self.width() - self.startup_label.width()) / 2), int((self.height() - self.startup_label.height()) / 2))
-        self.startup_label.show()
-        self.startup_label.raise_()
+        self.startup_overlay.show()
+        self.startup_overlay.raise_()
 
+    # Hàm riêng để cập nhật text, tránh tạo lại widget
+    def update_startup_status(self, message):
+        if self.startup_label:
+            self.startup_label.setText(message)
+
+    # Ghi đè resizeEvent để overlay luôn vừa với cửa sổ
+    def resizeEvent(self, event):
+        if hasattr(self, 'startup_overlay') and self.startup_overlay.isVisible():
+            self.startup_overlay.setGeometry(self.rect())
+        super().resizeEvent(event)
+    
     def save_scroll_positions(self):
         """Lưu vị trí hiện tại của các thanh cuộn."""
         self._scroll_positions['available'] = self.available_list_widget.verticalScrollBar().value()
@@ -699,8 +950,11 @@ class TekDT_AIS(QMainWindow):
     def on_tool_check_finished(self, success, message):
         self.tool_manager_thread.quit()
         self.tool_manager_thread.wait()
-        if self.startup_label:
-            self.startup_label.hide()
+        # Ẩn overlay và kích hoạt lại UI
+        if hasattr(self, 'startup_overlay'):
+            self.startup_overlay.hide()
+        if self.central_widget_ref:
+            self.central_widget_ref.setEnabled(True)
 
         if not success:
             self.show_styled_message_box(QMessageBox.Icon.Warning, "Cảnh báo", message)
@@ -745,21 +999,45 @@ class TekDT_AIS(QMainWindow):
         main_layout.addWidget(self.search_box)
         main_layout.addWidget(self.available_list_widget)
 
-    def on_task_completed(self, app_key, new_info):
-        """Cập nhật thông tin của một phần mềm trong bộ nhớ đệm."""
-        self.local_apps[app_key] = new_info
+    def update_download_progress_anywhere(self, app_key, percentage):
+        # Tìm widget ở available_list_widget
+        for i in range(self.available_list_widget.count()):
+            item = self.available_list_widget.item(i)
+            widget = self.available_list_widget.itemWidget(item)
+            if hasattr(widget, 'app_key') and widget.app_key == app_key:
+                widget.update_download_progress(app_key, percentage)
+                return
+        # Nếu không tìm thấy, tìm ở selected_list_widget (nếu không embed)
+        if not self.embed_mode:
+            for i in range(self.selected_list_widget.count()):
+                item = self.selected_list_widget.item(i)
+                widget = self.selected_list_widget.itemWidget(item)
+                if hasattr(widget, 'app_key') and widget.app_key == app_key:
+                    widget.update_download_progress(app_key, percentage)
+                    return
+    
+    def on_tasks_batch_completed(self, completed_items):
+        """Cập nhật hàng loạt thông tin phần mềm vào bộ nhớ đệm."""
+        self.local_apps.update(completed_items)
         # Cập nhật cả trong config đang chạy để đồng bộ
-        self.config['app_items'][app_key] = new_info
+        self.config['app_items'].update(completed_items)
     
     def is_app_downloaded(self, app_key, app_info):
-        """Kiểm tra xem tệp cài đặt chính của ứng dụng đã được tải về hay chưa."""
+        """
+        Kiểm tra xem tệp cài đặt của ứng dụng đã được tải về hoàn chỉnh hay chưa.
+        """
         download_url = app_info.get('download_url', '')
         if not download_url:
             return False
-        # Sử dụng 'output_filename' nếu có, nếu không thì lấy từ URL
+
         file_name = app_info.get('output_filename', Path(download_url).name)
         download_path = APPS_DIR / app_key / file_name
-        return download_path.exists()
+        
+        # Tạo đường dẫn tới file control của aria2
+        aria2_control_file = download_path.with_suffix(download_path.suffix + '.aria2')
+
+        # Điều kiện mới: File cài đặt phải tồn tại VÀ file .aria2 không được tồn tại.
+        return download_path.exists() and not aria2_control_file.exists()
 
     def handle_cli_args(self, args):
         """Xử lý các tham số dòng lệnh cho /install và /update."""
@@ -881,11 +1159,11 @@ class TekDT_AIS(QMainWindow):
             QApplication.quit()
 
         self.install_worker.signals.progress.connect(self.update_and_record_progress)
-        self.install_worker.signals.progress_percentage.connect(self.update_download_progress_selected)
+        self.install_worker.signals.progress_percentage.connect(self.update_download_progress_anywhere)
         self.install_worker.signals.finished.connect(on_cli_finished)
         self.install_worker.signals.error.connect(lambda e: self.show_styled_message_box(QMessageBox.Icon.Critical, "Lỗi Worker", str(e)))
         self.install_worker.signals.update_widget_status.connect(self.update_widget_status)
-        self.install_worker.signals.task_completed.connect(self.on_task_completed)
+        self.install_worker.signals.tasks_batch_completed.connect(self.on_tasks_batch_completed)
         self.install_worker.start()
 
     def update_and_record_progress(self, app_key, status, message):
@@ -1231,20 +1509,26 @@ class TekDT_AIS(QMainWindow):
             buttons=QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         )
         if reply == QMessageBox.StandardButton.Yes:
-            self.is_processing = True
-            self._app_to_select_after_action = key
-            # Action 'install' cũng có nghĩa là 'download and prepare for install'
+            # Không gán cho self.install_worker nữa, mà tạo worker cục bộ
             worker_tasks = {key: {'info': info, 'action': 'download'}}
-            self.install_worker = InstallWorker(worker_tasks)
-            self.install_worker.signals.progress.connect(self.update_install_progress)
-            self.install_worker.signals.finished.connect(self.on_single_download_finished)
-            self.install_worker.signals.error.connect(lambda e: self.show_styled_message_box(QMessageBox.Icon.Critical, "Lỗi Worker", str(e)))
-            self.install_worker.signals.update_widget_status.connect(self.update_widget_status)
-            self.install_worker.signals.task_completed.connect(self.on_task_completed)
-            if widget:
-                self.install_worker.signals.progress_percentage.connect(widget.update_download_progress)
-            self.install_worker.start()
-    
+            worker = InstallWorker(worker_tasks)
+            
+            # Kết nối các tín hiệu như cũ
+            worker.signals.progress.connect(self.update_install_progress)
+            worker.signals.progress_percentage.connect(self.update_download_progress_anywhere)
+            worker.signals.error.connect(lambda e: self.show_styled_message_box(QMessageBox.Icon.Critical, "Lỗi Worker", str(e)))
+            worker.signals.update_widget_status.connect(self.update_widget_status)
+            worker.signals.tasks_batch_completed.connect(self.on_tasks_batch_completed)
+
+            # THAY ĐỔI QUAN TRỌNG:
+            # Kết nối tín hiệu finished tới hàm xử lý mới (on_worker_finished).
+            # Dùng lambda để truyền app_key, đảm bảo hàm xử lý biết worker nào đã xong.
+            worker.signals.finished.connect(lambda app_key=key: self.on_worker_finished(app_key))
+            
+            # Lưu worker vào dictionary quản lý và bắt đầu chạy
+            self.active_workers[key] = worker
+            worker.start()
+
     def confirm_update(self, key, info, widget, local_ver, remote_ver, on_complete):
         reply = self.show_styled_message_box(
             QMessageBox.Icon.Question,
@@ -1255,27 +1539,36 @@ class TekDT_AIS(QMainWindow):
         )
 
         if reply == QMessageBox.StandardButton.No:
-            # Nếu không cập nhật, thực hiện hành động sau cùng ngay lập tức
             if on_complete:
                 on_complete()
             return
 
         if reply == QMessageBox.StandardButton.Yes:
-            # Đánh dấu hành động sau cùng để thực hiện khi worker xong việc
-            self._app_to_select_after_action = (key, on_complete)
-
-            # Sử dụng worker mới với tác vụ 'update'
+            # Tương tự confirm_download, tạo worker cục bộ
             worker_tasks = {key: {'info': info, 'action': 'update'}}
-            self.install_worker = InstallWorker(worker_tasks)
-            self.install_worker.signals.progress.connect(self.update_install_progress)
-            self.install_worker.signals.finished.connect(self.on_single_download_finished)
-            self.install_worker.signals.error.connect(lambda e: self.show_styled_message_box(QMessageBox.Icon.Critical, "Lỗi Worker", str(e)))
-            self.install_worker.signals.update_widget_status.connect(self.update_widget_status)
-            self.install_worker.signals.task_completed.connect(self.on_task_completed)
-            if widget:
-                self.install_worker.signals.progress_percentage.connect(widget.update_download_progress)
-            # widget.set_status("processing")
-            self.install_worker.start()
+            worker = InstallWorker(worker_tasks)
+            
+            # Kết nối các tín hiệu
+            worker.signals.progress.connect(self.update_install_progress)
+            worker.signals.progress_percentage.connect(self.update_download_progress_anywhere)
+            worker.signals.error.connect(lambda e: self.show_styled_message_box(QMessageBox.Icon.Critical, "Lỗi Worker", str(e)))
+            worker.signals.update_widget_status.connect(self.update_widget_status)
+            worker.signals.tasks_batch_completed.connect(self.on_tasks_batch_completed)
+            
+            # THAY ĐỔI QUAN TRỌNG:
+            # Khi worker xong, nó sẽ tự gọi on_worker_finished để làm mới giao diện.
+            # Sau đó, chúng ta mới thực hiện hành động 'on_complete' (như chuyển sang khung bên phải).
+            # Việc này đảm bảo giao diện được cập nhật đúng trước khi có hành động tiếp theo.
+            def on_update_and_action():
+                self.on_worker_finished(key)
+                if on_complete:
+                    on_complete()
+            
+            worker.signals.finished.connect(on_update_and_action)
+            
+            # Lưu worker và bắt đầu
+            self.active_workers[key] = worker
+            worker.start()
 
     def move_app_to_selection(self, key, info):
         # Kiểm tra xem item đã tồn tại trong danh sách chọn chưa
@@ -1361,64 +1654,23 @@ class TekDT_AIS(QMainWindow):
                         else:
                             widget.action_button.clicked.connect(on_complete_action)
                 break
+    
+    def on_worker_finished(self, app_key):
+        """
+        Được gọi khi một worker độc lập hoàn thành tác vụ.
+        Hàm này đảm bảo chỉ cập nhật cho đúng app đã xong.
+        """
+        # Xóa worker khỏi danh sách quản lý để giải phóng bộ nhớ
+        if app_key in self.active_workers:
+            del self.active_workers[app_key]
 
-    # def on_single_download_finished(self):
-        # """Được gọi khi một tác vụ tải/cập nhật đơn lẻ hoàn tất."""
-        # key_to_select = None
-        # on_complete_action = None
-        
-        # if isinstance(self._app_to_select_after_action, tuple):
-            # # Trường hợp cập nhật: (key, on_complete_action)
-            # key_to_select, on_complete_action = self._app_to_select_after_action
-            
-            # # Sau khi cập nhật thành công, cập nhật phiên bản trong config
-            # if key_to_select and key_to_select in self.remote_apps.get('app_items', {}):
-                # remote_info = self.remote_apps['app_items'][key_to_select]
-                # new_version = remote_info.get('version')
-                
-                # # Cập nhật cả trong config và trong bộ nhớ local_apps
-                # if new_version:
-                    # self.config['app_items'].setdefault(key_to_select, {})['version'] = new_version
-                    # self.local_apps.setdefault(key_to_select, {})['version'] = new_version
-                    # self.save_config() # Lưu lại ngay lập tức
+        # Rất quan trọng: Tải lại config từ file vào bộ nhớ
+        # để chắc chắn rằng dữ liệu là mới nhất trước khi làm mới giao diện.
+        self.load_config_and_apps(populate=False)
 
-        # elif isinstance(self._app_to_select_after_action, str):
-            # # Trường hợp tải mới: chỉ có key
-            # key_to_select = self._app_to_select_after_action
-
-        # self._app_to_select_after_action = None # Reset lại
-        # self.install_worker = None
-
-        # # Tải lại toàn bộ danh sách để phản ánh các thay đổi (vd: phiên bản mới)
-        # # Vì đã cập nhật config và local_apps, lần tải lại này sẽ hiển thị đúng trạng thái.
-        # self.is_processing = False
-        # self.load_config_and_apps()
-
-        # # Nếu có một hành động sau cùng cần thực hiện (ví dụ: chuyển sang khung bên phải)
-        # if on_complete_action:
-            # on_complete_action()
-
-    def on_single_download_finished(self):
-        """Được gọi khi một tác vụ tải/cập nhật đơn lẻ hoàn tất."""
-        on_complete_action = None
-        key_to_process = None
-
-        if isinstance(self._app_to_select_after_action, tuple):
-            key_to_process, on_complete_action = self._app_to_select_after_action
-        elif isinstance(self._app_to_select_after_action, str):
-            key_to_process = self._app_to_select_after_action
-
-        self._app_to_select_after_action = None
-        self.install_worker = None
-        self.is_processing = False
-
-        # Chỉ cần làm mới danh sách hiển thị, không cần đọc lại file config
-        # vì bộ nhớ self.local_apps đã được cập nhật qua tín hiệu.
+        # Làm mới toàn bộ danh sách để cập nhật giao diện
+        # (chuyển nút "Tải" -> "Thêm", cập nhật phiên bản, v.v.)
         self.populate_lists()
-
-        # Nếu có hành động sau cùng cần thực hiện (ví dụ: chuyển sang khung bên phải)
-        if on_complete_action:
-            on_complete_action()
     
     def filter_apps(self, text):
         text = text.lower().strip()
@@ -1484,11 +1736,11 @@ class TekDT_AIS(QMainWindow):
 
         self.install_worker = InstallWorker(apps_to_process)
         self.install_worker.signals.progress.connect(self.update_install_progress)
-        self.install_worker.signals.progress_percentage.connect(self.update_download_progress_selected)
+        self.install_worker.signals.progress_percentage.connect(self.update_download_progress_anywhere)
         self.install_worker.signals.finished.connect(self.on_installation_finished)
         self.install_worker.signals.error.connect(lambda e: self.show_styled_message_box(QMessageBox.Icon.Critical, "Lỗi Worker", str(e)))
         self.install_worker.signals.update_widget_status.connect(self.update_widget_status)
-        self.install_worker.signals.task_completed.connect(self.on_task_completed)
+        self.install_worker.signals.tasks_batch_completed.connect(self.on_tasks_batch_completed)
         self.install_worker.start()
         
     def update_download_progress_selected(self, app_key, percentage):
@@ -1525,7 +1777,6 @@ class TekDT_AIS(QMainWindow):
     
     def on_installation_finished(self):
         if self.install_worker and not self.install_worker._is_stopped:
-             # Hoàn thành bình thường
             status_text = "Hoàn tất! Nhấn 'Xong' để tiếp tục."
             if not self.embed_mode:
                 self.status_label.setText(status_text)
@@ -1533,10 +1784,20 @@ class TekDT_AIS(QMainWindow):
                 self.start_button.setEnabled(True)
                 self.start_button.setStyleSheet("background-color: #4CAF50; color: white;")
         else:
-             # Bị dừng giữa chừng
             self.reset_ui_after_completion()
-        
+
         self.install_worker = None
+
+        # Force populate và reset trong embed_mode
+        if self.embed_mode:
+            self.populate_lists()
+            for i in range(self.available_list_widget.count()):
+                widget = self.available_list_widget.itemWidget(self.available_list_widget.item(i))
+                if hasattr(widget, 'set_status'):
+                    widget.set_status("success")
+                    widget.action_button.setText("Thêm")
+                    widget.action_button.setStyleSheet("background-color: #4CAF50; color: white;")
+                    # Reconnect nếu cần
 
     def reset_ui_after_completion(self):
         if not self.embed_mode:
@@ -1566,12 +1827,17 @@ class TekDT_AIS(QMainWindow):
             print(f"Không thể lưu cấu hình: {e}")
             
     def closeEvent(self, event):
-        if self.install_worker and self.install_worker.isRunning():
-            self.install_worker.stop()
-            self.install_worker.wait(5000)
+        # Dừng các worker đang hoạt động
+        # Dùng list() để tạo bản sao, tránh thay đổi dict khi đang duyệt
+        for worker in list(self.active_workers.values()):
+            if worker and worker.isRunning():
+                worker.stop()
+                worker.wait(2000) # Cho worker 2 giây để dừng
+
         if self.tool_manager_thread.isRunning():
             self.tool_manager_thread.quit()
             self.tool_manager_thread.wait(5000)
+        
         self.save_config()
         super().closeEvent(event)
         
@@ -1683,6 +1949,7 @@ Lưu ý:
     if is_cli_command:
         # Chế độ CLI: Chờ tool check xong rồi mới chạy handle_cli_args.
         # handle_cli_args sẽ quyết định mọi thứ, bao gồm hiển thị GUI và thoát.
+        main_win.show()
         def start_cli_handler(success, msg):
             if success:
                 main_win.handle_cli_args(cli_command_args)
@@ -1694,6 +1961,8 @@ Lưu ý:
         main_win.tool_manager.finished.connect(start_cli_handler)
     else:
         # Chế độ GUI bình thường
-        main_win.tool_manager.finished.connect(lambda: main_win.show())
+        pass
+    if not is_cli_command:
+        main_win.show()
     
     sys.exit(app.exec())
