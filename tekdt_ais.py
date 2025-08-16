@@ -1364,6 +1364,8 @@ class TekDT_AIS(QMainWindow):
             self.populate_lists()
         
     def populate_lists(self):
+        if hasattr(self, '_populate_timer'):
+            self._populate_timer.stop()
         if self.is_processing:
             return
         self.save_scroll_positions()
@@ -1715,7 +1717,11 @@ class TekDT_AIS(QMainWindow):
 
         # Làm mới toàn bộ danh sách để cập nhật giao diện
         # (chuyển nút "Tải" -> "Thêm", cập nhật phiên bản, v.v.)
-        self.populate_lists()
+        if not hasattr(self, '_populate_timer') or not self._populate_timer.isActive():
+            self._populate_timer = QTimer(self)
+            self._populate_timer.setSingleShot(True)
+            self._populate_timer.timeout.connect(self.populate_lists)
+            self._populate_timer.start(50) # Chờ 50ms để gom các lệnh gọi
     
     def filter_apps(self, text):
         text = text.lower().strip()
