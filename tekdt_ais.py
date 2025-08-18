@@ -755,6 +755,10 @@ class AppItemWidget(QWidget):
             self.progress_overlay.setGeometry(0, 0, overlay_width, self.height())
         super().resizeEvent(event)
         
+    def reset_status_ui(self):
+        """Hàm call-back an toàn để reset trạng thái UI."""
+        self.set_status("")
+    
     def set_status(self, status):
         self.status_label.setMovie(None)
         self.status_label.setPixmap(QPixmap())
@@ -768,6 +772,7 @@ class AppItemWidget(QWidget):
             self.progress_overlay.hide()
             self.progress_overlay.setGeometry(0, 0, 0, self.height())
             self.status_label.show()
+            QTimer.singleShot(2000, self.reset_status_ui)
         elif status == "failed":
             self._progress_animation.stop()
             self.status_label.setPixmap(QPixmap(resource_path('Images/failed.png')).scaled(24, 24, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
