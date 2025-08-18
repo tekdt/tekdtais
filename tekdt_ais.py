@@ -772,7 +772,11 @@ class AppItemWidget(QWidget):
             self.progress_overlay.hide()
             self.progress_overlay.setGeometry(0, 0, 0, self.height())
             self.status_label.show()
-            QTimer.singleShot(2000, self.reset_status_ui)
+            # QTimer.singleShot(2000, self.reset_status_ui)
+            timer = QTimer(self)
+            timer.setSingleShot(True)
+            timer.timeout.connect(self.reset_status_ui)
+            timer.start(2000)
         elif status == "failed":
             self._progress_animation.stop()
             self.status_label.setPixmap(QPixmap(resource_path('Images/failed.png')).scaled(24, 24, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
