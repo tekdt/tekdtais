@@ -1584,6 +1584,7 @@ class TekDT_AIS(QMainWindow):
             # Kết nối tín hiệu finished tới hàm xử lý mới (on_worker_finished).
             # Dùng lambda để truyền app_key, đảm bảo hàm xử lý biết worker nào đã xong.
             worker.signals.finished.connect(lambda app_key=key: self.on_worker_finished(app_key))
+            worker.signals.finished.connect(lambda: self.populate_lists())
             
             # Lưu worker vào dictionary quản lý và bắt đầu chạy
             self.active_workers[key] = worker
