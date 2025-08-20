@@ -1,4 +1,4 @@
-# tekdt_ais.py
+ # tekdt_ais.py
 import sys
 import os
 import json
@@ -358,7 +358,6 @@ class AriaDownloader(QThread):
 class InstallWorker(QThread):
     def __init__(self, worker_tasks):
         super().__init__()
-        self.main_win = main_win
         self.signals = WorkerSignals()
         self.worker_tasks = worker_tasks # {app_key: {'action': ..., 'info': ...}}
         self._is_stopped = False
@@ -630,9 +629,6 @@ class InstallWorker(QThread):
                     if task_def['action'] == 'download':
                         remote_version = app_info.get('version', '0')
                         existing_item_info['version'] = remote_version
-
-                    # Thêm: Cập nhật ngay local_apps để đồng bộ bộ nhớ (tránh đè khi populate)
-                    self.main_win.local_apps.setdefault(app_key, {}).update(existing_item_info)  # Giả sử self.parent là main_win, điều chỉnh nếu khác
 
                     # Thêm vào dictionary để gửi đi qua tín hiệu
                     updated_items_for_signal[app_key] = existing_item_info
@@ -1584,7 +1580,8 @@ class TekDT_AIS(QMainWindow):
             # Kết nối tín hiệu finished tới hàm xử lý mới (on_worker_finished).
             # Dùng lambda để truyền app_key, đảm bảo hàm xử lý biết worker nào đã xong.
             worker.signals.finished.connect(lambda app_key=key: self.on_worker_finished(app_key))
-            worker.signals.finished.connect(lambda: self.populate_lists())
+            # worker.signals.finished.connect(lambda: self.populate_lists())
+            worker.signals.tasks_batch_completed.connect(self.populate_lists)
             
             # Lưu worker vào dictionary quản lý và bắt đầu chạy
             self.active_workers[key] = worker
@@ -1620,11 +1617,12 @@ class TekDT_AIS(QMainWindow):
             # Khi worker xong, nó sẽ tự gọi on_worker_finished để làm mới giao diện.
             # Sau đó, chúng ta mới thực hiện hành động 'on_complete' (như chuyển sang khung bên phải).
             # Việc này đảm bảo giao diện được cập nhật đúng trước khi có hành động tiếp theo.
-            def on_update_and_action():
-                self.on_worker_finished(key)
+            def on_update_and_action(completed_items):
+                self.populate_lists()
                 if on_complete:
                     on_complete()
             
+            worker.signals.finished.connect(lambda app_key=key: self.on_worker_finished(app_key))
             worker.signals.finished.connect(on_update_and_action)
             
             # Lưu worker và bắt đầu
@@ -1719,23 +1717,11 @@ class TekDT_AIS(QMainWindow):
     def on_worker_finished(self, app_key):
         """
         Được gọi khi một worker độc lập hoàn thành tác vụ.
-        Hàm này đảm bảo chỉ cập nhật cho đúng app đã xong.
+        Hàm này chỉ còn nhiệm vụ xóa worker khỏi danh sách đang hoạt động.
         """
         # Xóa worker khỏi danh sách quản lý để giải phóng bộ nhớ
         if app_key in self.active_workers:
             del self.active_workers[app_key]
-
-        # Rất quan trọng: Tải lại config từ file vào bộ nhớ
-        # để chắc chắn rằng dữ liệu là mới nhất trước khi làm mới giao diện.
-        self.load_config_and_apps(populate=False)
-
-        # Làm mới toàn bộ danh sách để cập nhật giao diện
-        # (chuyển nút "Tải" -> "Thêm", cập nhật phiên bản, v.v.)
-        if not hasattr(self, '_populate_timer') or not self._populate_timer.isActive():
-            self._populate_timer = QTimer(self)
-            self._populate_timer.setSingleShot(True)
-            self._populate_timer.timeout.connect(self.populate_lists)
-            self._populate_timer.start(50) # Chờ 50ms để gom các lệnh gọi
     
     def filter_apps(self, text):
         text = text.lower().strip()
