@@ -1208,13 +1208,13 @@ class TekDT_AIS(QMainWindow):
             self.show_styled_message_box(QMessageBox.Icon.Information, "Hoàn tất tác vụ dòng lệnh", final_message)
             self.load_config_and_apps(populate=False)
             QApplication.quit()
-
-        self.install_worker.progress.connect(self.update_and_record_progress)
-        self.install_worker.progress_percentage.connect(self.update_download_progress_anywhere)
-        self.install_worker.finished.connect(on_cli_finished)
-        self.install_worker.error.connect(lambda e: self.show_styled_message_box(QMessageBox.Icon.Critical, "Lỗi Worker", str(e)))
-        self.install_worker.update_widget_status.connect(self.update_widget_status)
-        self.install_worker.tasks_batch_completed.connect(self.on_tasks_batch_completed)
+        
+        self.install_worker.progress.connect(self.update_and_record_progress, Qt.ConnectionType.QueuedConnection)
+        self.install_worker.progress_percentage.connect(self.update_download_progress_anywhere, Qt.ConnectionType.QueuedConnection)
+        self.install_worker.finished.connect(on_cli_finished, Qt.ConnectionType.QueuedConnection)
+        self.install_worker.error.connect(lambda e: self.show_styled_message_box(QMessageBox.Icon.Critical, "Lỗi Worker", str(e)), Qt.ConnectionType.QueuedConnection)
+        self.install_worker.update_widget_status.connect(self.update_widget_status, Qt.ConnectionType.QueuedConnection)
+        self.install_worker.tasks_batch_completed.connect(self.on_tasks_batch_completed, Qt.ConnectionType.QueuedConnection)
         self.install_worker.start()
 
     def update_and_record_progress(self, app_key, status, message):
@@ -1841,7 +1841,7 @@ class TekDT_AIS(QMainWindow):
                 self.start_button.setText("Xong")
                 self.start_button.setEnabled(True)
                 self.start_button.setStyleSheet("background-color: #4CAF50; color: white;")
-        else:
+        elif self.install_worker and self.install_worker._is_stopped and not self.is_cli_mode:
             self.reset_ui_after_completion()
 
         self.install_worker = None
@@ -1863,9 +1863,6 @@ class TekDT_AIS(QMainWindow):
             self.start_button.setText("BẮT ĐẦU CÀI ĐẶT")
             self.start_button.setStyleSheet("background-color: #3498db; color: white;") # Blue button
             self.status_label.setText("Trạng thái: Sẵn sàng.")
-        self.selected_for_install.clear()
-        self.save_config()
-        self.load_config_and_apps()
 
     def update_counts(self):
         if self.embed_mode: return
@@ -2010,7 +2007,7 @@ Lưu ý:
         main_win.show()
         def start_cli_handler(success, msg):
             if success:
-                main_win.handle_cli_args(cli_command_args)
+                QTimer.singleShot(100, lambda: main_win.handle_cli_args(cli_command_args))
             else:
                 # Nếu tool check thất bại, hiển thị lỗi và thoát
                 main_win.show_styled_message_box(QMessageBox.Icon.Critical, "Lỗi khởi tạo", msg)
