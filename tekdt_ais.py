@@ -18,12 +18,12 @@ import queue
 import time
 from packaging.version import parse as parse_version
 
-from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
+from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
                              QListWidget, QListWidgetItem, QLabel, QPushButton, QLineEdit,
                              QFrame, QScrollArea, QGraphicsOpacityEffect, QToolTip,
                              QMessageBox, QSizePolicy, QTextEdit)
-from PyQt6.QtGui import QIcon, QPixmap, QColor, QPalette, QFont, QMovie
-from PyQt6.QtCore import (Qt, QSize, QThread, pyqtSignal, QObject, QPropertyAnimation,
+from PySide6.QtGui import QIcon, QPixmap, QColor, QPalette, QFont, QMovie
+from PySide6.QtCore import (Qt, QSize, QThread, Signal, QObject, QPropertyAnimation,
                           QEasingCurve, QTimer, QRect, QCoreApplication)
 
 # --- CÁC HẰNG SỐ VÀ CẤU HÌNH ---
@@ -102,8 +102,8 @@ class CliProgressWindow(QWidget):
 
 # --- NEW: Lớp quản lý và cập nhật công cụ ---
 class ToolManager(QObject):
-    progress_update = pyqtSignal(str)
-    finished = pyqtSignal(bool, str)
+    progress_update = Signal(str)
+    finished = Signal(bool, str)
 
     def __init__(self):
         super().__init__()
@@ -245,17 +245,17 @@ class ToolManager(QObject):
 
 # --- LỚP CHO TÁC VỤ NỀN (DOWNLOAD, INSTALL) ---
 class WorkerSignals(QObject):
-    finished = pyqtSignal()
-    progress = pyqtSignal(str, str, str)
-    error = pyqtSignal(str)
-    progress_percentage = pyqtSignal(str, float)
-    update_widget_status = pyqtSignal(str, str)
-    tasks_batch_completed = pyqtSignal(dict) 
+    finished = Signal()
+    progress = Signal(str, str, str)
+    error = Signal(str)
+    progress_percentage = Signal(str, float)
+    update_widget_status = Signal(str, str)
+    tasks_batch_completed = Signal(dict) 
 
 class AriaDownloader(QThread):
     # Tín hiệu trả về app_key để biết tiến trình của app nào
-    progress_percentage = pyqtSignal(str, float)
-    finished = pyqtSignal(str, bool) # app_key, success
+    progress_percentage = Signal(str, float)
+    finished = Signal(str, bool) # app_key, success
 
     def __init__(self, app_key, command, cwd):
         super().__init__()
@@ -649,9 +649,9 @@ class InstallWorker(QThread):
 
 # --- WIDGET TÙY CHỈNH CHO MỖI PHẦN MỀM ---
 class AppItemWidget(QWidget):
-    add_requested = pyqtSignal(str, dict)
-    remove_requested = pyqtSignal(str, dict)
-    auto_install_toggled = pyqtSignal(str, bool)
+    add_requested = Signal(str, dict)
+    remove_requested = Signal(str, dict)
+    auto_install_toggled = Signal(str, bool)
     def __init__(self, app_key, app_info, embed_mode=False, parent=None):
         super().__init__(parent)
         self.app_key = app_key
