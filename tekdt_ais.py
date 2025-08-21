@@ -240,17 +240,7 @@ class ToolManager(QObject):
             version_file.write_text(remote_version)
             self.progress_update.emit(f"Đã cập nhật {tool_name} thành công!")
         else:
-            self.progress_update.emit(f"{tool_name} đã là phiên bản mới nhất.")
-
-
-# --- LỚP CHO TÁC VỤ NỀN (DOWNLOAD, INSTALL) ---
-class WorkerSignals(QObject):
-    finished = Signal()
-    progress = Signal(str, str, str)
-    error = Signal(str)
-    progress_percentage = Signal(str, float)
-    update_widget_status = Signal(str, str)
-    tasks_batch_completed = Signal(dict) 
+            self.progress_update.emit(f"{tool_name} đã là phiên bản mới nhất.") 
 
 class AriaDownloader(QThread):
     # Tín hiệu trả về app_key để biết tiến trình của app nào
@@ -356,10 +346,15 @@ class AriaDownloader(QThread):
             self.finished.emit(self.app_key, False)
 
 class InstallWorker(QThread):
+    finished = Signal()
+    progress = Signal(str, str, str)
+    error = Signal(str)
+    progress_percentage = Signal(str, float)
+    update_widget_status = Signal(str, str)
+    tasks_batch_completed = Signal(dict)
+    
     def __init__(self, worker_tasks):
         super().__init__()
-        self.main_win = main_win
-        self.signals = WorkerSignals()
         self.worker_tasks = worker_tasks # {app_key: {'action': ..., 'info': ...}}
         self._is_stopped = False
         
@@ -403,7 +398,7 @@ class InstallWorker(QThread):
                 for app_key, task_def in download_tasks.items():
                     if self._is_stopped: break
                     
-                    self.signals.progress.emit(app_key, "processing", f"Chuẩn bị tải...")
+                    self.progress.emit(app_key, "processing", f"Chuẩn bị tải...")
                     app_info = task_def['info']
                     app_dir = APPS_DIR / app_key
                     app_dir.mkdir(exist_ok=True)
@@ -418,7 +413,7 @@ class InstallWorker(QThread):
                     downloader = AriaDownloader(app_key, command, app_dir)
                     
                     # Kết nối tín hiệu từ downloader con đến tín hiệu của worker chính
-                    downloader.progress_percentage.connect(self.signals.progress_percentage)
+                    downloader.progress_percentage.connect(self.progress_percentage)
                     downloader.finished.connect(self._on_download_finished)
                     
                     self.downloaders.append(downloader)
@@ -428,13 +423,13 @@ class InstallWorker(QThread):
                 self._process_remaining_tasks()
 
         except Exception as e:
-            self.signals.error.emit(f"Lỗi nghiêm trọng khi khởi tạo Worker: {e}")
+            self.error.emit(f"Lỗi nghiêm trọng khi khởi tạo Worker: {e}")
         finally:
             # Chỉ phát tín hiệu finished nếu không có tác vụ tải nào đang hoạt động.
             # Nếu có, hàm _on_download_finished sẽ tự xử lý việc này sau.
             with self.lock:
                 if self.active_downloads == 0:
-                    self.signals.finished.emit()
+                    self.finished.emit()
 
     def _build_aria_command(self, app_info, app_dir):
         download_url = app_info['download_url']
@@ -453,19 +448,19 @@ class InstallWorker(QThread):
         with self.lock:
             if success:
                 # Cập nhật giao diện ngay lập tức để tránh overlay đứng 100%
-                self.signals.update_widget_status.emit(app_key, "success")
-                self.signals.progress.emit(app_key, "success", f"Đã tải {app_key} thành công!")
+                self.update_widget_status.emit(app_key, "success")
+                self.progress.emit(app_key, "success", f"Đã tải {app_key} thành công!")
 
                 # Process ngay per task thay vì đợi all
                 self._process_single_task(app_key, self.worker_tasks[app_key])
             else:
                 status = "stopped" if self._is_stopped else "failed"
-                self.signals.update_widget_status.emit(app_key, "failed")
-                self.signals.progress.emit(app_key, status, f"Tải thất bại.")
+                self.update_widget_status.emit(app_key, "failed")
+                self.progress.emit(app_key, status, f"Tải thất bại.")
 
             self.active_downloads -= 1
             if self.active_downloads == 0:
-                self.signals.finished.emit()
+                self.finished.emit()
 
     def _process_single_task(self, app_key, task_def):
         if self._is_stopped: return
@@ -481,19 +476,19 @@ class InstallWorker(QThread):
         # --- Xử lý Cài đặt/Tải về ---
         if action == "download" or app_info.get('type') == 'portable':
             # Với 'download' hoặc portable, chỉ cần tải xong là thành công
-            self.signals.update_widget_status.emit(app_key, "success")
-            self.signals.progress.emit(app_key, "success", f"Đã xử lý {display_name} thành công!")
+            self.update_widget_status.emit(app_key, "success")
+            self.progress.emit(app_key, "success", f"Đã xử lý {display_name} thành công!")
             task_successful = True
 
         elif (action == "install" or action == "update") and app_info.get('type') == 'installer':
             download_path = APPS_DIR / app_key / app_info.get('output_filename', Path(app_info['download_url']).name)
             if not download_path.exists():
-                self.signals.update_widget_status.emit(app_key, "failed")
-                self.signals.progress.emit(app_key, "failed", f"Lỗi: Không tìm thấy file đã tải của {display_name}.")
+                self.update_widget_status.emit(app_key, "failed")
+                self.progress.emit(app_key, "failed", f"Lỗi: Không tìm thấy file đã tải của {display_name}.")
                 return
 
-            self.signals.update_widget_status.emit(app_key, "installing")
-            self.signals.progress.emit(app_key, "installing", f"Đang cài đặt {display_name}...")
+            self.update_widget_status.emit(app_key, "installing")
+            self.progress.emit(app_key, "installing", f"Đang cài đặt {display_name}...")
 
             install_params = app_info.get('install_params', '')
             install_command = [str(download_path)] + shlex.split(install_params)
@@ -502,18 +497,18 @@ class InstallWorker(QThread):
                 install_process.wait(timeout=600)
 
                 if install_process.returncode == 0:
-                    self.signals.update_widget_status.emit(app_key, "success")
-                    self.signals.progress.emit(app_key, "success", f"Đã xử lý {display_name} thành công!")
+                    self.update_widget_status.emit(app_key, "success")
+                    self.progress.emit(app_key, "success", f"Đã xử lý {display_name} thành công!")
                     task_successful = True
                 else:
-                    self.signals.update_widget_status.emit(app_key, "failed")
-                    self.signals.progress.emit(app_key, "failed", f"Cài đặt thất bại (mã lỗi: {install_process.returncode}).")
+                    self.update_widget_status.emit(app_key, "failed")
+                    self.progress.emit(app_key, "failed", f"Cài đặt thất bại (mã lỗi: {install_process.returncode}).")
             except subprocess.TimeoutExpired:
-                self.signals.update_widget_status.emit(app_key, "failed")
-                self.signals.progress.emit(app_key, "failed", f"Cài đặt quá thời gian cho phép.")
+                self.update_widget_status.emit(app_key, "failed")
+                self.progress.emit(app_key, "failed", f"Cài đặt quá thời gian cho phép.")
             except Exception as e:
-                self.signals.update_widget_status.emit(app_key, "failed")
-                self.signals.progress.emit(app_key, "failed", f"Lỗi khi chạy cài đặt: {e}")
+                self.update_widget_status.emit(app_key, "failed")
+                self.progress.emit(app_key, "failed", f"Lỗi khi chạy cài đặt: {e}")
 
         # Nếu thành công, ghi config ngay per task
         if task_successful:
@@ -522,7 +517,7 @@ class InstallWorker(QThread):
     def _process_remaining_tasks(self):
         """Xử lý các tác vụ còn lại như cài đặt, cập nhật icon..."""
         if self._is_stopped:
-            self.signals.finished.emit()
+            self.finished.emit()
             return
 
         successful_tasks = {} #CHANGED: Lưu các tác vụ thành công để xử lý config một lần
@@ -541,19 +536,19 @@ class InstallWorker(QThread):
             # --- Xử lý Cài đặt/Tải về ---
             if action == "download" or app_info.get('type') == 'portable':
                 # Với 'download' hoặc portable, chỉ cần tải xong là thành công
-                self.signals.update_widget_status.emit(app_key, "success")
-                self.signals.progress.emit(app_key, "success", f"Đã xử lý {display_name} thành công!")
+                self.update_widget_status.emit(app_key, "success")
+                self.progress.emit(app_key, "success", f"Đã xử lý {display_name} thành công!")
                 task_successful = True
 
             elif (action == "install" or action == "update") and app_info.get('type') == 'installer':
                 download_path = APPS_DIR / app_key / app_info.get('output_filename', Path(app_info['download_url']).name)
                 if not download_path.exists():
-                    self.signals.update_widget_status.emit(app_key, "failed")
-                    self.signals.progress.emit(app_key, "failed", f"Lỗi: Không tìm thấy file đã tải của {display_name}.")
+                    self.update_widget_status.emit(app_key, "failed")
+                    self.progress.emit(app_key, "failed", f"Lỗi: Không tìm thấy file đã tải của {display_name}.")
                     continue # Bỏ qua tác vụ này
 
-                self.signals.update_widget_status.emit(app_key, "installing")
-                self.signals.progress.emit(app_key, "installing", f"Đang cài đặt {display_name}...")
+                self.update_widget_status.emit(app_key, "installing")
+                self.progress.emit(app_key, "installing", f"Đang cài đặt {display_name}...")
 
                 install_params = app_info.get('install_params', '')
                 install_command = [str(download_path)] + shlex.split(install_params)
@@ -563,18 +558,18 @@ class InstallWorker(QThread):
                     install_process.wait(timeout=600) # Timeout 10 phút
 
                     if install_process.returncode == 0:
-                        self.signals.update_widget_status.emit(app_key, "success")
-                        self.signals.progress.emit(app_key, "success", f"Đã xử lý {display_name} thành công!")
+                        self.update_widget_status.emit(app_key, "success")
+                        self.progress.emit(app_key, "success", f"Đã xử lý {display_name} thành công!")
                         task_successful = True
                     else:
-                        self.signals.update_widget_status.emit(app_key, "failed")
-                        self.signals.progress.emit(app_key, "failed", f"Cài đặt thất bại (mã lỗi: {install_process.returncode}).")
+                        self.update_widget_status.emit(app_key, "failed")
+                        self.progress.emit(app_key, "failed", f"Cài đặt thất bại (mã lỗi: {install_process.returncode}).")
                 except subprocess.TimeoutExpired:
-                    self.signals.update_widget_status.emit(app_key, "failed")
-                    self.signals.progress.emit(app_key, "failed", f"Cài đặt quá thời gian cho phép.")
+                    self.update_widget_status.emit(app_key, "failed")
+                    self.progress.emit(app_key, "failed", f"Cài đặt quá thời gian cho phép.")
                 except Exception as e:
-                    self.signals.update_widget_status.emit(app_key, "failed")
-                    self.signals.progress.emit(app_key, "failed", f"Lỗi khi chạy cài đặt: {e}")
+                    self.update_widget_status.emit(app_key, "failed")
+                    self.progress.emit(app_key, "failed", f"Lỗi khi chạy cài đặt: {e}")
 
             # CHANGED: Nếu tác vụ thành công, thêm vào danh sách để cập nhật config
             if task_successful:
@@ -631,9 +626,6 @@ class InstallWorker(QThread):
                         remote_version = app_info.get('version', '0')
                         existing_item_info['version'] = remote_version
 
-                    # Thêm: Cập nhật ngay local_apps để đồng bộ bộ nhớ (tránh đè khi populate)
-                    self.main_win.local_apps.setdefault(app_key, {}).update(existing_item_info)  # Giả sử self.parent là main_win, điều chỉnh nếu khác
-
                     # Thêm vào dictionary để gửi đi qua tín hiệu
                     updated_items_for_signal[app_key] = existing_item_info
 
@@ -642,10 +634,10 @@ class InstallWorker(QThread):
 
                 # Phát tín hiệu MỘT LẦN với TẤT CẢ các mục đã cập nhật
                 if updated_items_for_signal:
-                    self.signals.tasks_batch_completed.emit(updated_items_for_signal)
+                    self.tasks_batch_completed.emit(updated_items_for_signal)
 
             except (IOError, json.JSONDecodeError) as e:
-                self.signals.error.emit(f"Lỗi nghiêm trọng khi ghi file config: {e}")
+                self.error.emit(f"Lỗi nghiêm trọng khi ghi file config: {e}")
 
 # --- WIDGET TÙY CHỈNH CHO MỖI PHẦN MỀM ---
 class AppItemWidget(QWidget):
@@ -865,6 +857,7 @@ class TekDT_AIS(QMainWindow):
         self.is_cli_mode = False
         self.is_processing = False
         self.central_widget_ref = None
+        self.install_worker = None
 
         if self.embed_mode:
             self.setup_embed_ui()
@@ -1216,12 +1209,12 @@ class TekDT_AIS(QMainWindow):
             self.load_config_and_apps(populate=False)
             QApplication.quit()
 
-        self.install_worker.signals.progress.connect(self.update_and_record_progress)
-        self.install_worker.signals.progress_percentage.connect(self.update_download_progress_anywhere)
-        self.install_worker.signals.finished.connect(on_cli_finished)
-        self.install_worker.signals.error.connect(lambda e: self.show_styled_message_box(QMessageBox.Icon.Critical, "Lỗi Worker", str(e)))
-        self.install_worker.signals.update_widget_status.connect(self.update_widget_status)
-        self.install_worker.signals.tasks_batch_completed.connect(self.on_tasks_batch_completed)
+        self.install_worker.progress.connect(self.update_and_record_progress)
+        self.install_worker.progress_percentage.connect(self.update_download_progress_anywhere)
+        self.install_worker.finished.connect(on_cli_finished)
+        self.install_worker.error.connect(lambda e: self.show_styled_message_box(QMessageBox.Icon.Critical, "Lỗi Worker", str(e)))
+        self.install_worker.update_widget_status.connect(self.update_widget_status)
+        self.install_worker.tasks_batch_completed.connect(self.on_tasks_batch_completed)
         self.install_worker.start()
 
     def update_and_record_progress(self, app_key, status, message):
@@ -1781,12 +1774,12 @@ class TekDT_AIS(QMainWindow):
         for key in self.selected_for_install:
             if key in self.remote_apps.get('app_items', {}):
                 remote_info = self.remote_apps['app_items'][key]
-                # local_info = self.local_apps.get(key, {})
-                # # Mặc định là 'install', nhưng nếu có phiên bản mới thì là 'update'
-                # action = 'install'
-                # if self.is_app_downloaded(key, remote_info) and parse_version(remote_info.get('version', '0')) > parse_version(local_info.get('version', '0')):
-                    # action = 'update'
-                apps_to_process[key] = {'info': remote_info, 'action': 'install'}
+                local_info = self.local_apps.get(key, {})
+                # Mặc định là 'install', nhưng nếu có phiên bản mới thì là 'update'
+                action = 'install'
+                if self.is_app_downloaded(key, remote_info) and parse_version(remote_info.get('version', '0')) > parse_version(local_info.get('version', '0')):
+                    action = 'update'
+                apps_to_process[key] = {'info': remote_info, 'action': action}
 
 
         if not apps_to_process:
@@ -1800,12 +1793,12 @@ class TekDT_AIS(QMainWindow):
         self.start_button.setStyleSheet("background-color: #e74c3c; color: white; border: none; padding: 8px 16px; border-radius: 4px; font-weight: bold;")
 
         self.install_worker = InstallWorker(apps_to_process)
-        self.install_worker.signals.progress.connect(self.update_install_progress)
-        self.install_worker.signals.progress_percentage.connect(self.update_download_progress_anywhere)
-        self.install_worker.signals.finished.connect(self.on_installation_finished)
-        self.install_worker.signals.error.connect(lambda e: self.show_styled_message_box(QMessageBox.Icon.Critical, "Lỗi Worker", str(e)))
-        self.install_worker.signals.update_widget_status.connect(self.update_widget_status)
-        self.install_worker.signals.tasks_batch_completed.connect(self.on_tasks_batch_completed)
+        self.install_worker.progress.connect(self.update_install_progress)
+        self.install_worker.progress_percentage.connect(self.update_download_progress_anywhere)
+        self.install_worker.finished.connect(self.on_installation_finished)
+        self.install_worker.error.connect(lambda e: self.show_styled_message_box(QMessageBox.Icon.Critical, "Lỗi Worker", str(e)))
+        self.install_worker.update_widget_status.connect(self.update_widget_status)
+        self.install_worker.tasks_batch_completed.connect(self.on_tasks_batch_completed)
         self.install_worker.start()
         
     def update_download_progress_selected(self, app_key, percentage):
