@@ -1196,6 +1196,7 @@ class TekDT_AIS(QMainWindow):
             self.move_app_to_selection(key, task_def['info'])
         
         self.set_ui_interactive(False) # Vô hiệu hóa tương tác
+        self.start_button.hide()
         
         self.install_worker = InstallWorker(worker_tasks)
 
@@ -1320,7 +1321,6 @@ class TekDT_AIS(QMainWindow):
         main_layout.addWidget(bottom_panel)
 
     def set_ui_interactive(self, enabled):
-        """Enable or disable all interactive UI elements except the stop button when disabled."""
         self.search_box.setEnabled(enabled)
         self.available_list_widget.setEnabled(enabled)
         
@@ -1330,14 +1330,22 @@ class TekDT_AIS(QMainWindow):
             widget = self.selected_list_widget.itemWidget(item)
             if hasattr(widget, 'action_button'):
                 if not enabled:
-                    # Ẩn nút "Bỏ" và hiển thị trạng thái "processing" khi bắt đầu cài đặt
-                    widget.action_button.hide()
+                    # Không ẩn nút "Bỏ", chỉ disable và hiển thị trạng thái "processing"
+                    widget.action_button.setEnabled(False)
                     widget.set_status("processing")
                 else:
-                    # Hiển thị lại nút "Bỏ" và ẩn trạng thái khi kết thúc
-                    widget.action_button.show()
+                    # Giữ nút hiển thị và enable
+                    widget.action_button.setEnabled(True)
                     widget.set_status("")
-                widget.action_button.setEnabled(enabled)
+        
+        # Giữ nút "Bắt đầu cài đặt" luôn hiển thị, nhưng đổi text nếu không enabled
+        if not enabled:
+            self.start_button.setText("DỪNG")
+            self.start_button.setEnabled(True)  # Cho phép click để dừng
+            self.start_button.setStyleSheet("background-color: #e74c3c; color: white;")
+        else:
+            self.start_button.setText("BẮT ĐẦU CÀI ĐẶT")
+            self.start_button.setStyleSheet("background-color: #3498db; color: white;")
     
     def load_config_and_apps(self, populate=True):
         # Load local config
@@ -1469,10 +1477,13 @@ class TekDT_AIS(QMainWindow):
 
         if not self.embed_mode:
             # Xóa các mục đã chọn không còn tương thích
-            valid_selected = [key for key in self.selected_for_install if key in compatible_apps]
-            self.selected_for_install = valid_selected
+            if self.is_cli_mode:
+                valid_selected = [key for key in self.cli_target_apps if key in compatible_apps]
+            else:
+                valid_selected = [key for key in self.selected_for_install if key in compatible_apps]
+                self.selected_for_install = valid_selected
             
-            for key in self.selected_for_install:
+            for key in valid_selected:
                 self.move_app_to_selection(key, compatible_apps[key])
 
         self.update_counts()
@@ -1653,6 +1664,8 @@ class TekDT_AIS(QMainWindow):
             worker.start()
 
     def move_app_to_selection(self, key, info):
+        if self.is_cli_mode and key not in self.cli_target_apps:
+            return
         # Kiểm tra xem item đã tồn tại trong danh sách chọn chưa
         for i in range(self.selected_list_widget.count()):
             item = self.selected_list_widget.item(i)
