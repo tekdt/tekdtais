@@ -1112,6 +1112,7 @@ class TekDT_AIS(QMainWindow):
         # --- Xác định các phần mềm mục tiêu ---
         target_keys = set()
         if app_names_str:
+            app_names_str = app_names_str.strip('\'"') 
             target_keys = set(app_names_str.split('|'))
         elif is_update_action and not is_install_action: # Chỉ /update
             # Lấy tất cả các app đã được tải về
@@ -1138,10 +1139,10 @@ class TekDT_AIS(QMainWindow):
                 if is_install_action: report['install']['skipped_not_found'].append(key)
                 continue
             local_info = self.local_apps.get(key, {})
-            if not self.is_app_downloaded(key, remote_info):
-                if is_update_action: report['update']['skipped_online'].append(key)
-                if is_install_action: report['install']['skipped_online'].append(key)
-                continue
+            # if not self.is_app_downloaded(key, remote_info):
+                # if is_update_action: report['update']['skipped_online'].append(key)
+                # if is_install_action: report['install']['skipped_online'].append(key)
+                # continue
             
             needs_update = is_update_action and parse_version(remote_info.get('version', '0')) > parse_version(local_info.get('version', '0'))
             needs_install = is_install_action
@@ -1149,7 +1150,7 @@ class TekDT_AIS(QMainWindow):
             if needs_update:
                 worker_tasks[key] = {'info': remote_info, 'action': 'update'}
             elif needs_install:
-                worker_tasks[key] = {'info': remote_info, 'action': 'install'}
+                worker_tasks[key] = {'info': local_info, 'action': 'install'}
 
         if not worker_tasks:
             # Tạo thông báo nếu không có gì để làm
