@@ -1606,17 +1606,17 @@ class TekDT_AIS(QMainWindow):
             worker = InstallWorker(worker_tasks)
             
             # Kết nối các tín hiệu như cũ
-            worker.signals.progress.connect(self.update_install_progress)
-            worker.signals.progress_percentage.connect(self.update_download_progress_anywhere)
-            worker.signals.error.connect(lambda e: self.show_styled_message_box(QMessageBox.Icon.Critical, "Lỗi Worker", str(e)))
-            worker.signals.update_widget_status.connect(self.update_widget_status)
-            worker.signals.tasks_batch_completed.connect(self.on_tasks_batch_completed)
+            worker.progress.connect(self.update_install_progress)
+            worker.progress_percentage.connect(self.update_download_progress_anywhere)
+            worker.error.connect(lambda e: self.show_styled_message_box(QMessageBox.Icon.Critical, "Lỗi Worker", str(e)))
+            worker.update_widget_status.connect(self.update_widget_status)
+            worker.tasks_batch_completed.connect(self.on_tasks_batch_completed)
 
             # THAY ĐỔI QUAN TRỌNG:
             # Kết nối tín hiệu finished tới hàm xử lý mới (on_worker_finished).
             # Dùng lambda để truyền app_key, đảm bảo hàm xử lý biết worker nào đã xong.
-            worker.signals.finished.connect(lambda app_key=key: self.on_worker_finished(app_key))
-            worker.signals.finished.connect(lambda: self.populate_lists())
+            worker.finished.connect(lambda app_key=key: self.on_worker_finished(app_key))
+            worker.finished.connect(lambda: self.populate_lists())
             
             # Lưu worker vào dictionary quản lý và bắt đầu chạy
             self.active_workers[key] = worker
@@ -1642,11 +1642,11 @@ class TekDT_AIS(QMainWindow):
             worker = InstallWorker(worker_tasks)
             
             # Kết nối các tín hiệu
-            worker.signals.progress.connect(self.update_install_progress)
-            worker.signals.progress_percentage.connect(self.update_download_progress_anywhere)
-            worker.signals.error.connect(lambda e: self.show_styled_message_box(QMessageBox.Icon.Critical, "Lỗi Worker", str(e)))
-            worker.signals.update_widget_status.connect(self.update_widget_status)
-            worker.signals.tasks_batch_completed.connect(self.on_tasks_batch_completed)
+            worker.progress.connect(self.update_install_progress)
+            worker.progress_percentage.connect(self.update_download_progress_anywhere)
+            worker.error.connect(lambda e: self.show_styled_message_box(QMessageBox.Icon.Critical, "Lỗi Worker", str(e)))
+            worker.update_widget_status.connect(self.update_widget_status)
+            worker.tasks_batch_completed.connect(self.on_tasks_batch_completed)
             
             # THAY ĐỔI QUAN TRỌNG:
             # Khi worker xong, nó sẽ tự gọi on_worker_finished để làm mới giao diện.
@@ -1657,7 +1657,7 @@ class TekDT_AIS(QMainWindow):
                 if on_complete:
                     on_complete()
             
-            worker.signals.finished.connect(on_update_and_action)
+            worker.finished.connect(on_update_and_action)
             
             # Lưu worker và bắt đầu
             self.active_workers[key] = worker
