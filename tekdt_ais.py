@@ -841,12 +841,16 @@ class AppItemWidget(QWidget):
 
 # --- CỬA SỔ CHÍNH ---
 class TekDT_AIS(QMainWindow):
-    def __init__(self, embed_mode=False, embed_size=None):
+    def __init__(self, embed_mode=False, embed_size=None, is_cli_mode=False, cli_args=None):
         super().__init__()
         self.embed_mode = embed_mode
         if embed_mode:
             threading.Thread(target=self.check_shutdown_signal, daemon=True).start()
         self.embed_size = embed_size
+        
+        self.is_cli_mode = is_cli_mode
+        self.cli_args = cli_args if cli_args is not None else []
+        
         self.config = {}
         self.remote_apps = {}
         self.local_apps = {}
@@ -1005,21 +1009,29 @@ class TekDT_AIS(QMainWindow):
     def on_tool_check_finished(self, success, message):
         self.tool_manager_thread.quit()
         self.tool_manager_thread.wait()
-        # Ẩn overlay và kích hoạt lại UI
+        
+        # Ẩn overlay khởi động
         if hasattr(self, 'startup_overlay'):
             self.startup_overlay.hide()
-        if self.central_widget_ref:
-            self.central_widget_ref.setEnabled(True)
-
+        
         if not success:
-            self.show_styled_message_box(QMessageBox.Icon.Warning, "Cảnh báo", message)
-            # Thoát chương trình nếu không có công cụ
+            self.show_styled_message_box(QMessageBox.Icon.Warning, "Lỗi công cụ", message)
             if not (ARIA2_EXEC.exists() and SEVENZ_EXEC.exists()):
                 QApplication.quit()
                 return
         
-        # Tiếp tục tải cấu hình và ứng dụng
-        self.load_config_and_apps()
+        # Bật lại giao diện chính
+        if self.central_widget_ref:
+            self.central_widget_ref.setEnabled(True)
+
+        # --- LOGIC QUYẾT ĐỊNH CHẾ ĐỘ CHẠY ---
+        if self.is_cli_mode:
+            # Nếu là chế độ dòng lệnh, gọi hàm xử lý CLI
+            # Dùng QTimer để đảm bảo giao diện được vẽ xong trước khi bắt đầu xử lý nặng
+            QTimer.singleShot(100, lambda: self.handle_cli_args(self.cli_args))
+        else:
+            # Nếu là chế độ giao diện thông thường, tải danh sách ứng dụng
+            self.load_config_and_apps()
 
     def setup_embed_ui(self):
         self.setWindowTitle(f"{APP_NAME}")
@@ -1960,15 +1972,11 @@ def handle_auto_install_cli(args):
 if __name__ == '__main__':
     QApplication.setHighDpiScaleFactorRoundingPolicy(Qt.HighDpiScaleFactorRoundingPolicy.PassThrough)
     
-    # Phân tích tham số bằng shlex để hỗ trợ khoảng trắng
-    raw_args = ' '.join(sys.argv[1:])
     cli_args = sys.argv[1:]
     
-    # Xử lý lệnh /auto_install trước tiên <<
     if handle_auto_install_cli(cli_args):
         sys.exit(0)
     
-    # Tách flags (--embed) ra khỏi các tham số dòng lệnh (/)
     flags = [arg for arg in cli_args if arg.startswith('--')]
     cli_command_args = [arg for arg in cli_args if not arg.startswith('--')]
     
@@ -1990,9 +1998,19 @@ if __name__ == '__main__':
     icon_path_main = resource_path("logo.ico")
     if Path(icon_path_main).exists():
         app.setWindowIcon(QIcon(icon_path_main))
-    main_win = TekDT_AIS(embed_mode=embed_mode, embed_size=embed_size)
 
-    # Xử lý /help riêng biệt vì nó không cần giao diện
+    # --- THAY ĐỔI CHÍNH BẮT ĐẦU TỪ ĐÂY ---
+    is_cli_command = any(arg in ['/install', '/update', '/help'] for arg in cli_command_args)
+
+    # Truyền các tham số CLI vào class ngay từ đầu
+    main_win = TekDT_AIS(
+        embed_mode=embed_mode, 
+        embed_size=embed_size,
+        is_cli_mode=is_cli_command,
+        cli_args=cli_command_args
+    )
+
+    # Xử lý /help riêng biệt vì nó không cần chờ
     if '/help' in cli_command_args:
         help_text = """Sử dụng TekDT AIS qua dòng lệnh:
   /help                       Hiển thị trợ giúp này.
