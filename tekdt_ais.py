@@ -860,7 +860,8 @@ class TekDT_AIS(QMainWindow):
         self.system_arch = platform.architecture()[0]
         self.session = requests.Session()
         self.session.headers.update({'User-Agent': 'TekDT-AIS-App'})
-        self.cli_task_results = {}        
+        self.cli_task_results = {}    
+        self.cli_target_apps = []        
         self._scroll_positions = {}
         self.is_cli_mode = False
         self.is_processing = False
@@ -1170,7 +1171,7 @@ class TekDT_AIS(QMainWindow):
                     needs_update = True
             
             # Quyết định tác vụ cuối cùng
-            if needs_update:
+            if is_update_action and needs_update:
                 # Nếu cần update, hành động sẽ là 'update'.
                 # Worker sẽ tự động xử lý việc tải phiên bản mới.
                 # Nếu có cả /install, worker sẽ cài đặt sau khi update thành công.
@@ -1179,7 +1180,8 @@ class TekDT_AIS(QMainWindow):
                 # Nếu không cần update nhưng có lệnh /install, hành động là 'install'
                 worker_tasks[key] = {'info': remote_info, 'action': 'install'}
 
-
+        self.cli_target_apps = list(target_keys)
+        
         if not worker_tasks:
             self.show_styled_message_box(QMessageBox.Icon.Information, "Thông báo", "Không có tác vụ nào cần thực hiện.")
             QApplication.quit()
@@ -1201,38 +1203,34 @@ class TekDT_AIS(QMainWindow):
         def on_cli_finished():
             # Xử lý kết quả từ self.cli_task_results
             for key, result in self.cli_task_results.items():
-                action = result.get('action') # 'install' hoặc 'update'
-                status = result.get('status') # 'success' hoặc 'failed'
+                action = result.get('action')  # 'install' hoặc 'update'
+                status = result.get('status')  # 'success' hoặc 'failed'
                 
-                if action == 'update':
+                # Chỉ đếm cho hành động tương ứng, tránh đếm kép nếu kết hợp /install /update
+                if action == 'update' and is_update_action:
                     if status == 'success':
                         report['update']['success'] += 1
-                        # Nếu update thành công và có lệnh /install, cũng tính là install thành công
-                        if is_install_action:
-                            report['install']['success'] += 1
                     else:
                         report['update']['fail'] += 1
-                elif action == 'install':
+                elif action == 'install' and is_install_action:
                     if status == 'success':
                         report['install']['success'] += 1
                     else:
                         report['install']['fail'] += 1
 
-            # Xây dựng thông báo tổng kết
+            # Xây dựng thông báo tổng kết (thêm kiểm tra để chỉ hiển thị phần liên quan)
             summary_lines = []
             if is_update_action:
                 s = report['update']['success']
                 f = report['update']['fail']
-                skip_not_found = len(report['update']['skipped_not_found'])
-                skip_offline = len(report['update']['skipped_offline'])
-                summary_lines.append(f"--- Cập nhật ---\nThành công: {s} | Thất bại: {f} | Bỏ qua: {skip_not_found + skip_offline} (Không tìm thấy hoặc chưa tải)")
+                skip = len(report['update']['skipped_not_found']) + len(report['update']['skipped_offline'])
+                summary_lines.append(f"--- Cập nhật ---\nThành công: {s} | Thất bại: {f} | Bỏ qua: {skip} (Không tìm thấy hoặc chưa tải)")
             
             if is_install_action:
                 s = report['install']['success']
                 f = report['install']['fail']
-                skip_not_found = len(report['install']['skipped_not_found'])
-                skip_offline = len(report['install']['skipped_offline'])
-                summary_lines.append(f"--- Cài đặt ---\nThành công: {s} | Thất bại: {f} | Bỏ qua: {skip_not_found + skip_offline} (Không tìm thấy hoặc chưa tải)")
+                skip = len(report['install']['skipped_not_found']) + len(report['install']['skipped_offline'])
+                summary_lines.append(f"--- Cài đặt ---\nThành công: {s} | Thất bại: {f} | Bỏ qua: {skip} (Không tìm thấy hoặc chưa tải)")
 
             final_message = "\n\n".join(summary_lines)
             self.show_styled_message_box(QMessageBox.Icon.Information, "Hoàn tất tác vụ dòng lệnh", final_message)
