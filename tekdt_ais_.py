@@ -1378,6 +1378,9 @@ class TekDT_AIS(QMainWindow):
         if self.is_processing:
             return
         self.save_scroll_positions()
+        QTimer.singleShot(50, self._do_populate_lists)
+        
+    def _do_populate_lists(self):
         self.available_list_widget.clear()
         if not self.embed_mode:
             self.selected_list_widget.clear()
@@ -1569,18 +1572,11 @@ class TekDT_AIS(QMainWindow):
             worker_tasks = {key: {'info': info, 'action': 'download'}}
             worker = InstallWorker(worker_tasks)
             
-            # Kết nối các tín hiệu như cũ
             worker.signals.progress.connect(self.update_install_progress)
             worker.signals.progress_percentage.connect(self.update_download_progress_anywhere)
             worker.signals.error.connect(lambda e: self.show_styled_message_box(QMessageBox.Icon.Critical, "Lỗi Worker", str(e)))
             worker.signals.update_widget_status.connect(self.update_widget_status)
             worker.signals.tasks_batch_completed.connect(self.on_tasks_batch_completed)
-
-            # THAY ĐỔI QUAN TRỌNG:
-            # Kết nối tín hiệu finished tới hàm xử lý mới (on_worker_finished).
-            # Dùng lambda để truyền app_key, đảm bảo hàm xử lý biết worker nào đã xong.
-            worker.signals.finished.connect(lambda app_key=key: self.on_worker_finished(app_key))
-            # worker.signals.finished.connect(lambda: self.populate_lists())
             worker.signals.tasks_batch_completed.connect(self.populate_lists)
             
             # Lưu worker vào dictionary quản lý và bắt đầu chạy
@@ -1611,14 +1607,11 @@ class TekDT_AIS(QMainWindow):
             worker.signals.progress_percentage.connect(self.update_download_progress_anywhere)
             worker.signals.error.connect(lambda e: self.show_styled_message_box(QMessageBox.Icon.Critical, "Lỗi Worker", str(e)))
             worker.signals.update_widget_status.connect(self.update_widget_status)
-            worker.signals.tasks_batch_completed.connect(self.on_tasks_batch_completed)
+            worker.signals.tasks_batch_completed.connect(self.on_tasks_batch_completed)  # THÊM DÒNG NÀY: Cập nhật local_apps
+            worker.signals.tasks_batch_completed.connect(self.populate_lists)
             
-            # THAY ĐỔI QUAN TRỌNG:
-            # Khi worker xong, nó sẽ tự gọi on_worker_finished để làm mới giao diện.
-            # Sau đó, chúng ta mới thực hiện hành động 'on_complete' (như chuyển sang khung bên phải).
-            # Việc này đảm bảo giao diện được cập nhật đúng trước khi có hành động tiếp theo.
             def on_update_and_action(completed_items):
-                self.populate_lists()
+                QTimer.singleShot(100, lambda: self.populate_lists())  # Delay 100ms trước populate
                 if on_complete:
                     on_complete()
             
