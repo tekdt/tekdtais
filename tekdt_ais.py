@@ -466,6 +466,69 @@ class InstallWorker(QThread):
                 self.finished.emit() # Báo hiệu worker đã xong việc
 
     def _process_single_task(self, app_key, task_def):
+        if app_info.get('is_office_suite'):
+            action = task_def['action'] # 'download' hoặc 'install'
+            office_tool_path = TOOLS_DIR / "Office" / "Setup.exe"
+            app_dir = APPS_DIR / app_key
+            app_dir.mkdir(exist_ok=True, parents=True)
+            config_xml_path = app_dir / "configuration.xml"
+
+            if not office_tool_path.exists():
+                self.progress.emit(app_key, "failed", "Lỗi: Không tìm thấy Office Deployment Tool (Setup.exe).")
+                return
+
+            if action == 'download':
+                # Bước 1: Tạo file XML để tải
+                self.progress.emit(app_key, "processing", "Đang tạo file cấu hình...")
+                # (Tùy chọn) Ở đây bạn có thể hiện một Dialog để người dùng chọn Visio/Project
+                if not self.parent()._create_office_config_xml(config_xml_path, app_info, download_mode=True):
+                     self.progress.emit(app_key, "failed", "Tạo file cấu hình thất bại.")
+                     return
+                
+                # Bước 2: Chạy lệnh tải
+                self.progress.emit(app_key, "processing", "Đang tải bộ cài Office...")
+                command = [str(office_tool_path), "/download", str(config_xml_path)]
+                try:
+                    process = subprocess.Popen(command, cwd=app_dir)
+                    process.wait() # Chờ cho đến khi tiến trình tải xong
+                    
+                    if process.returncode == 0:
+                        # Tạo file đánh dấu thành công
+                        (app_dir / "Office" / "Data" / ".downloaded").touch()
+                        self.progress.emit(app_key, "success", "Tải Office thành công!")
+                        # (Quan trọng) Sau khi tải xong, tự động thêm vào khung thứ 2
+                        QMetaObject.invokeMethod(self.parent(), "move_app_to_selection", Qt.QueuedConnection, Q_ARG(str, app_key), Q_ARG(dict, app_info))
+                    else:
+                        self.progress.emit(app_key, "failed", f"Tải Office thất bại (mã lỗi: {process.returncode}).")
+                except Exception as e:
+                    self.progress.emit(app_key, "failed", f"Lỗi khi tải Office: {e}")
+
+            elif action == 'install':
+                # Bước 1: Tạo file XML để cài đặt
+                self.progress.emit(app_key, "installing", "Đang tạo file cấu hình cài đặt...")
+                if not self.parent()._create_office_config_xml(config_xml_path, app_info, download_mode=False):
+                     self.progress.emit(app_key, "failed", "Tạo file cấu hình thất bại.")
+                     return
+                
+                # Bước 2: Chạy lệnh cài đặt
+                self.progress.emit(app_key, "installing", "Đang cài đặt Office...")
+                command = [str(office_tool_path), "/configure", str(config_xml_path)]
+                try:
+                    process = subprocess.Popen(command, cwd=app_dir)
+                    process.wait() # Chờ cài đặt xong
+                    
+                    if process.returncode == 0:
+                        self.progress.emit(app_key, "success", "Cài đặt Office thành công!")
+                        # Cập nhật phiên bản và lưu config
+                        self._commit_config_changes({app_key: task_def})
+                    else:
+                        self.progress.emit(app_key, "failed", f"Cài đặt Office thất bại (mã lỗi: {process.returncode}).")
+                except Exception as e:
+                    self.progress.emit(app_key, "failed", f"Lỗi khi cài đặt Office: {e}")
+            
+            # Kết thúc xử lý cho Office
+            return
+        
         if self._is_stopped: return
 
         app_info = task_def['info']
