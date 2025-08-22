@@ -190,7 +190,7 @@
       "compatible_os_arch": "both",
       "download_url": "https://www.avast.com/vi-vn/download-thank-you.php?product=FAV-AVAST&locale=vi-vn&direct=1",
       "output_filename": "avast_free_antivirus_offline_setup.exe",
-      "install_params": "/wait /silent",
+      "install_params": "/VERYSILENT /NORESTART",
       "icon_url": "https://static3.avast.com/10004423/web/i/v3/components/avast-logos/avast-logo-default.svg"
     },
     "AVGAVfree": {
@@ -645,8 +645,34 @@
       "compatible_os_arch": "both",
       "download_url": "https://www.foxit.com/downloads/latest.html?product=Foxit-Reader&platform=Windows&version=&package_type=&language=English&distID=",
       "output_filename": "FoxitPDFReader_enu_Setup_Prom.exe",
-      "install_params": "/S",
+      "install_params": "/quiet /norestart",
       "icon_url": "https://www.foxit.com/static/company/images/icons/foxit-pdf-reader-logo-500x500.png"
+    },
+    "Zoom32": {
+      "display_name": "Zoom",
+      "version": "6.5.11.13227",
+      "category": "Hội họp trực tuyến",
+      "description": "Nền tảng Zoom Workplace cung cấp bộ công cụ năng suất được xây dựng để tối ưu hóa và phát triển giai đoạn kết nối tiếp theo của con người.",
+      "type": "installer",
+      "architecture": "32bit",
+      "compatible_os_arch": "both",
+      "download_url": "https://zoom.us/client/6.5.11.13227/ZoomInstallerFull.msi",
+      "output_filename": "ZoomInstallerFull.msi",
+      "install_params": "/quiet /qn /norestart",
+      "icon_url": "https://st2.zoom.us/static/6.3.41408/image/new/topNav/Resources-ZoomClient.png"
+    },
+    "Zoom64": {
+      "display_name": "Zoom",
+      "version": "6.5.11.13227",
+      "category": "Hội họp trực tuyến",
+      "description": "Nền tảng Zoom Workplace cung cấp bộ công cụ năng suất được xây dựng để tối ưu hóa và phát triển giai đoạn kết nối tiếp theo của con người.",
+      "type": "installer",
+      "architecture": "64bit",
+      "compatible_os_arch": "64bit",
+      "download_url": "https://zoom.us/client/6.5.11.13227/ZoomInstallerFull.msi?archType=x64",
+      "output_filename": "ZoomInstallerFull.msi",
+      "install_params": "/quiet /qn /norestart",
+      "icon_url": "https://st2.zoom.us/static/6.3.41408/image/new/topNav/Resources-ZoomClient.png"
     }
   }
 }
