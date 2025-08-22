@@ -35,7 +35,7 @@
       "architecture": "64bit",
       "compatible_os_arch": "64bit",
       "download_url": "https://get.videolan.org/vlc/3.0.21/win64/vlc-3.0.21-win64.exe",
-      "install_params": "/L=1066 /S",
+      "install_params": "/S",
       "executable": "vlc-3.0.21-win64.exe",
       "icon_url": "https://images.videolan.org/images/largeVLC.png"
     },
@@ -48,7 +48,7 @@
       "architecture": "32bit",
       "compatible_os_arch": "both",
       "download_url": "https://get.videolan.org/vlc/3.0.21/win32/vlc-3.0.21-win32.exe",
-      "install_params": "/L=1066 /S",
+      "install_params": "/S",
       "executable": "vlc-3.0.21-win32.exe",
       "icon_url": "https://images.videolan.org/images/largeVLC.png"
     },
