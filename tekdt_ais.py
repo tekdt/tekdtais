@@ -2005,6 +2005,59 @@ class TekDT_AIS(QMainWindow):
                 print("Nhận tín hiệu tắt, đang thoát...")
                 os._exit(0)
             time.sleep(1)
+            
+    def _create_office_config_xml(self, config_path, app_info, include_visio=True, include_project=True, download_mode=True):
+        """Tạo file configuration.xml cho việc tải hoặc cài đặt Office."""
+        
+        # Đường dẫn lưu file Office đã tải về
+        office_data_path = APPS_DIR / app_info['app_key']
+
+        xml_content = f"""
+<Configuration>
+  <Add OfficeClientEdition="{app_info['architecture']}" Channel="{app_info['channel']}" {"DownloadPath=\"" + str(office_data_path) + "\"" if download_mode else "SourcePath=\"" + str(office_data_path) + "\""}>
+    <Product ID="{app_info['product_id']}">
+      <Language ID="vi-vn" />
+      <Language ID="en-us" />
+    </Product>
+"""
+        # Tự động tìm và thêm Visio/Project tương ứng nếu có
+        if include_visio:
+            visio_key = app_info['product_id'].replace('ProPlus', 'VisioPro')
+            if visio_key in self.remote_apps.get('app_items', {}):
+                 xml_content += f"""
+    <Product ID="{visio_key}">
+      <Language ID="vi-vn" />
+      <Language ID="en-us" />
+    </Product>"""
+        if include_project:
+            project_key = app_info['product_id'].replace('ProPlus', 'ProjectPro')
+            if project_key in self.remote_apps.get('app_items', {}):
+                xml_content += f"""
+    <Product ID="{project_key}">
+      <Language ID="vi-vn" />
+      <Language ID="en-us" />
+    </Product>"""
+
+        xml_content += """
+  </Add>
+"""
+        # Thêm các tùy chọn cho chế độ cài đặt
+        if not download_mode:
+            xml_content += """
+  <Updates Enabled="TRUE" />
+  <RemoveMSI />
+  <Display Level="Full" AcceptEULA="TRUE" />
+  <Property Name="SharedComputerLicensing" Value="0" />
+  <Property Name="AUTOACTIVATE" Value="1" />
+"""
+        xml_content += "</Configuration>"
+
+        try:
+            with open(config_path, 'w', encoding='utf-8') as f:
+                f.write(xml_content)
+            return True
+        except IOError:
+            return False
 
 def handle_auto_install_cli(args):
     """Xử lý riêng cho tham số dòng lệnh /auto_install."""
