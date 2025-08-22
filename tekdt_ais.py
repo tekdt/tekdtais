@@ -1108,58 +1108,65 @@ class TekDT_AIS(QMainWindow):
         return download_path.exists() and not aria2_control_file.exists()
 
     def handle_cli_args(self, args):
-        """Xử lý các tham số dòng lệnh cho /install và /update."""
-        self.load_config_and_apps(populate=False) # Tải dữ liệu remote và local
+        # Tải dữ liệu remote và local mà không vẽ lại giao diện
+        self.load_config_and_apps(populate=False) 
         if not self.remote_apps.get('app_items'):
             self.show_styled_message_box(QMessageBox.Icon.Critical, "Lỗi", "Không thể tải danh sách phần mềm. Không thể tiếp tục.")
             QApplication.quit()
             return
 
-        self.cli_task_results.clear()
+        # Xác định hành động người dùng yêu cầu
         is_install_action = '/install' in args
         is_update_action = '/update' in args
-
-        # --- BƯỚC 1: Xác định danh sách phần mềm mục tiêu ---
+        
+        # --- BƯỚC 1: Xác định danh sách phần mềm mục tiêu (target_keys) ---
         target_keys = set()
         app_names_str = ""
         for arg in args:
             if not arg.startswith('/'):
                 app_names_str = arg.strip('\'"')
                 break
-        
-        if app_names_str: # Trường hợp có cung cấp tên: /install "app1|app2"
+
+        if app_names_str:
+            # Trường hợp 1: Có cung cấp tên cụ thể (vd: /install "app1|app2")
             target_keys = set(app_names_str.split('|'))
-        elif is_install_action and not is_update_action: # Chỉ /install không có tên
-            # Lấy các app có auto_install=true
+        elif is_install_action and not app_names_str:
+            # Trường hợp 2: /install hoặc /install /update không có tên -> lấy app có auto_install=true
             for key, info in self.local_apps.items():
                 if info.get('auto_install', False):
-                     target_keys.add(key)
-        elif is_update_action: # /update hoặc /install /update không có tên
-            # Lấy tất cả các app đã được tải về
+                    target_keys.add(key)
+        elif is_update_action and not is_install_action and not app_names_str:
+            # Trường hợp 3: Chỉ có /update không có tên -> lấy tất cả app đã tải
             for key in self.local_apps:
                 target_keys.add(key)
                 
-        # --- BƯỚC 2: Xây dựng danh sách tác vụ cho Worker ---
+        # Gán danh sách mục tiêu này để giao diện sử dụng
+        self.cli_target_apps = list(target_keys)
+
+        # --- BƯỚC 2: Xây dựng danh sách tác vụ cho Worker (worker_tasks) ---
         worker_tasks = {}
+        self.cli_task_results = {} # Reset kết quả
+        
+        # Chuẩn bị cho báo cáo cuối cùng
         report = {
-            'update': {'success': 0, 'fail': 0, 'skipped_not_found': [], 'skipped_offline': []},
-            'install': {'success': 0, 'fail': 0, 'skipped_not_found': [], 'skipped_offline': []}
+            'update': {'success': 0, 'fail': 0, 'skipped': []},
+            'install': {'success': 0, 'fail': 0, 'skipped': []}
         }
 
         for key in target_keys:
             remote_info = self.remote_apps.get('app_items', {}).get(key)
             local_info = self.local_apps.get(key, {})
 
-            # Bỏ qua nếu không tìm thấy thông tin phần mềm trên máy chủ
+            # Bỏ qua nếu không tìm thấy thông tin phần mềm trên server
             if not remote_info:
-                report['update']['skipped_not_found'].append(key)
-                report['install']['skipped_not_found'].append(key)
+                report['update']['skipped'].append(key)
+                report['install']['skipped'].append(key)
                 continue
             
-            # Bỏ qua nếu phần mềm chưa được tải về
+            # Bỏ qua nếu phần mềm CHƯA được tải về
             if not self.is_app_downloaded(key, remote_info):
-                report['update']['skipped_offline'].append(key)
-                report['install']['skipped_offline'].append(key)
+                report['update']['skipped'].append(key)
+                report['install']['skipped'].append(key)
                 continue
 
             # Logic xác định hành động
@@ -1171,67 +1178,60 @@ class TekDT_AIS(QMainWindow):
                     needs_update = True
             
             # Quyết định tác vụ cuối cùng
-            if is_update_action and needs_update:
-                # Nếu cần update, hành động sẽ là 'update'.
-                # Worker sẽ tự động xử lý việc tải phiên bản mới.
-                # Nếu có cả /install, worker sẽ cài đặt sau khi update thành công.
+            if needs_update:
+                # Nếu cần cập nhật, hành động sẽ là 'update'.
+                # Worker sẽ tự xử lý việc tải phiên bản mới.
+                # Sau khi update xong, nếu có /install, worker sẽ cài đặt.
                 worker_tasks[key] = {'info': remote_info, 'action': 'update'}
             elif is_install_action:
                 # Nếu không cần update nhưng có lệnh /install, hành động là 'install'
                 worker_tasks[key] = {'info': remote_info, 'action': 'install'}
 
-        self.cli_target_apps = list(target_keys)
-        
         if not worker_tasks:
-            self.show_styled_message_box(QMessageBox.Icon.Information, "Thông báo", "Không có tác vụ nào cần thực hiện.")
+            self.show_styled_message_box(QMessageBox.Icon.Information, "Thông báo", "Không có tác vụ nào cần thực hiện (phần mềm không tồn tại, chưa được tải về, hoặc đã là phiên bản mới nhất).")
             QApplication.quit()
             return
 
         # --- BƯỚC 3: Hiển thị giao diện và khởi chạy Worker ---
         self.show()
-        self.populate_lists() # Tải lại UI
-        
-        # Đưa tất cả các phần mềm mục tiêu sang khung bên phải
-        for key, task_def in worker_tasks.items():
-            self.move_app_to_selection(key, task_def['info'])
+        # QUAN TRỌNG: Gọi populate_lists SAU KHI đã xác định self.cli_target_apps
+        self.populate_lists() 
         
         self.set_ui_interactive(False) # Vô hiệu hóa tương tác
-        self.start_button.hide()
+        self.start_button.hide() # Ẩn nút "Bắt đầu" đi là đúng yêu cầu
         
         self.install_worker = InstallWorker(worker_tasks)
 
-        # Hàm callback khi worker hoàn thành
+        # --- BƯỚC 4: Xử lý khi Worker hoàn thành ---
         def on_cli_finished():
             # Xử lý kết quả từ self.cli_task_results
             for key, result in self.cli_task_results.items():
-                action = result.get('action')  # 'install' hoặc 'update'
-                status = result.get('status')  # 'success' hoặc 'failed'
+                action = result.get('action')
+                status = result.get('status')
                 
-                # Chỉ đếm cho hành động tương ứng, tránh đếm kép nếu kết hợp /install /update
-                if action == 'update' and is_update_action:
-                    if status == 'success':
-                        report['update']['success'] += 1
-                    else:
-                        report['update']['fail'] += 1
-                elif action == 'install' and is_install_action:
-                    if status == 'success':
-                        report['install']['success'] += 1
-                    else:
-                        report['install']['fail'] += 1
+                # Cập nhật báo cáo dựa trên hành động thực tế đã diễn ra
+                if action == 'update':
+                    if status == 'success': report['update']['success'] += 1
+                    else: report['update']['fail'] += 1
+                # Sau khi update thành công, worker sẽ tự chuyển sang install
+                # nên cần kiểm tra cả hành động install
+                if action == 'install':
+                     if status == 'success': report['install']['success'] += 1
+                     else: report['install']['fail'] += 1
 
-            # Xây dựng thông báo tổng kết (thêm kiểm tra để chỉ hiển thị phần liên quan)
+            # Xây dựng thông báo tổng kết
             summary_lines = []
             if is_update_action:
                 s = report['update']['success']
                 f = report['update']['fail']
-                skip = len(report['update']['skipped_not_found']) + len(report['update']['skipped_offline'])
-                summary_lines.append(f"--- Cập nhật ---\nThành công: {s} | Thất bại: {f} | Bỏ qua: {skip} (Không tìm thấy hoặc chưa tải)")
+                skip = len(report['update']['skipped'])
+                summary_lines.append(f"--- Cập nhật ---\nThành công: {s} | Thất bại: {f} | Bỏ qua: {skip}")
             
             if is_install_action:
                 s = report['install']['success']
                 f = report['install']['fail']
-                skip = len(report['install']['skipped_not_found']) + len(report['install']['skipped_offline'])
-                summary_lines.append(f"--- Cài đặt ---\nThành công: {s} | Thất bại: {f} | Bỏ qua: {skip} (Không tìm thấy hoặc chưa tải)")
+                skip = len(report['install']['skipped'])
+                summary_lines.append(f"--- Cài đặt ---\nThành công: {s} | Thất bại: {f} | Bỏ qua: {skip}")
 
             final_message = "\n\n".join(summary_lines)
             self.show_styled_message_box(QMessageBox.Icon.Information, "Hoàn tất tác vụ dòng lệnh", final_message)
@@ -1250,12 +1250,30 @@ class TekDT_AIS(QMainWindow):
         """Cập nhật giao diện và ghi lại kết quả cuối cùng cho các tác vụ CLI."""
         self.update_install_progress(app_key, status, message)
         
-        # Chỉ ghi nhận khi tác vụ kết thúc (thành công, thất bại, hoặc bị dừng)
-        if status in ["success", "failed", "stopped"]:
-             # Đảm bảo worker và các tác vụ của nó vẫn tồn tại
-             if self.install_worker and app_key in self.install_worker.worker_tasks:
-                action_type = self.install_worker.worker_tasks[app_key]['action']
-                self.cli_task_results[app_key] = {'status': status, 'action': action_type}
+        if self.is_cli_mode and status in ["success", "failed", "stopped"]:
+            if self.install_worker and app_key in self.install_worker.worker_tasks:
+                original_action = self.install_worker.worker_tasks[app_key]['action']
+                
+                # Logic mới để ghi nhận kết quả chính xác
+                # Nếu hành động gốc là 'update'
+                if original_action == 'update':
+                    # Nếu tải về thất bại, thì cả update và install đều thất bại
+                    if status == 'failed' and message == "Tải thất bại.":
+                        self.cli_task_results[app_key] = {'status': 'failed', 'action': 'update'}
+                    # Nếu cài đặt thất bại sau khi update
+                    elif status == 'failed':
+                        self.cli_task_results[app_key] = {'status': 'failed', 'action': 'install'}
+                    # Nếu thành công
+                    elif status == 'success':
+                        # Ghi nhận thành công cho cả hai nếu có lệnh /install
+                        is_install_requested = '/install' in self.cli_args
+                        self.cli_task_results[f"{app_key}_update"] = {'status': 'success', 'action': 'update'}
+                        if is_install_requested:
+                             self.cli_task_results[f"{app_key}_install"] = {'status': 'success', 'action': 'install'}
+
+                # Nếu hành động gốc là 'install'
+                elif original_action == 'install':
+                    self.cli_task_results[app_key] = {'status': status, 'action': 'install'}
 
     def setup_ui(self):
         self.setWindowTitle(f"{APP_NAME} - v{APP_VERSION}")
@@ -1320,6 +1338,8 @@ class TekDT_AIS(QMainWindow):
         main_layout.addLayout(panels_layout)
         main_layout.addWidget(bottom_panel)
 
+    
+    
     def set_ui_interactive(self, enabled):
         self.search_box.setEnabled(enabled)
         self.available_list_widget.setEnabled(enabled)
@@ -1477,14 +1497,22 @@ class TekDT_AIS(QMainWindow):
 
         if not self.embed_mode:
             # Xóa các mục đã chọn không còn tương thích
+            valid_selected = []
             if self.is_cli_mode:
+                # Nếu là chế độ CLI, danh sách chọn là cli_target_apps
                 valid_selected = [key for key in self.cli_target_apps if key in compatible_apps]
             else:
+                # Nếu là chế độ GUI thường, lấy từ config
                 valid_selected = [key for key in self.selected_for_install if key in compatible_apps]
-                self.selected_for_install = valid_selected
+            
+            # Gán lại self.selected_for_install để đồng bộ
+            self.selected_for_install = valid_selected
             
             for key in valid_selected:
-                self.move_app_to_selection(key, compatible_apps[key])
+                # Lấy thông tin mới nhất của app để đưa vào khung
+                app_info_to_move = compatible_apps.get(key)
+                if app_info_to_move:
+                    self.move_app_to_selection(key, app_info_to_move)
 
         self.update_counts()
         self.restore_scroll_positions()
@@ -1796,6 +1824,9 @@ class TekDT_AIS(QMainWindow):
                 item.setHidden(category_name not in visible_categories and len(text) >= min_chars)
 
     def start_installation(self):
+        if self.start_button.text() == "Xong":
+            self.reset_ui_after_completion()
+            return
         if self.install_worker and self.install_worker.isRunning():
             reply = self.show_styled_message_box(QMessageBox.Icon.Question, "Dừng tác vụ",
                                                  "Bạn có chắc muốn dừng quá trình cài đặt không?",
@@ -1828,7 +1859,15 @@ class TekDT_AIS(QMainWindow):
             return
 
         # Vô hiệu hóa giao diện, ngoại trừ nút "Dừng"
-        self.set_ui_interactive(False)
+        self.search_box.setEnabled(False)
+        self.available_list_widget.setEnabled(False)
+
+        for i in range(self.selected_list_widget.count()):
+            item = self.selected_list_widget.item(i)
+            widget = self.selected_list_widget.itemWidget(item)
+            if hasattr(widget, 'action_button'):
+                widget.action_button.hide() # Ẩn nút "Bỏ"
+                widget.set_status("processing") # Hiển thị trạng thái chờ
         self.start_button.setText("DỪNG")
         self.start_button.setEnabled(True)
         self.start_button.setStyleSheet("background-color: #e74c3c; color: white; border: none; padding: 8px 16px; border-radius: 4px; font-weight: bold;")
@@ -1879,9 +1918,10 @@ class TekDT_AIS(QMainWindow):
             status_text = "Hoàn tất! Nhấn 'Xong' để tiếp tục."
             if not self.embed_mode:
                 self.status_label.setText(status_text)
-                self.start_button.setText("Xong")
+                self.start_button.setText("Xong") # Đổi text thành "Xong"
                 self.start_button.setEnabled(True)
-                self.start_button.setStyleSheet("background-color: #4CAF50; color: white;")
+                # Đổi màu nút thành màu xanh lá cây để báo hiệu thành công
+                self.start_button.setStyleSheet("background-color: #4CAF50; color: white;") 
         elif self.install_worker and self.install_worker._is_stopped and not self.is_cli_mode:
             self.reset_ui_after_completion()
 
@@ -1900,10 +1940,18 @@ class TekDT_AIS(QMainWindow):
 
     def reset_ui_after_completion(self):
         if not self.embed_mode:
-            self.set_ui_interactive(True) # Re-enable UI
+            self.set_ui_interactive(True) # Bật lại tương tác
             self.start_button.setText("BẮT ĐẦU CÀI ĐẶT")
-            self.start_button.setStyleSheet("background-color: #3498db; color: white;") # Blue button
+            self.start_button.setStyleSheet("background-color: #3498db; color: white;")
             self.status_label.setText("Trạng thái: Sẵn sàng.")
+            
+            # Lặp qua các widget và reset trạng thái của chúng
+            for i in range(self.selected_list_widget.count()):
+                item = self.selected_list_widget.item(i)
+                widget = self.selected_list_widget.itemWidget(item)
+                if hasattr(widget, 'action_button'):
+                    widget.set_status("") # Ẩn icon success/failed
+                    widget.action_button.show() # Hiện lại nút "Bỏ"
 
     def update_counts(self):
         if self.embed_mode: return
