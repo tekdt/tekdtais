@@ -1204,36 +1204,50 @@ class TekDT_AIS(QMainWindow):
 
         # --- BƯỚC 4: Xử lý khi Worker hoàn thành ---
         def on_cli_finished():
-            # Xử lý kết quả từ self.cli_task_results
+            # Khởi tạo lại một đối tượng report sạch để đếm lại từ đầu
+            final_report = {
+                'update': {'success': 0, 'fail': 0},
+                'install': {'success': 0, 'fail': 0}
+            }
+
+            # Duyệt qua danh sách kết quả cuối cùng
             for key, result in self.cli_task_results.items():
                 action = result.get('action')
                 status = result.get('status')
                 
-                # Cập nhật báo cáo dựa trên hành động thực tế đã diễn ra
-                if action == 'update':
-                    if status == 'success': report['update']['success'] += 1
-                    else: report['update']['fail'] += 1
-                # Sau khi update thành công, worker sẽ tự chuyển sang install
-                # nên cần kiểm tra cả hành động install
-                if action == 'install':
-                     if status == 'success': report['install']['success'] += 1
-                     else: report['install']['fail'] += 1
+                # Chỉ quan tâm đến kết quả cuối cùng là thành công hoặc thất bại
+                if status not in ['success', 'failed']:
+                    continue
 
-            # Xây dựng thông báo tổng kết
+                # Phân loại kết quả vào report
+                if action == 'update':
+                    if status == 'success':
+                        final_report['update']['success'] += 1
+                    else:
+                        final_report['update']['fail'] += 1
+                elif action == 'install':
+                    if status == 'success':
+                        final_report['install']['success'] += 1
+                    else:
+                        final_report['install']['fail'] += 1
+
+            # Xây dựng thông báo tổng kết từ final_report đã được đếm chính xác
             summary_lines = []
             if is_update_action:
-                s = report['update']['success']
-                f = report['update']['fail']
-                skip = len(report['update']['skipped'])
+                s = final_report['update']['success']
+                f = final_report['update']['fail']
+                # Lấy số lượng app bị bỏ qua từ report ban đầu
+                skip = len(report['update'].get('skipped', []))
                 summary_lines.append(f"--- Cập nhật ---\nThành công: {s} | Thất bại: {f} | Bỏ qua: {skip}")
             
             if is_install_action:
-                s = report['install']['success']
-                f = report['install']['fail']
-                skip = len(report['install']['skipped'])
+                s = final_report['install']['success']
+                f = final_report['install']['fail']
+                # Lấy số lượng app bị bỏ qua từ report ban đầu
+                skip = len(report['install'].get('skipped', []))
                 summary_lines.append(f"--- Cài đặt ---\nThành công: {s} | Thất bại: {f} | Bỏ qua: {skip}")
 
-            final_message = "\n\n".join(summary_lines)
+            final_message = "\n\n".join(summary_lines) if summary_lines else "Không có tác vụ nào được thực hiện."
             self.show_styled_message_box(QMessageBox.Icon.Information, "Hoàn tất tác vụ dòng lệnh", final_message)
             QApplication.quit()
         
@@ -1350,12 +1364,12 @@ class TekDT_AIS(QMainWindow):
             widget = self.selected_list_widget.itemWidget(item)
             if hasattr(widget, 'action_button'):
                 if not enabled:
-                    # Không ẩn nút "Bỏ", chỉ disable và hiển thị trạng thái "processing"
-                    widget.action_button.setEnabled(False)
+                    # Ẩn nút "Bỏ" đi thay vì chỉ vô hiệu hóa
+                    widget.action_button.hide()
                     widget.set_status("processing")
                 else:
-                    # Giữ nút hiển thị và enable
-                    widget.action_button.setEnabled(True)
+                    # Hiển thị lại nút "Bỏ"
+                    widget.action_button.show()
                     widget.set_status("")
         
         # Giữ nút "Bắt đầu cài đặt" luôn hiển thị, nhưng đổi text nếu không enabled
@@ -1962,7 +1976,7 @@ class TekDT_AIS(QMainWindow):
         self.selected_count_label.setText(f"Đã chọn: {selected_count}")
 
     def save_config(self):
-        if not self.embed_mode:
+        if not self.embed_mode and not self.is_cli_mode:
             self.config['settings']['selected_for_install'] = self.selected_for_install
         try:
             with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
