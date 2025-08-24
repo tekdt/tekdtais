@@ -55,10 +55,6 @@ ARIA2_EXEC = ARIA2_DIR / "aria2c.exe"
 SEVENZ_EXEC = SEVENZ_DIR / "7za.exe"
 ARIA2_API_URL = "https://api.github.com/repos/aria2/aria2/releases/latest"
 SEVENZIP_API_URL = "https://api.github.com/repos/ip7z/7zip/releases/latest"
-ODT_SETUP_URL = "https://download.microsoft.com/download/6c1eeb25-cf8b-41d9-8d0d-cc1dbc032140/officedeploymenttool_19029-20136.exe"
-ODT_DIR = TOOLS_DIR / "ODT"
-ODT_EXEC = ODT_DIR / "setup.exe"
-
 
 # Create storage directories if they don't exist
 def initialize_directories_and_tools():
@@ -71,8 +67,7 @@ def initialize_directories_and_tools():
     if getattr(sys, 'frozen', False):
         bundled_tools = {
             resource_path("Tools/aria2/aria2c.exe"): ARIA2_EXEC,
-            resource_path("Tools/7z/7za.exe"): SEVENZ_EXEC,
-            resource_path("Tools/ODT/setup.exe"): ODT_EXEC
+            resource_path("Tools/7z/7za.exe"): SEVENZ_EXEC
         }
         for src_path_str, dest_path in bundled_tools.items():
             src_path = Path(src_path_str)
@@ -117,7 +112,7 @@ class ToolManager(QObject):
         self.session.headers.update({'User-Agent': 'TekDT-AIS-App'})
 
     def run_checks(self):
-        tools_present = ARIA2_EXEC.exists() and SEVENZ_EXEC.exists() and ODT_EXEC.exists()
+        tools_present = ARIA2_EXEC.exists() and SEVENZ_EXEC.exists()
         is_online = False
 
         # 1. Kiểm tra kết nối mạng một cách an toàn
@@ -136,7 +131,6 @@ class ToolManager(QObject):
             try:
                 self._check_7zip()
                 self._check_aria2()
-                self._check_odt()
                 self.finished.emit(True, "Kiểm tra công cụ hoàn tất.")
             except Exception as e:
                 # Nếu cập nhật thất bại nhưng công cụ đã có sẵn, vẫn có thể tiếp tục
@@ -246,48 +240,7 @@ class ToolManager(QObject):
             version_file.write_text(remote_version)
             self.progress_update.emit(f"Đã cập nhật {tool_name} thành công!")
         else:
-            self.progress_update.emit(f"{tool_name} đã là phiên bản mới nhất.")
-            
-    def _check_odt(self):
-        """Kiểm tra và tải Office Deployment Tool nếu cần."""
-        if ODT_EXEC.exists():
-            self.progress_update.emit("Office Deployment Tool đã có sẵn.")
-            return
-
-        self.progress_update.emit("Đang tải Office Deployment Tool...")
-        try:
-            # Tải file .exe chứa ODT
-            response = self.session.get(ODT_SETUP_URL, stream=True)
-            response.raise_for_status()
-
-            # ODT là một self-extracting archive, cần chạy nó để giải nén
-            temp_odt_installer = TOOLS_DIR / "odt_installer.exe"
-            with open(temp_odt_installer, 'wb') as f:
-                shutil.copyfileobj(response.raw, f)
-
-            self.progress_update.emit("Đang giải nén Office Deployment Tool...")
-            ODT_DIR.mkdir(exist_ok=True)
-            
-            # Lệnh giải nén tự động vào thư mục ODT_DIR
-            # /quiet: chạy ẩn, /extract: giải nén, /log: ghi log (tùy chọn)
-            command = [str(temp_odt_installer), f'/extract:{str(ODT_DIR)}', '/quiet']
-            print(command)
-            process = subprocess.run(command, capture_output=True, text=True, timeout=60, check=False)
-            
-            print("returncode:", process.returncode)
-            print("stdout:", process.stdout)
-            print("stderr:", process.stderr)
-
-            # subprocess.run sẽ đợi tiến trình con hoàn thành
-            if process.returncode != 0:
-                raise Exception(f"Giải nén ODT thất bại: {process.stderr}")
-
-            # Dọn dẹp file cài đặt tạm SAU KHI đã chắc chắn giải nén xong
-            temp_odt_installer.unlink()
-            self.progress_update.emit("Office Deployment Tool đã sẵn sàng.")
-
-        except Exception as e:
-            raise Exception(f"Lỗi khi xử lý ODT: {e}")    
+            self.progress_update.emit(f"{tool_name} đã là phiên bản mới nhất.") 
 
 class AriaDownloader(QThread):
     # Tín hiệu trả về app_key để biết tiến trình của app nào
@@ -423,34 +376,20 @@ class InstallWorker(QThread):
     def run(self):
         try:
             # --- BƯỚC 1: LỌC VÀ KHỞI CHẠY CÁC TÁC VỤ TẢI XUỐNG ĐỒNG THỜI ---
-            # Tách biệt các tác vụ Office và tác vụ thông thường
-            office_tasks = {}
             download_tasks = {}
             for key, task in self.worker_tasks.items():
                 app_info = task['info']
-                if app_info.get('type') == 'office_suite':
-                    office_tasks[key] = task
+                download_path = APPS_DIR / key / app_info.get('output_filename', Path(app_info.get('download_url', '')).name)
+                
+                # Chỉ tải nếu file chưa tồn tại, hoặc nếu hành động là 'update'
+                needs_download = not download_path.exists() or task['action'] == 'update'
+                
+                if needs_download:
+                    download_tasks[key] = task
                 else:
-                    download_path = APPS_DIR / key / app_info.get('output_filename', Path(app_info.get('download_url', '')).name)
-                    
-                    # Chỉ tải nếu file chưa tồn tại, hoặc nếu hành động là 'update'
-                    needs_download = not download_path.exists() or task['action'] == 'update'
-                    
-                    if needs_download:
-                        download_tasks[key] = task
-                    else:
-                        # Nếu không cần tải, đưa thẳng vào danh sách xử lý sau
-                        self.tasks_to_process_after_download[key] = task
+                    # Nếu không cần tải, đưa thẳng vào danh sách xử lý sau
+                    self.tasks_to_process_after_download[key] = task
 
-            for app_key, task_def in office_tasks.items():
-                if self._is_stopped: break
-                # Chỉ xử lý nếu hành động là 'download' hoặc 'update'
-                if task_def['action'] in ['download', 'update']:
-                    self._handle_office_download(app_key, task_def['info'])
-                else:
-                    # Nếu không phải download, đưa vào danh sách xử lý sau (để cài đặt)
-                    self.tasks_to_process_after_download[app_key] = task_def
-            
             if not download_tasks and not self.tasks_to_process_after_download:
                 pass
 
@@ -483,80 +422,15 @@ class InstallWorker(QThread):
                 # Nếu không có gì để tải, chuyển ngay đến bước xử lý sau
                 self._process_remaining_tasks()
 
-            if self.active_downloads > 0:
-                self.exec() # Bắt đầu vòng lặp sự kiện, giữ luồng tồn tại
-            else:
-                # Nếu không có gì để tải, xử lý các tác vụ còn lại và kết thúc
-                self._process_remaining_tasks()
-                self.finished.emit()
-
         except Exception as e:
             self.error.emit(f"Lỗi nghiêm trọng khi khởi tạo Worker: {e}")
-            if self.isRunning(): # Đảm bảo quit() nếu có lỗi
-                self.quit()
-            self.finished.emit()
+        finally:
+            # Chỉ phát tín hiệu finished nếu không có tác vụ tải nào đang hoạt động.
+            # Nếu có, hàm _on_download_finished sẽ tự xử lý việc này sau.
+            with self.lock:
+                if self.active_downloads == 0:
+                    self.finished.emit()
 
-    def _handle_office_download(self, app_key, app_info):
-        """Thực hiện tải bộ cài Office bằng ODT."""
-        self.update_widget_status.emit(app_key, "processing")
-        self.progress.emit(app_key, "processing", "Đang tạo file cấu hình...")
-        
-        app_dir = APPS_DIR / app_key
-        app_dir.mkdir(exist_ok=True)
-        
-        # Xóa file đánh dấu cũ nếu có (trường hợp update)
-        marker_file = app_dir / "_download_completed.marker"
-        if marker_file.exists():
-            marker_file.unlink()
-
-        # Tạo file XML để download
-        xml_content = f"""
-        <Configuration>
-          <Add OfficeClientEdition="{app_info['architecture'][1:]}" Channel="{app_info['channel']}">
-            <Product ID="{app_info['product_id']}">
-              <Language ID="vi-vn" />
-            </Product>
-            <Product ID="{app_info['visio_id']}">
-              <Language ID="vi-vn" />
-            </Product>
-            <Product ID="{app_info['project_id']}">
-              <Language ID="vi-vn" />
-            </Product>
-          </Add>
-          <Property Name="FORCEAPPSHUTDOWN" Value="FALSE" />
-        </Configuration>
-        """
-        config_path = app_dir / "download_config.xml"
-        with open(config_path, 'w', encoding='utf-8') as f:
-            f.write(xml_content.strip())
-
-        self.progress.emit(app_key, "processing", "Bắt đầu tải bộ cài Office...")
-        command = [str(ODT_EXEC), '/download', str(config_path)]
-        
-        try:
-            # Chạy tiến trình tải về và chờ
-            process = subprocess.Popen(command, cwd=app_dir, creationflags=subprocess.CREATE_NO_WINDOW)
-            process.wait(timeout=3600) # Chờ tối đa 1 tiếng
-
-            if self._is_stopped:
-                self.update_widget_status.emit(app_key, "stopped")
-                return
-
-            if process.returncode == 0:
-                # Tải thành công -> Tạo file đánh dấu
-                with open(marker_file, 'w') as f:
-                    f.write('done')
-                self.update_widget_status.emit(app_key, "success")
-                self.progress.emit(app_key, "success", "Tải Office thành công!")
-                # Ghi config
-                self._commit_config_changes({app_key: {'info': app_info, 'action': 'download'}})
-            else:
-                raise Exception(f"ODT download exited with code {process.returncode}")
-
-        except Exception as e:
-            self.update_widget_status.emit(app_key, "failed")
-            self.progress.emit(app_key, "failed", f"Lỗi tải Office: {e}")
-    
     def _build_aria_command(self, app_info, app_dir):
         download_url = app_info['download_url']
         file_name = app_info.get('output_filename', Path(download_url).name)
@@ -589,7 +463,6 @@ class InstallWorker(QThread):
             if self.active_downloads == 0:
                 # Xử lý các tác vụ không cần tải (nếu có)
                 self._process_remaining_tasks() 
-                self.quit()
                 self.finished.emit() # Báo hiệu worker đã xong việc
 
     def _process_single_task(self, app_key, task_def):
@@ -664,47 +537,6 @@ class InstallWorker(QThread):
             # --- Tải Icon (luôn thực hiện) ---
             self._download_icon_if_needed(app_key, app_info)
 
-            if app_info.get('type') == 'office_suite' and action in ["install", "update"]:
-                # --- LOGIC CÀI ĐẶT OFFICE ---
-                self.update_widget_status.emit(app_key, "installing")
-                self.progress.emit(app_key, "installing", f"Đang cài đặt {display_name}...")
-                
-                app_dir = APPS_DIR / app_key
-                # Tạo file XML để install
-                xml_content = f"""
-                <Configuration>
-                  <Add OfficeClientEdition="{app_info['architecture'][1:]}" Channel="{app_info['channel']}" SourcePath="{app_dir}">
-                    <Product ID="{app_info['product_id']}">
-                      <Language ID="vi-vn" />
-                    </Product>
-                    <Product ID="{app_info['visio_id']}">
-                      <Language ID="vi-vn" />
-                    </Product>
-                    <Product ID="{app_info['project_id']}">
-                      <Language ID="vi-vn" />
-                    </Product>
-                  </Add>
-                  <Display Level="None" AcceptEULA="TRUE" />
-                  <Property Name="FORCEAPPSHUTDOWN" Value="TRUE" />
-                </Configuration>
-                """
-                config_path = app_dir / "install_config.xml"
-                with open(config_path, 'w', encoding='utf-8') as f:
-                    f.write(xml_content.strip())
-                
-                command = [str(ODT_EXEC), '/configure', str(config_path)]
-                try:
-                    install_process = subprocess.Popen(command, creationflags=subprocess.CREATE_NO_WINDOW)
-                    install_process.wait(timeout=1800) # Chờ 30 phút
-
-                    if install_process.returncode == 0:
-                        self.update_widget_status.emit(app_key, "success")
-                        task_successful = True
-                    else:
-                        self.update_widget_status.emit(app_key, "failed")
-                except Exception as e:
-                     self.update_widget_status.emit(app_key, "failed")
-            
             # --- Xử lý Cài đặt/Tải về ---
             if action == "download" or app_info.get('type') == 'portable':
                 # Với 'download' hoặc portable, chỉ cần tải xong là thành công
@@ -1051,7 +883,7 @@ class TekDT_AIS(QMainWindow):
         self.tool_manager.moveToThread(self.tool_manager_thread)
         self.tool_manager.finished.connect(self.on_tool_check_finished)
         self.tool_manager_thread.started.connect(self.tool_manager.run_checks)
-        self.tool_manager.progress_update.connect(self.update_startup_status)
+        
         self.tool_manager_thread.start()
 
     def show_styled_message_box(self, icon, title, text, detailed_text="", buttons=QMessageBox.StandardButton.Ok):
@@ -1235,40 +1067,6 @@ class TekDT_AIS(QMainWindow):
         main_layout.addWidget(self.search_box)
         main_layout.addWidget(self.available_list_widget)
 
-    def _generate_office_suites_info(self):
-        """
-        Tạo thông tin cho các bộ Office để hiển thị trong danh sách.
-        """
-        suites = {
-            # ProductID từ: https://learn.microsoft.com/en-us/microsoft-365/troubleshoot/installation/product-ids-supported-office-deployment-tool
-            "O365ProPlusRetail": {"display_name": "Microsoft 365 Apps for enterprise", "channel": "Current"},
-            "O365BusinessRetail": {"display_name": "Microsoft 365 Apps for business", "channel": "Current"},
-            "Office2021Volume": {"display_name": "Office LTSC Professional Plus 2021", "channel": "PerpetualVL2021"},
-            "ProPlus2019Volume": {"display_name": "Office Professional Plus 2019", "channel": "PerpetualVL2019"},
-        }
-        
-        office_apps = {}
-        for product_id, info in suites.items():
-            for arch in ["64", "32"]:
-                app_key = f"{product_id}_{arch}bit"
-                display_name_with_arch = f"{info['display_name']} (x{arch})"
-                
-                office_apps[app_key] = {
-                    "display_name": display_name_with_arch,
-                    "version": "Mới nhất", # Office tự quản lý phiên bản
-                    "description": f"Bộ cài đặt {display_name_with_arch} qua Office Deployment Tool.",
-                    "category": "Văn phòng",
-                    "type": "office_suite",  # Key đặc biệt để nhận diện
-                    "icon_url": "https://img.icons8.com/color/96/microsoft-office-2019.png", # Icon chung
-                    "product_id": product_id,
-                    "architecture": f"x{arch}",
-                    "channel": info['channel'],
-                    # Các ID cho Visio và Project tương ứng
-                    "visio_id": "VisioProRetail" if "Retail" in product_id else "VisioPro2021Volume",
-                    "project_id": "ProjectProRetail" if "Retail" in product_id else "ProjectPro2021Volume",
-                }
-        return office_apps
-    
     def update_download_progress_anywhere(self, app_key, percentage):
         # Tìm widget ở available_list_widget
         for i in range(self.available_list_widget.count()):
@@ -1296,11 +1094,6 @@ class TekDT_AIS(QMainWindow):
         """
         Kiểm tra xem tệp cài đặt của ứng dụng đã được tải về hoàn chỉnh hay chưa.
         """
-        # --- Logic riêng cho Office ---
-        if app_info.get('type') == 'office_suite':
-            marker_file = APPS_DIR / app_key / "_download_completed.marker"
-            return marker_file.exists()
-        
         download_url = app_info.get('download_url', '')
         if not download_url:
             return False
@@ -1633,10 +1426,6 @@ class TekDT_AIS(QMainWindow):
             if hasattr(self, 'status_label') and self.status_label:
                 self.status_label.setText("Chế độ Offline. Hiển thị các phần mềm đã tải.")
         
-        if is_online: # Chỉ hiển thị các bộ Office khi có mạng
-            generated_office_apps = self._generate_office_suites_info()
-            self.remote_apps.get("app_items", {}).update(generated_office_apps)
-        
         # Nếu đang ở chế độ offline, lọc danh sách để chỉ giữ lại các app đã được tải về.
         if not is_online:
             all_local_apps = self.remote_apps.get("app_items", {})
@@ -1650,51 +1439,6 @@ class TekDT_AIS(QMainWindow):
         if populate:
             self.populate_lists()
         
-    def update_single_app_widget(self, app_key):
-        """Tìm và cập nhật trạng thái của chỉ một AppItemWidget mà không vẽ lại toàn bộ danh sách."""
-        widget = self.find_widget_by_key(app_key)
-        if not widget:
-            print(f"Không tìm thấy widget cho {app_key} để cập nhật.")
-            return
-
-        # Tải thông tin mới nhất của phần mềm (đã được worker cập nhật trong config)
-        app_info = self.remote_apps.get('app_items', {}).get(app_key, {})
-        local_info = self.local_apps.get(app_key, {})
-        app_info.update(local_info)
-        widget.app_info = app_info # Cập nhật thông tin trong widget
-
-        # Lấy lại trạng thái mới
-        is_downloaded = self.is_app_downloaded(app_key, app_info) # Bây giờ phải là True
-        local_ver_str = self.local_apps.get(app_key, {}).get('version', '0')
-        remote_ver_str = self.remote_apps.get('app_items', {}).get(app_key, {}).get('version', '0')
-        is_update_available = is_downloaded and parse_version(remote_ver_str) > parse_version(local_ver_str)
-
-        # Cập nhật lại nhãn phiên bản
-        widget.version_label.setText(f"Phiên bản: {app_info.get('version', 'N/A')}")
-        widget.version_label.setStyleSheet("color: #bdc3c7; font-size: 10pt;") # Reset về style mặc định
-        if is_update_available:
-            widget.version_label.setText(f"Cập nhật: {local_ver_str} -> {remote_ver_str}")
-            widget.version_label.setStyleSheet("color: #2ecc71; font-weight: bold;")
-
-        # Ngắt kết nối cũ của nút để tránh gọi nhiều lần
-        try:
-            widget.action_button.clicked.disconnect()
-        except (TypeError, RuntimeError):
-            pass # Bỏ qua nếu không có kết nối nào
-
-        # Thiết lập lại nút bấm với hành động mới ("Thêm" thay vì "Tải")
-        widget.action_button.setText("Thêm")
-        widget.action_button.setToolTip(f"Thêm {app_info['display_name']} vào danh sách")
-        widget.action_button.setStyleSheet("background-color: #4CAF50; color: white;")
-        widget.action_button.setEnabled(True)
-
-        # Kết nối lại hành động mới cho nút
-        on_complete_action = lambda k=app_key, i=app_info: self.move_app_to_selection(k, i)
-        if is_update_available:
-            widget.action_button.clicked.connect(lambda _, k=app_key, i=app_info, w=widget, lv=local_ver_str, rv=remote_ver_str, cb=on_complete_action: self.confirm_update(k, i, w, lv, rv, on_complete=cb))
-        else:
-            widget.action_button.clicked.connect(on_complete_action)
-    
     def populate_lists(self):
         if hasattr(self, '_populate_timer'):
             self._populate_timer.stop()
@@ -1914,6 +1658,7 @@ class TekDT_AIS(QMainWindow):
             # Kết nối tín hiệu finished tới hàm xử lý mới (on_worker_finished).
             # Dùng lambda để truyền app_key, đảm bảo hàm xử lý biết worker nào đã xong.
             worker.finished.connect(lambda app_key=key: self.on_worker_finished(app_key))
+            worker.finished.connect(lambda: self.populate_lists())
             
             # Lưu worker vào dictionary quản lý và bắt đầu chạy
             self.active_workers[key] = worker
@@ -1960,26 +1705,6 @@ class TekDT_AIS(QMainWindow):
             self.active_workers[key] = worker
             worker.start()
 
-    def _update_office_selection_state(self):
-        """Vô hiệu hóa các lựa chọn Office khác nếu đã có một phiên bản được chọn."""
-        is_office_selected = any(
-            self.remote_apps['app_items'].get(key, {}).get('type') == 'office_suite'
-            for key in self.selected_for_install
-        )
-
-        for i in range(self.available_list_widget.count()):
-            item = self.available_list_widget.item(i)
-            widget = self.available_list_widget.itemWidget(item)
-            if hasattr(widget, 'app_info') and widget.app_info.get('type') == 'office_suite':
-                # Nếu đã có Office được chọn VÀ widget này không phải là cái đã được chọn
-                if is_office_selected and widget.app_key not in self.selected_for_install:
-                    widget.action_button.setDisabled(True)
-                    widget.action_button.setToolTip("Chỉ có thể chọn một phiên bản Office để cài đặt.")
-                # Nếu không có Office nào được chọn, bật lại nút (nếu nó không bị vô hiệu hóa vì lý do khác)
-                elif not is_office_selected and widget.app_key not in self.selected_for_install:
-                    widget.action_button.setDisabled(False)
-                    widget.action_button.setToolTip(f"Thêm {widget.app_info['display_name']} vào danh sách")
-    
     def move_app_to_selection(self, key, info):
         if self.is_cli_mode and key not in self.cli_target_apps:
             return
@@ -2011,7 +1736,6 @@ class TekDT_AIS(QMainWindow):
             self.selected_for_install.append(key)
         self.save_config()
         self.update_counts()
-        self._update_office_selection_state()
 
     def remove_app_from_selection(self, key, info):
         for i in range(self.selected_list_widget.count()):
@@ -2026,7 +1750,6 @@ class TekDT_AIS(QMainWindow):
             self.selected_for_install.remove(key)
         self.save_config()
         self.update_counts()
-        self._update_office_selection_state()
         
     def update_available_item_state(self, key, is_selected):
         for i in range(self.available_list_widget.count()):
@@ -2072,27 +1795,23 @@ class TekDT_AIS(QMainWindow):
     def on_worker_finished(self, app_key):
         """
         Được gọi khi một worker độc lập hoàn thành tác vụ.
-        Cập nhật trạng thái trong bộ nhớ một cách trực tiếp và mạnh mẽ.
+        Hàm này đảm bảo chỉ cập nhật cho đúng app đã xong.
         """
-        # Xóa worker khỏi danh sách quản lý
+        # Xóa worker khỏi danh sách quản lý để giải phóng bộ nhớ
         if app_key in self.active_workers:
             del self.active_workers[app_key]
 
-        # --- THAY ĐỔI QUAN TRỌNG ---
-        # Lấy thông tin mới nhất của phần mềm từ danh sách remote
-        remote_info = self.remote_apps.get("app_items", {}).get(app_key)
-        if remote_info:
-            # GHI ĐÈ TRỰC TIẾP phiên bản mới vào bộ nhớ (self.local_apps)
-            # Bước này đảm bảo trạng thái trong bộ nhớ là MỚI NHẤT
-            # trước khi cập nhật giao diện.
-            self.local_apps.setdefault(app_key, {}).update(remote_info)
-            
-            # Đồng bộ cả vào self.config để nhất quán
-            self.config['app_items'].setdefault(app_key, {}).update(remote_info)
+        # Rất quan trọng: Tải lại config từ file vào bộ nhớ
+        # để chắc chắn rằng dữ liệu là mới nhất trước khi làm mới giao diện.
+        self.load_config_and_apps(populate=False)
 
-        # Bây giờ, gọi hàm cập nhật widget.
-        # Nó sẽ đọc trạng thái mới nhất mà chúng ta vừa ghi đè ở trên.
-        self.update_single_app_widget(app_key)
+        # Làm mới toàn bộ danh sách để cập nhật giao diện
+        # (chuyển nút "Tải" -> "Thêm", cập nhật phiên bản, v.v.)
+        if not hasattr(self, '_populate_timer') or not self._populate_timer.isActive():
+            self._populate_timer = QTimer(self)
+            self._populate_timer.setSingleShot(True)
+            self._populate_timer.timeout.connect(self.populate_lists)
+            self._populate_timer.start(50) # Chờ 50ms để gom các lệnh gọi
     
     def filter_apps(self, text):
         text = text.lower().strip()
