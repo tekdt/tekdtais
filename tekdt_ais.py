@@ -624,6 +624,7 @@ class InstallWorker(QThread):
             
             if success:
                 self.update_widget_status.emit(app_key, "success")
+                self._commit_config_changes({app_key: task_def})
             else:
                 status = "stopped" if self._is_stopped else "failed"
                 self.update_widget_status.emit(app_key, status) # Cập nhật UI thất bại
@@ -684,10 +685,6 @@ class InstallWorker(QThread):
             self.update_widget_status.emit(app_key, "success")
             self.progress.emit(app_key, "success", f"Đã xử lý {display_name} thành công!")
             task_successful = True
-
-        # Nếu tác vụ (cài đặt hoặc cập nhật) thành công, ghi lại vào config
-        if task_successful:
-            self._commit_config_changes({app_key: task_def})
     
     def _process_remaining_tasks(self):
         """Xử lý các tác vụ còn lại như cài đặt, cập nhật icon..."""
@@ -2059,7 +2056,9 @@ class TekDT_AIS(QMainWindow):
             # THAY ĐỔI QUAN TRỌNG:
             # Kết nối tín hiệu finished tới hàm xử lý mới (on_worker_finished).
             # Dùng lambda để truyền app_key, đảm bảo hàm xử lý biết worker nào đã xong.
-            worker.finished.connect(lambda app_key=key: self.on_worker_finished(app_key))
+            worker.tasks_batch_completed.connect(
+                lambda completed_items: self.on_worker_finished(list(completed_items.keys())[0])
+            )
             
             # Lưu worker vào dictionary quản lý và bắt đầu chạy
             self.active_workers[key] = worker
