@@ -673,6 +673,19 @@
       "output_filename": "ZoomInstallerFull.msi",
       "install_params": "/quiet /qn /norestart",
       "icon_url": "https://st2.zoom.us/static/6.3.41408/image/new/topNav/Resources-ZoomClient.png"
+    },
+    "mas_aio": {
+      "display_name": "Microsoft Activation Scripts",
+      "version": "3.5",
+      "category": "Kích hoạt",
+      "description": "Kích hoạt Windows và Office.",
+      "type": "Portable",
+      "architecture": "32bit",
+      "compatible_os_arch": "both",
+      "download_url": " https://github.com/massgravel/Microsoft-Activation-Scripts/archive/refs/heads/master.zip",
+      "output_filename": "MAS.zip|MAS_AIO*.cmd",
+      "install_params": "",
+      "icon_url": "https://massgrave.dev/img/logo.png"
     }
   }
 }
