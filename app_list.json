@@ -180,6 +180,19 @@
       "install_params": "/SP- /VERYSILENT /SUPPRESSMSGBOXES /NORESTART",
       "icon_url": "https://www.freedownloadmanager.org/favicon.ico"
     },
+    "idm": {
+      "display_name": "Internet Download Manager (IDM)",
+      "version": "6.42",
+      "category": "Quản lý tải xuống",
+      "description": "Cài đặt Internet Download Manager (IDM) để không còn phải chờ đợi tải xuống nữa. Bạn sẽ thực sự ngạc nhiên về tốc độ tải xuống tệp của IDM. IDM cũng sẽ sửa lỗi và tiếp tục tải xuống bị gián đoạn do mất kết nối, sự cố mạng, tắt máy tính hoặc mất điện đột ngột.",
+      "type": "installer",
+      "architecture": "32bit",
+      "compatible_os_arch": "both",
+      "download_url": "https://mirror2.internetdownloadmanager.com/idman642build42.exe",
+      "output_filename": "idman.exe",
+      "install_params": "/skipdlgs",
+      "icon_url": "https://www.internetdownloadmanager.com/register/IDMlib/images/idman_logos.png"
+    },
     "AvastAVfree": {
       "display_name": "Avast Antivirus Free",
       "version": "1.0.0",
@@ -682,10 +695,36 @@
       "type": "Portable",
       "architecture": "32bit",
       "compatible_os_arch": "both",
-      "download_url": " https://github.com/massgravel/Microsoft-Activation-Scripts/archive/refs/heads/master.zip",
+      "download_url": "https://github.com/massgravel/Microsoft-Activation-Scripts/archive/refs/heads/master.zip",
       "output_filename": "MAS.zip|MAS_AIO*.cmd",
       "install_params": "",
       "icon_url": "https://massgrave.dev/img/logo.png"
+    },
+    "idm_as": {
+      "display_name": "IDM Activation Script (Activator + Registry Cleaner)",
+      "version": "6.42",
+      "category": "Kích hoạt",
+      "description": "IDM Activation Script là công cụ được thiết kế để kích hoạt Internet Download Manager (IDM) miễn phí, cho phép người dùng bỏ qua các hạn chế trong thời gian dùng thử và tận hưởng phiên bản đầy đủ mà không cần mua giấy phép.",
+      "type": "Portable",
+      "architecture": "32bit",
+      "compatible_os_arch": "both",
+      "download_url": "https://github.com/Coporton/IDM-Activation-Script/archive/refs/heads/master.zip",
+      "output_filename": "IDM_AS.zip|IASL.cmd",
+      "install_params": "",
+      "icon_url": "https://cdn.coporton.com/data/CWS-Logo-Full-White.svg"
+    },
+    "ias": {
+      "display_name": "IDM Activation Script (IAS)",
+      "version": "3.7",
+      "category": "Kích hoạt",
+      "description": "Một công cụ mã nguồn mở để kích hoạt, đóng băng, đặt lại và chặn tường lửa Internet Download Manager (IDM).",
+      "type": "Portable",
+      "architecture": "32bit",
+      "compatible_os_arch": "both",
+      "download_url": "https://github.com/Blindsinner/IDM-ACTIVATION-SCRIPT/archive/refs/heads/master.zip",
+      "output_filename": "IAS.zip|IAS.cmd",
+      "install_params": "",
+      "icon_url": "https://cdn-icons-png.flaticon.com/512/6112/6112200.png"
     }
   }
 }
