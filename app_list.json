@@ -738,6 +738,19 @@
       "output_filename": "Defender_Remover.zip|Script_Run.bat",
       "install_params": "",
       "icon_url": "https://raw.githubusercontent.com/ionuttbara/windows-defender-remover/refs/heads/main/app_icon.ico"
+    },
+    "WUB": {
+      "display_name": "Windows Update Blocker",
+      "version": "1.8",
+      "category": "Công cụ hệ thống",
+      "description": "Windows Update Blocker là phần mềm miễn phí di động giúp bạn vô hiệu hóa hoặc kích hoạt hoàn toàn tính năng Cập nhật tự động trên hệ thống Windows của mình.",
+      "type": "Portable",
+      "architecture": "32bit",
+      "compatible_os_arch": "both",
+      "download_url": "https://www.sordum.org/files/downloads.php?st-windows-update-blocker",
+      "output_filename": "Wub.zip|Wub.exe",
+      "install_params": "",
+      "icon_url": "https://www.sordum.org/wp-content/uploads/2023/03/windows_update_blocker_wub.png"
     }
   }
 }
