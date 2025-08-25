@@ -58,13 +58,13 @@ SEVENZIP_API_URL = "https://api.github.com/repos/ip7z/7zip/releases/latest"
 ODT_SETUP_URL = "https://download.microsoft.com/download/6c1eeb25-cf8b-41d9-8d0d-cc1dbc032140/officedeploymenttool_19029-20136.exe"
 ODT_DIR = TOOLS_DIR / "ODT"
 ODT_EXEC = ODT_DIR / "setup.exe"
-
+EXTRACTION_BASE_DIR = Path("C:/TEKDT_AIS")
 
 # Create storage directories if they don't exist
 def initialize_directories_and_tools():
     """ Tạo các thư mục cần thiết và sao chép công cụ từ gói EXE (nếu cần) """
     # Tạo các thư mục lưu trữ bền vững
-    for dir_path in [APPS_DIR, TOOLS_DIR, IMAGES_DIR_DATA, ARIA2_DIR, SEVENZ_DIR]:
+    for dir_path in [APPS_DIR, TOOLS_DIR, IMAGES_DIR_DATA, ARIA2_DIR, SEVENZ_DIR, EXTRACTION_BASE_DIR]:
         dir_path.mkdir(parents=True, exist_ok=True)
 
     # Nếu chạy dưới dạng EXE, kiểm tra và sao chép các công cụ đi kèm vào thư mục Tools
@@ -496,6 +496,53 @@ class InstallWorker(QThread):
                 self.quit()
             self.finished.emit()
 
+    def _extract_archive(self, archive_path, destination_dir):
+        """
+        Sử dụng 7za.exe để giải nén file.
+        Hỗ trợ ghi đè (-y) và trích xuất với đầy đủ đường dẫn (x).
+        """
+        self.progress.emit(self.app_key, "installing", f"Đang giải nén file...")
+        try:
+            # Lệnh: 7za x <archive_path> -o<destination_dir> -y
+            # x: giải nén với đường dẫn đầy đủ
+            # -o: chỉ định thư mục đầu ra (viết liền không có khoảng trắng)
+            # -y: tự động đồng ý với mọi câu hỏi (ghi đè file)
+            command = [
+                str(SEVENZ_EXEC),
+                'x',
+                str(archive_path),
+                f'-o{str(destination_dir)}',
+                '-y'
+            ]
+            process = subprocess.run(command, capture_output=True, text=True, timeout=300, check=False, creationflags=subprocess.CREATE_NO_WINDOW)
+
+            if process.returncode != 0:
+                error_message = process.stderr or process.stdout
+                raise Exception(f"Giải nén thất bại: {error_message}")
+            return True
+        except Exception as e:
+            self.progress.emit(self.app_key, "failed", f"Lỗi giải nén: {e}")
+            return False
+
+    def _find_executable(self, search_dir, pattern):
+        """
+        Tìm kiếm file thực thi theo pattern.
+        Ưu tiên tìm ở thư mục gốc, sau đó tìm đệ quy trong các thư mục con.
+        """
+        search_path = Path(search_dir)
+        
+        # 1. Tìm trong thư mục gốc trước
+        found_files = list(search_path.glob(pattern))
+        if found_files:
+            return found_files[0] # Trả về file đầu tiên tìm thấy
+
+        # 2. Nếu không thấy, tìm đệ quy (recursive glob)
+        found_files_recursive = list(search_path.rglob(pattern))
+        if found_files_recursive:
+            return found_files_recursive[0] # Trả về file đầu tiên tìm thấy
+            
+        return None # Không tìm thấy file nào
+    
     def _handle_office_download(self, app_key, app_info):
         """Thực hiện tải bộ cài Office bằng ODT."""
         # self.update_widget_status.emit(app_key, "processing")
@@ -710,21 +757,56 @@ class InstallWorker(QThread):
                 task_successful = True
 
             elif (action == "install" or action == "update") and app_info.get('type') == 'installer':
-                download_path = APPS_DIR / app_key / app_info.get('output_filename', Path(app_info['download_url']).name)
+                output_filename_str = app_info.get('output_filename', Path(app_info.get('download_url', '')).name)
+                
+                # 1. Phân tích output_filename để lấy file nén và file thực thi
+                archive_name = output_filename_str
+                executable_pattern = output_filename_str
+                if '|' in output_filename_str:
+                    parts = output_filename_str.split('|', 1)
+                    archive_name = parts[0]
+                    executable_pattern = parts[1]
+
+                download_path = APPS_DIR / app_key / archive_name
+                
                 if not download_path.exists():
                     self.update_widget_status.emit(app_key, "failed")
-                    self.progress.emit(app_key, "failed", f"Lỗi: Không tìm thấy file đã tải của {display_name}.")
-                    continue # Bỏ qua tác vụ này
+                    self.progress.emit(app_key, "failed", f"Lỗi: Không tìm thấy file đã tải '{archive_name}'.")
+                    continue
 
+                search_base_dir = APPS_DIR / app_key # Mặc định tìm trong thư mục app
+                is_archive = any(archive_name.lower().endswith(ext) for ext in ['.zip', '.7z', '.rar', '.tar', '.iso', '.img'])
+
+                # 2. Nếu là file nén, giải nén ra C:\TEKDT_AIS\<app_key>
+                if is_archive:
+                    extraction_dir = EXTRACTION_BASE_DIR / app_key
+                    extraction_dir.mkdir(parents=True, exist_ok=True)
+                    
+                    if not self._extract_archive(download_path, extraction_dir):
+                        # Hàm _extract_archive đã tự gửi tín hiệu lỗi, nên chỉ cần continue
+                        continue
+                    
+                    search_base_dir = extraction_dir # Cập nhật lại đường dẫn tìm kiếm
+
+                # 3. Tìm file thực thi dựa trên pattern (hỗ trợ wildcard *)
+                self.progress.emit(app_key, "installing", f"Đang tìm file thực thi '{executable_pattern}'...")
+                executable_path = self._find_executable(search_base_dir, executable_pattern)
+
+                if not executable_path:
+                    self.update_widget_status.emit(app_key, "failed")
+                    self.progress.emit(app_key, "failed", f"Không tìm thấy file thực thi '{executable_pattern}'.")
+                    continue
+
+                # 4. Chạy file thực thi đã tìm được với các tham số
                 self.update_widget_status.emit(app_key, "installing")
                 self.progress.emit(app_key, "installing", f"Đang cài đặt {display_name}...")
-
+                
                 install_params = app_info.get('install_params', '')
-                install_command = [str(download_path)] + shlex.split(install_params)
+                install_command = [str(executable_path)] + shlex.split(install_params)
+                
                 try:
-                    # Sử dụng Popen.wait() với timeout để tránh bị treo vô hạn
                     install_process = subprocess.Popen(install_command, creationflags=subprocess.CREATE_NO_WINDOW)
-                    install_process.wait(timeout=600) # Timeout 10 phút
+                    install_process.wait(timeout=600)
 
                     if install_process.returncode == 0:
                         self.update_widget_status.emit(app_key, "success")
@@ -740,7 +822,7 @@ class InstallWorker(QThread):
                     self.update_widget_status.emit(app_key, "failed")
                     self.progress.emit(app_key, "failed", f"Lỗi khi chạy cài đặt: {e}")
 
-            # CHANGED: Nếu tác vụ thành công, thêm vào danh sách để cập nhật config
+            # Nếu tác vụ thành công, thêm vào danh sách để cập nhật config
             if task_successful:
                 successful_tasks[app_key] = task_def
 
