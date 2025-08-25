@@ -747,7 +747,7 @@
       "type": "Portable",
       "architecture": "32bit",
       "compatible_os_arch": "both",
-      "download_url": "https://www.sordum.org/files/downloads.php?st-windows-update-blocker",
+      "download_url": "https://drive.usercontent.google.com/download?id=1N_XtcQHA6iSMC8YvL0_WIJ6n2AH0wePf&export=download&authuser=0",
       "output_filename": "Wub.zip|Wub.exe",
       "install_params": "",
       "icon_url": "https://www.sordum.org/wp-content/uploads/2023/03/windows_update_blocker_wub.png"
@@ -760,7 +760,7 @@
       "type": "Portable",
       "architecture": "32bit",
       "compatible_os_arch": "both",
-      "download_url": "https://www.sordum.org/files/downloads.php?dns-angel",
+      "download_url": "https://www.sordum.org/files/download/dns-angel/DnsAngel.zip",
       "output_filename": "DnsAngel.zip|DnsAngel.exe",
       "install_params": "",
       "icon_url": "https://www.sordum.org/wp-content/uploads/2023/01/one_cikan_gorsel_fixed.jpg"
@@ -773,7 +773,7 @@
       "type": "Portable",
       "architecture": "32bit",
       "compatible_os_arch": "both",
-      "download_url": "https://www.sordum.org/downloads/?win11-classic-context-menu",
+      "download_url": "https://www.sordum.org/files/download/win11-classic-context-menu/W11ClassicMenu.zip",
       "output_filename": "W11ClassicMenu.zip|W11ClassicMenu.exe",
       "install_params": "",
       "icon_url": "https://www.sordum.org/wp-content/uploads/2023/05/classic_context_menu.png"
@@ -786,7 +786,7 @@
       "type": "Portable",
       "architecture": "32bit",
       "compatible_os_arch": "both",
-      "download_url": "https://www.sordum.org/downloads/?st-fix-print-spooler",
+      "download_url": "https://www.sordum.org/files/download/fix-print-spooler/FixPrintSpooler_v1.3.zip",
       "output_filename": "FixPrintSpooler.zip|FixSpooler.exe",
       "install_params": "",
       "icon_url": "https://www.sordum.org/wp-content/uploads/2021/07/fix_print_spooler.png"
