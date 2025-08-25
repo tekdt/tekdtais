@@ -751,6 +751,45 @@
       "output_filename": "Wub.zip|Wub.exe",
       "install_params": "",
       "icon_url": "https://www.sordum.org/wp-content/uploads/2023/03/windows_update_blocker_wub.png"
+    },
+    "DNS_Angel": {
+      "display_name": "DNS Angel",
+      "version": "1.8",
+      "category": "Công cụ hệ thống",
+      "description": "Để bảo vệ con bạn khỏi nội dung Internet không phù hợp, bạn có thể sử dụng DNSAngel, phần mềm này sẽ bảo vệ gia đình bạn khỏi các trang web không phù hợp và sẽ tự động chặn chúng (mà không cần cài đặt bất kỳ phần mềm nào).",
+      "type": "Portable",
+      "architecture": "32bit",
+      "compatible_os_arch": "both",
+      "download_url": "https://www.sordum.org/files/downloads.php?dns-angel",
+      "output_filename": "DnsAngel.zip|DnsAngel.exe",
+      "install_params": "",
+      "icon_url": "https://www.sordum.org/wp-content/uploads/2023/01/one_cikan_gorsel_fixed.jpg"
+    },
+    "W11ClassicMenu": {
+      "display_name": "Windows 11 Classic Context Menu",
+      "version": "1.2",
+      "category": "Công cụ hệ thống",
+      "description": "Với chương trình này, bạn có thể dễ dàng chuyển đổi giữa menu ngữ cảnh của Windows 11 Cổ điển và Mặc định.",
+      "type": "Portable",
+      "architecture": "32bit",
+      "compatible_os_arch": "both",
+      "download_url": "https://www.sordum.org/downloads/?win11-classic-context-menu",
+      "output_filename": "W11ClassicMenu.zip|W11ClassicMenu.exe",
+      "install_params": "",
+      "icon_url": "https://www.sordum.org/wp-content/uploads/2023/05/classic_context_menu.png"
+    },
+    "FixPrintSpooler": {
+      "display_name": "Fix Print Spooler",
+      "version": "1.3",
+      "category": "Công cụ hệ thống",
+      "description": "Fix Print Spooler là một ứng dụng di động miễn phí dùng để thiết lập lại và xóa hàng đợi Print Spooler. Ứng dụng này xóa nội dung của thư mục %systemroot%\\System32\\spool\\printers\\ và khởi động lại dịch vụ Spooler. Nếu dịch vụ Spooler đã bị xóa, ứng dụng sẽ tạo và sửa chữa nó. Bạn cũng có thể sử dụng ứng dụng này để vô hiệu hóa dịch vụ Spooler.",
+      "type": "Portable",
+      "architecture": "32bit",
+      "compatible_os_arch": "both",
+      "download_url": "https://www.sordum.org/downloads/?st-fix-print-spooler",
+      "output_filename": "FixPrintSpooler.zip|FixSpooler.exe",
+      "install_params": "",
+      "icon_url": "https://www.sordum.org/wp-content/uploads/2021/07/fix_print_spooler.png"
     }
   }
 }
