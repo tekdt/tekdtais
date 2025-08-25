@@ -725,6 +725,19 @@
       "output_filename": "IAS.zip|IAS.cmd",
       "install_params": "",
       "icon_url": "https://cdn-icons-png.flaticon.com/512/6112/6112200.png"
+    },
+    "Defender_Remover": {
+      "display_name": "Defender Remover",
+      "version": "12.8.4",
+      "category": "Công cụ hệ thống",
+      "description": "Ứng dụng này xóa/vô hiệu hóa Windows Defender, bao gồm Windows Security App, Windows Virtualization-Based Security (VBS), Windows SmartScreen, Windows Security Services, Windows Web-Threat Service, Windows File Virtualization (UAC), Microsoft Defender App Guard, Microsoft Driver Block List, System Mitigations và trang Windows Defender trong Ứng dụng Cài đặt trên Windows 10 trở lên.",
+      "type": "Portable",
+      "architecture": "32bit",
+      "compatible_os_arch": "both",
+      "download_url": "https://github.com/ionuttbara/windows-defender-remover/archive/refs/heads/master.zip",
+      "output_filename": "Defender_Remover.zip|Script_Run.bat",
+      "install_params": "",
+      "icon_url": "https://raw.githubusercontent.com/ionuttbara/windows-defender-remover/refs/heads/main/app_icon.ico"
     }
   }
 }
