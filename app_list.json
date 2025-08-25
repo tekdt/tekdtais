@@ -373,7 +373,7 @@
       "download_url": "https://officecdn.microsoft.com/db/492350f6-3a01-4f97-b9c0-c7c6ddf67d60/media/en-us/O365ProPlusRetail.img",
       "output_filename": "O365ProPlusRetail.img|Setup.exe",
       "install_params": "",
-      "icon_url": "https://img.icons8.com/color/96/microsoft-office-2019.png",
+      "icon_url": "https://img.icons8.com/color/96/microsoft-office-2019.png"
     },
     "O365BusinessRetail": {
       "display_name": "Office 365 Business Retail",
@@ -386,7 +386,7 @@
       "download_url": "https://officecdn.microsoft.com/db/492350f6-3a01-4f97-b9c0-c7c6ddf67d60/media/en-us/O365BusinessRetail.img",
       "output_filename": "O365BusinessRetail.img|Setup.exe",
       "install_params": "",
-      "icon_url": "https://img.icons8.com/color/96/microsoft-office-2019.png",
+      "icon_url": "https://img.icons8.com/color/96/microsoft-office-2019.png"
     },
     "O365HomePremRetail": {
       "display_name": "Office 365 Premium Retail",
@@ -399,7 +399,7 @@
       "download_url": "https://officecdn.microsoft.com/db/492350f6-3a01-4f97-b9c0-c7c6ddf67d60/media/en-us/O365HomePremRetail.img",
       "output_filename": "O365HomePremRetail.img|Setup.exe",
       "install_params": "",
-      "icon_url": "https://img.icons8.com/color/96/microsoft-office-2019.png",
+      "icon_url": "https://img.icons8.com/color/96/microsoft-office-2019.png"
     },
     "HomeBusiness2024Retail": {
       "display_name": "Office Home Business 2024 Retail",
@@ -412,7 +412,7 @@
       "download_url": "https://officecdn.microsoft.com/db/492350f6-3a01-4f97-b9c0-c7c6ddf67d60/media/en-us/HomeBusiness2024Retail.img",
       "output_filename": "HomeBusiness2024Retail.img|Setup.exe",
       "install_params": "",
-      "icon_url": "https://img.icons8.com/color/96/microsoft-office-2019.png",
+      "icon_url": "https://img.icons8.com/color/96/microsoft-office-2019.png"
     },
     "Home2024Retail": {
       "display_name": "Office Home 2024 Retail",
@@ -425,7 +425,7 @@
       "download_url": "https://officecdn.microsoft.com/db/492350f6-3a01-4f97-b9c0-c7c6ddf67d60/media/en-us/Home2024Retail.img",
       "output_filename": "Home2024Retail.img|Setup.exe",
       "install_params": "",
-      "icon_url": "https://img.icons8.com/color/96/microsoft-office-2019.png",
+      "icon_url": "https://img.icons8.com/color/96/microsoft-office-2019.png"
     },
     "ProPlus2024Retail": {
       "display_name": "Office Pro Plus 2024 Retail",
@@ -438,7 +438,7 @@
       "download_url": "https://officecdn.microsoft.com/db/492350f6-3a01-4f97-b9c0-c7c6ddf67d60/media/en-us/ProPlus2024Retail.img",
       "output_filename": "ProPlus2024Retail.img|Setup.exe",
       "install_params": "",
-      "icon_url": "https://img.icons8.com/color/96/microsoft-office-2019.png",
+      "icon_url": "https://img.icons8.com/color/96/microsoft-office-2019.png"
     },
     "HomeBusiness2021Retail": {
       "display_name": "Office Home Business 2021 Retail",
@@ -451,7 +451,7 @@
       "download_url": "https://officecdn.microsoft.com/db/492350f6-3a01-4f97-b9c0-c7c6ddf67d60/media/en-us/HomeBusiness2021Retail.img",
       "output_filename": "HomeBusiness2021Retail.img|Setup.exe",
       "install_params": "",
-      "icon_url": "https://img.icons8.com/color/96/microsoft-office-2019.png",
+      "icon_url": "https://img.icons8.com/color/96/microsoft-office-2019.png"
     },
     "HomeStudent2021Retail": {
       "display_name": "Office Home Student 2021 Retail",
@@ -464,7 +464,7 @@
       "download_url": "https://officecdn.microsoft.com/db/492350f6-3a01-4f97-b9c0-c7c6ddf67d60/media/en-us/HomeStudent2021Retail.img",
       "output_filename": "HomeStudent2021Retail.img|Setup.exe",
       "install_params": "",
-      "icon_url": "https://img.icons8.com/color/96/microsoft-office-2019.png",
+      "icon_url": "https://img.icons8.com/color/96/microsoft-office-2019.png"
     },
     "Professional2021Retail": {
       "display_name": "Office Professional 2021 Retail",
@@ -477,7 +477,7 @@
       "download_url": "https://officecdn.microsoft.com/db/492350f6-3a01-4f97-b9c0-c7c6ddf67d60/media/en-us/Professional2021Retail.img",
       "output_filename": "Professional2021Retail.img|Setup.exe",
       "install_params": "",
-      "icon_url": "https://img.icons8.com/color/96/microsoft-office-2019.png",
+      "icon_url": "https://img.icons8.com/color/96/microsoft-office-2019.png"
     },
     "ProPlus2021Retail": {
       "display_name": "Office Pro Plus 2021 Retail",
@@ -490,7 +490,7 @@
       "download_url": "https://officecdn.microsoft.com/db/492350f6-3a01-4f97-b9c0-c7c6ddf67d60/media/en-us/ProPlus2021Retail.img",
       "output_filename": "ProPlus2021Retail.img|Setup.exe",
       "install_params": "",
-      "icon_url": "https://img.icons8.com/color/96/microsoft-office-2019.png",
+      "icon_url": "https://img.icons8.com/color/96/microsoft-office-2019.png"
     },
     "HomeBusiness2019Retail": {
       "display_name": "Office Home Business 2019 Retail",
@@ -503,7 +503,7 @@
       "download_url": "https://officecdn.microsoft.com/db/492350f6-3a01-4f97-b9c0-c7c6ddf67d60/media/en-us/HomeBusiness2019Retail.img",
       "output_filename": "HomeBusiness2019Retail.img|Setup.exe",
       "install_params": "",
-      "icon_url": "https://img.icons8.com/color/96/microsoft-office-2019.png",
+      "icon_url": "https://img.icons8.com/color/96/microsoft-office-2019.png"
     },
     "HomeStudent2019Retail": {
       "display_name": "Office Home Student 2019 Retail",
@@ -516,7 +516,7 @@
       "download_url": "https://officecdn.microsoft.com/db/492350f6-3a01-4f97-b9c0-c7c6ddf67d60/media/en-us/HomeStudent2019Retail.img",
       "output_filename": "HomeStudent2019Retail.img|Setup.exe",
       "install_params": "",
-      "icon_url": "https://img.icons8.com/color/96/microsoft-office-2019.png","
+      "icon_url": "https://img.icons8.com/color/96/microsoft-office-2019.png"
     },
     "Professional2019Retail": {
       "display_name": "Office Professional 2019 Retail",
@@ -529,7 +529,7 @@
       "download_url": "https://officecdn.microsoft.com/db/492350f6-3a01-4f97-b9c0-c7c6ddf67d60/media/en-us/Professional2019Retail.img",
       "output_filename": "Professional2019Retail.img|Setup.exe",
       "install_params": "",
-      "icon_url": "https://img.icons8.com/color/96/microsoft-office-2019.png",
+      "icon_url": "https://img.icons8.com/color/96/microsoft-office-2019.png"
     },
     "ProPlus2019Retail": {
       "display_name": "Office Pro Plus 2019 Retail",
@@ -542,7 +542,7 @@
       "download_url": "https://officecdn.microsoft.com/db/492350f6-3a01-4f97-b9c0-c7c6ddf67d60/media/en-us/ProPlus2019Retail.img",
       "output_filename": "ProPlus2019Retail.img|Setup.exe",
       "install_params": "",
-      "icon_url": "https://img.icons8.com/color/96/microsoft-office-2019.png",
+      "icon_url": "https://img.icons8.com/color/96/microsoft-office-2019.png"
     },
     "HomeBusiness2016Retail": {
       "display_name": "Office Home Business 2016 Retail",
@@ -555,7 +555,7 @@
       "download_url": "https://officecdn.microsoft.com/db/492350f6-3a01-4f97-b9c0-c7c6ddf67d60/media/en-us/HomeBusinessRetail.img",
       "output_filename": "HomeBusinessRetail.img|Setup.exe",
       "install_params": "",
-      "icon_url": "https://img.icons8.com/color/96/microsoft-office-2019.png",
+      "icon_url": "https://img.icons8.com/color/96/microsoft-office-2019.png"
     },
     "HomeStudent2016Retail": {
       "display_name": "Office Home Student 2016 Retail",
@@ -568,7 +568,7 @@
       "download_url": "https://officecdn.microsoft.com/db/492350f6-3a01-4f97-b9c0-c7c6ddf67d60/media/en-us/HomeStudentRetail.img",
       "output_filename": "HomeStudentRetail.img|Setup.exe",
       "install_params": "",
-      "icon_url": "https://img.icons8.com/color/96/microsoft-office-2019.png",
+      "icon_url": "https://img.icons8.com/color/96/microsoft-office-2019.png"
     },
     "Professional2016Retail": {
       "display_name": "Office Professional 2016 Retail",
@@ -581,7 +581,7 @@
       "download_url": "https://officecdn.microsoft.com/db/492350f6-3a01-4f97-b9c0-c7c6ddf67d60/media/en-us/ProfessionalRetail.img",
       "output_filename": "ProfessionalRetail.img|Setup.exe",
       "install_params": "",
-      "icon_url": "https://img.icons8.com/color/96/microsoft-office-2019.png",
+      "icon_url": "https://img.icons8.com/color/96/microsoft-office-2019.png"
     },
     "ProPlus2016Retail": {
       "display_name": "Office Pro Plus 2016 Retail",
@@ -594,7 +594,7 @@
       "download_url": "https://officecdn.microsoft.com/db/492350f6-3a01-4f97-b9c0-c7c6ddf67d60/media/en-us/ProPlusRetail.img",
       "output_filename": "ProPlusRetail.img|Setup.exe",
       "install_params": "",
-      "icon_url": "https://img.icons8.com/color/96/microsoft-office-2019.png",
+      "icon_url": "https://img.icons8.com/color/96/microsoft-office-2019.png"
     },
     "HomeBusiness2013Retail": {
       "display_name": "Office Home Business 2013 Retail",
@@ -607,7 +607,7 @@
       "download_url": "https://officecdn.microsoft.com/db/39168d7e-077b-48e7-872c-b232c3e72675/media/en-us/HomeBusinessRetail.img",
       "output_filename": "HomeBusinessRetail.img|Setup.exe",
       "install_params": "",
-      "icon_url": "https://img.icons8.com/color/96/microsoft-office-2019.png",
+      "icon_url": "https://img.icons8.com/color/96/microsoft-office-2019.png"
     },
     "HomeStudent2013Retail": {
       "display_name": "Office Home Student 2013 Retail",
@@ -620,7 +620,7 @@
       "download_url": "https://officecdn.microsoft.com/db/39168d7e-077b-48e7-872c-b232c3e72675/media/en-us/HomeStudentRetail.img",
       "output_filename": "HomeStudentRetail.img|Setup.exe",
       "install_params": "",
-      "icon_url": "https://img.icons8.com/color/96/microsoft-office-2019.png",
+      "icon_url": "https://img.icons8.com/color/96/microsoft-office-2019.png"
     },
     "ProfessionalRetail": {
       "display_name": "Office Professional 2013 Retail",
@@ -633,7 +633,7 @@
       "download_url": "https://officecdn.microsoft.com/db/39168d7e-077b-48e7-872c-b232c3e72675/media/en-us/ProfessionalRetail.img",
       "output_filename": "ProfessionalRetail.img|Setup.exe",
       "install_params": "",
-      "icon_url": "https://img.icons8.com/color/96/microsoft-office-2019.png","
+      "icon_url": "https://img.icons8.com/color/96/microsoft-office-2019.png"
     },
     "FileZilla32": {
       "display_name": "FileZilla Client 32Bit",
