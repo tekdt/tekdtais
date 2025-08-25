@@ -28,7 +28,7 @@ from PySide6.QtCore import (Qt, QSize, QThread, Signal, QObject, QPropertyAnimat
 
 # --- CÁC HẰNG SỐ VÀ CẤU HÌNH ---
 APP_NAME = "TekDT AIS"
-APP_VERSION = "1.0.1"
+APP_VERSION = "1.0.2"
 GITHUB_REPO_URL = "https://github.com/tekdt/tekdtais"
 REMOTE_APP_LIST_URL = "https://raw.githubusercontent.com/tekdt/tekdtais/refs/heads/main/app_list.json"
     
@@ -498,7 +498,7 @@ class InstallWorker(QThread):
 
     def _handle_office_download(self, app_key, app_info):
         """Thực hiện tải bộ cài Office bằng ODT."""
-        self.update_widget_status.emit(app_key, "processing")
+        # self.update_widget_status.emit(app_key, "processing")
         self.progress.emit(app_key, "processing", "Đang tạo file cấu hình...")
         
         app_dir = APPS_DIR / app_key
@@ -530,7 +530,8 @@ class InstallWorker(QThread):
         with open(config_path, 'w', encoding='utf-8') as f:
             f.write(xml_content.strip())
 
-        self.progress.emit(app_key, "processing", "Bắt đầu tải bộ cài Office...")
+        self.progress.emit(app_key, "processing", "Bắt đầu tải Office (có thể mất vài phút)...")
+        self.update_widget_status.emit(app_key, "downloading_office")
         command = [str(ODT_EXEC), '/download', str(config_path)]
         
         try:
@@ -575,11 +576,7 @@ class InstallWorker(QThread):
             task_def = self.worker_tasks[app_key]
             
             if success:
-                self.progress.emit(app_key, "success", f"Đã tải {app_key} thành công!")
-                
-                # QUAN TRỌNG: Xử lý cài đặt/cập nhật ngay sau khi tải xong
-                # Nếu hành động là 'update' và có tham số /install, nó sẽ tự động cài đặt
-                self._process_single_task(app_key, task_def)
+                self.update_widget_status.emit(app_key, "success")
             else:
                 status = "stopped" if self._is_stopped else "failed"
                 self.update_widget_status.emit(app_key, status) # Cập nhật UI thất bại
@@ -923,51 +920,109 @@ class AppItemWidget(QWidget):
         """Hàm call-back an toàn để reset trạng thái UI."""
         self.set_status("")
     
+    # def set_status(self, status):
+        # self.status_label.setMovie(None)
+        # self.status_label.setPixmap(QPixmap())
+
+        # if status == "success":
+            # self._progress_animation.stop()
+            # self.status_label.setPixmap(QPixmap(resource_path('Images/success.png')).scaled(24, 24, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
+            # self.name_label.setStyleSheet("color: #4CAF50; font-weight: bold; font-size: 12pt;")
+            # self.action_button.setEnabled(True) # Re-enable after process
+            # self._current_progress = 0
+            # self.progress_overlay.hide()
+            # self.progress_overlay.setGeometry(0, 0, 0, self.height())
+            # self.status_label.show()
+            # # QTimer.singleShot(2000, self.reset_status_ui)
+            # timer = QTimer(self)
+            # timer.setSingleShot(True)
+            # timer.timeout.connect(self.reset_status_ui)
+            # timer.start(2000)
+        # elif status == "failed":
+            # self._progress_animation.stop()
+            # self.status_label.setPixmap(QPixmap(resource_path('Images/failed.png')).scaled(24, 24, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
+            # self.name_label.setStyleSheet("color: #F44336; font-weight: bold; font-size: 12pt;")
+            # self.action_button.setEnabled(True) # Re-enable after process
+            # self._current_progress = 0
+            # self.progress_overlay.hide()
+            # self.status_label.show()
+        # elif status == "processing": # Downloading
+            # movie = QMovie(resource_path('Images/loading.gif'))
+            # self.status_label.setMovie(movie)
+            # movie.start()
+            # self.action_button.setEnabled(False)
+            # self.status_label.show()
+        # elif status == "installing": # Installing (new status)
+            # movie = QMovie(resource_path('Images/loading.gif'))
+            # self.status_label.setMovie(movie)
+            # movie.start()
+            # self.action_button.setEnabled(False)
+            # self.status_label.show()
+        # else: # Idle
+            # self.status_label.hide()
+            # self.name_label.setStyleSheet("font-weight: bold; font-size: 12pt;")
+            # self.action_button.setEnabled(True)
+            # self._current_progress = 0
+            # self.progress_overlay.hide()
+
     def set_status(self, status):
+        # Dừng mọi animation và movie cũ trước khi bắt đầu cái mới
+        self._progress_animation.stop()
         self.status_label.setMovie(None)
         self.status_label.setPixmap(QPixmap())
 
         if status == "success":
-            self._progress_animation.stop()
             self.status_label.setPixmap(QPixmap(resource_path('Images/success.png')).scaled(24, 24, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
             self.name_label.setStyleSheet("color: #4CAF50; font-weight: bold; font-size: 12pt;")
-            self.action_button.setEnabled(True) # Re-enable after process
+            self.action_button.setEnabled(True)
             self._current_progress = 0
             self.progress_overlay.hide()
             self.progress_overlay.setGeometry(0, 0, 0, self.height())
             self.status_label.show()
-            # QTimer.singleShot(2000, self.reset_status_ui)
             timer = QTimer(self)
             timer.setSingleShot(True)
             timer.timeout.connect(self.reset_status_ui)
             timer.start(2000)
         elif status == "failed":
-            self._progress_animation.stop()
             self.status_label.setPixmap(QPixmap(resource_path('Images/failed.png')).scaled(24, 24, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
             self.name_label.setStyleSheet("color: #F44336; font-weight: bold; font-size: 12pt;")
-            self.action_button.setEnabled(True) # Re-enable after process
+            self.action_button.setEnabled(True)
             self._current_progress = 0
             self.progress_overlay.hide()
             self.status_label.show()
-        elif status == "processing": # Downloading
+        elif status == "processing" or status == "installing":
             movie = QMovie(resource_path('Images/loading.gif'))
             self.status_label.setMovie(movie)
             movie.start()
             self.action_button.setEnabled(False)
             self.status_label.show()
-        elif status == "installing": # Installing (new status)
-            movie = QMovie(resource_path('Images/loading.gif'))
-            self.status_label.setMovie(movie)
-            movie.start()
+            self.progress_overlay.hide() # Ẩn lớp phủ tiến trình cũ
+        elif status == "downloading_office": # <--- LOGIC MỚI CHO HIỆU ỨNG OFFICE
             self.action_button.setEnabled(False)
-            self.status_label.show()
-        else: # Idle
+            self.status_label.hide() # Ẩn icon loading gif đi
+            self.progress_overlay.show()
+            self.progress_overlay.raise_()
+
+            # Cấu hình animation chạy lặp vô hạn
+            self._progress_animation.setDuration(1500) # Tốc độ chạy của lớp phủ
+            self._progress_animation.setLoopCount(-1) # Lặp lại vô hạn
+            self._progress_animation.setEasingCurve(QEasingCurve.Type.InOutQuad)
+            
+            # Điểm bắt đầu: lớp phủ rộng 30% và ở ngoài bên trái
+            start_rect = QRect(-int(self.width() * 0.3), 0, int(self.width() * 0.3), self.height())
+            # Điểm kết thúc: lớp phủ ở ngoài bên phải
+            end_rect = QRect(self.width(), 0, int(self.width() * 0.3), self.height())
+            
+            self._progress_animation.setStartValue(start_rect)
+            self._progress_animation.setEndValue(end_rect)
+            self._progress_animation.start()
+        else: # Trạng thái chờ (Idle)
             self.status_label.hide()
             self.name_label.setStyleSheet("font-weight: bold; font-size: 12pt;")
             self.action_button.setEnabled(True)
             self._current_progress = 0
             self.progress_overlay.hide()
-
+    
     def update_download_progress(self, app_key, percentage):
         if app_key != self.app_key:
             return
@@ -1046,6 +1101,11 @@ class TekDT_AIS(QMainWindow):
         self.central_widget_ref.setEnabled(False)
         self.show_startup_status("Đang khởi tạo...")
         
+        QTimer.singleShot(50, self.start_tool_check)
+        
+        
+    def start_tool_check(self):
+        """Khởi tạo và chạy ToolManager trong một luồng riêng."""
         self.tool_manager_thread = QThread()
         self.tool_manager = ToolManager()
         self.tool_manager.moveToThread(self.tool_manager_thread)
@@ -1255,7 +1315,7 @@ class TekDT_AIS(QMainWindow):
                 
                 office_apps[app_key] = {
                     "display_name": display_name_with_arch,
-                    "version": "Mới nhất", # Office tự quản lý phiên bản
+                    "version": "1.0.0.0", # Office tự quản lý phiên bản
                     "description": f"Bộ cài đặt {display_name_with_arch} qua Office Deployment Tool.",
                     "category": "Văn phòng",
                     "type": "office_suite",  # Key đặc biệt để nhận diện
@@ -1792,7 +1852,11 @@ class TekDT_AIS(QMainWindow):
         is_downloaded = self.is_app_downloaded(key, info)
         local_ver_str = self.local_apps.get(key, {}).get('version', '0')
         remote_ver_str = self.remote_apps.get('app_items', {}).get(key, {}).get('version', '0')
-        is_update_available = is_downloaded and parse_version(remote_ver_str) > parse_version(local_ver_str)
+        
+        is_update_available = False
+        # Chỉ so sánh phiên bản cho các ứng dụng không phải là Office
+        if info.get('type') != 'office_suite':
+            is_update_available = is_downloaded and parse_version(remote_ver_str) > parse_version(local_ver_str)
 
         # Luôn hiển thị thông báo nếu có cập nhật
         if is_update_available:
@@ -1960,10 +2024,11 @@ class TekDT_AIS(QMainWindow):
             self.active_workers[key] = worker
             worker.start()
 
+    # Trong class TekDT_AIS, thay thế hoàn toàn hàm cũ bằng hàm này
     def _update_office_selection_state(self):
-        """Vô hiệu hóa các lựa chọn Office khác nếu đã có một phiên bản được chọn."""
+        """Vô hiệu hóa hoặc kích hoạt lại các lựa chọn Office."""
         is_office_selected = any(
-            self.remote_apps['app_items'].get(key, {}).get('type') == 'office_suite'
+            self.remote_apps.get('app_items', {}).get(key, {}).get('type') == 'office_suite'
             for key in self.selected_for_install
         )
 
@@ -1975,10 +2040,19 @@ class TekDT_AIS(QMainWindow):
                 if is_office_selected and widget.app_key not in self.selected_for_install:
                     widget.action_button.setDisabled(True)
                     widget.action_button.setToolTip("Chỉ có thể chọn một phiên bản Office để cài đặt.")
-                # Nếu không có Office nào được chọn, bật lại nút (nếu nó không bị vô hiệu hóa vì lý do khác)
-                elif not is_office_selected and widget.app_key not in self.selected_for_install:
+                # Nếu không có Office nào được chọn, KHÔI PHỤC HOÀN TOÀN TRẠNG THÁI NÚT
+                elif not is_office_selected:
                     widget.action_button.setDisabled(False)
-                    widget.action_button.setToolTip(f"Thêm {widget.app_info['display_name']} vào danh sách")
+                    # Logic khôi phục nút (quan trọng nhất)
+                    is_downloaded = self.is_app_downloaded(widget.app_key, widget.app_info)
+                    if is_downloaded:
+                        widget.action_button.setText("Thêm")
+                        widget.action_button.setToolTip(f"Thêm {widget.app_info['display_name']} vào danh sách")
+                        widget.action_button.setStyleSheet("background-color: #4CAF50; color: white;")
+                    else:
+                        widget.action_button.setText("Tải")
+                        widget.action_button.setToolTip(f"Tải về {widget.app_info['display_name']}")
+                        widget.action_button.setStyleSheet("background-color: #f39c12; color: white;")
     
     def move_app_to_selection(self, key, info):
         if self.is_cli_mode and key not in self.cli_target_apps:
@@ -2131,7 +2205,9 @@ class TekDT_AIS(QMainWindow):
                 self.start_button.setText("ĐANG DỪNG...")
                 self.start_button.setDisabled(True)
             return
-
+        
+        self.is_processing = True
+        
         # Nếu nút đang ở trạng thái "Xong"
         if self.start_button.text() == "Xong":
             self.reset_ui_after_completion()
@@ -2209,6 +2285,7 @@ class TekDT_AIS(QMainWindow):
             target_widget.set_status(status)
     
     def on_installation_finished(self):
+        self.is_processing = False
         if self.install_worker and not self.install_worker._is_stopped:
             status_text = "Hoàn tất! Nhấn 'Xong' để tiếp tục."
             if not self.embed_mode:
@@ -2234,6 +2311,7 @@ class TekDT_AIS(QMainWindow):
                     # Reconnect nếu cần
 
     def reset_ui_after_completion(self):
+        self.is_processing = False
         if not self.embed_mode:
             self.set_ui_interactive(True) # Bật lại tương tác
             self.start_button.setText("BẮT ĐẦU CÀI ĐẶT")
@@ -2266,12 +2344,27 @@ class TekDT_AIS(QMainWindow):
             print(f"Không thể lưu cấu hình: {e}")
             
     def closeEvent(self, event):
-        # Dừng các worker đang hoạt động
-        # Dùng list() để tạo bản sao, tránh thay đổi dict khi đang duyệt
-        for worker in list(self.active_workers.values()):
-            if worker and worker.isRunning():
-                worker.stop()
-                worker.wait(2000) # Cho worker 2 giây để dừng
+        if self.is_processing or self.active_workers:
+            reply = self.show_styled_message_box(
+                QMessageBox.Icon.Warning,
+                "Xác nhận thoát",
+                "Các tác vụ vẫn đang chạy. Bạn có chắc chắn muốn thoát không?\n"
+                "Việc này có thể làm gián đoạn quá trình tải hoặc cài đặt.",
+                buttons=QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            )
+
+            if reply == QMessageBox.StandardButton.No:
+                event.ignore() # Hủy sự kiện đóng cửa sổ
+                return
+            else:
+                # Nếu người dùng vẫn muốn thoát, hãy dừng các worker
+                if self.install_worker and self.install_worker.isRunning():
+                    self.install_worker.stop()
+                
+                # Dừng các worker tải/cập nhật riêng lẻ
+                for worker in list(self.active_workers.values()):
+                    if worker and worker.isRunning():
+                        worker.stop()
 
         if self.tool_manager_thread.isRunning():
             self.tool_manager_thread.quit()
