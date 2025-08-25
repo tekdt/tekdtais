@@ -1378,13 +1378,13 @@ class TekDT_AIS(QMainWindow):
         """
         Tạo thông tin cho các bộ Office để hiển thị trong danh sách.
         """
-        suites = {
-            # ProductID từ: https://learn.microsoft.com/en-us/microsoft-365/troubleshoot/installation/product-ids-supported-office-deployment-tool
-            "O365ProPlusRetail": {"display_name": "Microsoft 365 Apps for enterprise", "channel": "Current"},
-            "O365BusinessRetail": {"display_name": "Microsoft 365 Apps for business", "channel": "Current"},
-            "Office2021Volume": {"display_name": "Office LTSC Professional Plus 2021", "channel": "PerpetualVL2021"},
-            "ProPlus2019Volume": {"display_name": "Office Professional Plus 2019", "channel": "PerpetualVL2019"},
-        }
+        # suites = {
+            # # ProductID từ: https://learn.microsoft.com/en-us/microsoft-365/troubleshoot/installation/product-ids-supported-office-deployment-tool
+            # "O365ProPlusRetail": {"display_name": "Microsoft 365 Apps for enterprise", "channel": "Current"},
+            # "O365BusinessRetail": {"display_name": "Microsoft 365 Apps for business", "channel": "Current"},
+            # "Office2021Volume": {"display_name": "Office LTSC Professional Plus 2021", "channel": "PerpetualVL2021"},
+            # "ProPlus2019Volume": {"display_name": "Office Professional Plus 2019", "channel": "PerpetualVL2019"},
+        # }
         
         suites = {
             # Microsoft 365 Apps
