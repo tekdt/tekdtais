@@ -1386,6 +1386,68 @@ class TekDT_AIS(QMainWindow):
             "ProPlus2019Volume": {"display_name": "Office Professional Plus 2019", "channel": "PerpetualVL2019"},
         }
         
+        suites = {
+            # Microsoft 365 Apps
+            "O365ProPlusRetail": {"display_name": "Microsoft 365 Apps for enterprise", "channel": "Current"},
+            "O365BusinessRetail": {"display_name": "Microsoft 365 Apps for business", "channel": "Current"},
+            "O365ProPlusEEANoTeamsRetail": {"display_name": "M365 Apps for enterprise (No Teams)", "channel": "Current"},
+            "O365BusinessEEANoTeamsRetail": {"display_name": "M365 Apps for business (No Teams)", "channel": "Current"},
+
+            # Non-365 Retail Suites
+            "HomeBusinessRetail": {"display_name": "Office Home Business (Retail)", "channel": "Retail"},
+            "HomeBusiness2019Retail": {"display_name": "Office Home Business 2019", "channel": "Retail"},
+            "HomeBusiness2021Retail": {"display_name": "Office Home Business 2021", "channel": "Retail"},
+            "HomeBusiness2024Retail": {"display_name": "Office Home Business 2024", "channel": "Retail"},
+            "HomeStudentRetail": {"display_name": "Office Home Student (Retail)", "channel": "Retail"},
+            "HomeStudent2019Retail": {"display_name": "Office Home Student 2019", "channel": "Retail"},
+            "HomeStudent2021Retail": {"display_name": "Office Home Student 2021", "channel": "Retail"},
+            "Home2024Retail": {"display_name": "Office Home 2024 (Retail)", "channel": "Retail"},
+            "O365HomePremRetail": {"display_name": "Office 365 Home Premium", "channel": "Retail"},
+            "ProfessionalRetail": {"display_name": "Office Professional (Retail)", "channel": "Retail"},
+            "Professional2019Retail": {"display_name": "Office Professional 2019", "channel": "Retail"},
+            "Personal2019Retail": {"display_name": "Office Personal 2019", "channel": "Retail"},
+            
+            # Component Apps Retail
+            "AccessRetail": {"display_name": "Access (Retail)", "channel": "Retail"},
+            "Access2019Retail": {"display_name": "Access 2019", "channel": "Retail"},
+            "Access2021Retail": {"display_name": "Access 2021", "channel": "Retail"},
+            "Access2024Retail": {"display_name": "Access 2024", "channel": "Retail"},
+            "ExcelRetail": {"display_name": "Excel (Retail)", "channel": "Retail"},
+            "Excel2019Retail": {"display_name": "Excel 2019", "channel": "Retail"},
+            "Excel2021Retail": {"display_name": "Excel 2021", "channel": "Retail"},
+            "Excel2024Retail": {"display_name": "Excel 2024", "channel": "Retail"},
+            "OutlookRetail": {"display_name": "Outlook (Retail)", "channel": "Retail"},
+            "Outlook2019Retail": {"display_name": "Outlook 2019", "channel": "Retail"},
+            "Outlook2021Retail": {"display_name": "Outlook 2021", "channel": "Retail"},
+            "Outlook2024Retail": {"display_name": "Outlook 2024", "channel": "Retail"},
+            "PowerPointRetail": {"display_name": "PowerPoint (Retail)", "channel": "Retail"},
+            "PowerPoint2019Retail": {"display_name": "PowerPoint 2019", "channel": "Retail"},
+            "PowerPoint2021Retail": {"display_name": "PowerPoint 2021", "channel": "Retail"},
+            "PowerPoint2024Retail": {"display_name": "PowerPoint 2024", "channel": "Retail"},
+            "OneNoteRetail": {"display_name": "OneNote (Retail)", "channel": "Retail"},
+            "OneNoteFreeRetail": {"display_name": "OneNote Free (Retail)", "channel": "Retail"},
+            "PublisherRetail": {"display_name": "Publisher (Retail)", "channel": "Retail"},
+            
+            # Volume / LTSC Suites
+            "ProPlus2019Volume": {"display_name": "Office Professional Plus 2019 (Volume)", "channel": "PerpetualVL2019"},
+            "Standard2019Volume": {"display_name": "Office Standard 2019 (Volume)", "channel": "PerpetualVL2019"},
+            "VisioPro2019Volume": {"display_name": "Visio Professional 2019 (Volume)", "channel": "PerpetualVL2019"},
+            "VisioStd2019Volume": {"display_name": "Visio Standard 2019 (Volume)", "channel": "PerpetualVL2019"},
+            "ProjectPro2019Volume": {"display_name": "Project Professional 2019 (Volume)", "channel": "PerpetualVL2019"},
+            "ProjectStd2019Volume": {"display_name": "Project Standard 2019 (Volume)", "channel": "PerpetualVL2019"},
+            
+            # Proofing Tools for 2019
+            "ProofingTools": {"display_name": "Proofing Tools (Office 2019)", "channel": "Retail"},
+
+            # LTSC 2024 Volume
+            "ProPlus2024Volume": {"display_name": "Office Professional Plus 2024 (Volume)", "channel": "PerpetualVL2024"},
+            "Standard2024Volume": {"display_name": "Office Standard 2024 (Volume)", "channel": "PerpetualVL2024"},
+            "VisioPro2024Volume": {"display_name": "Visio Professional 2024 (Volume)", "channel": "PerpetualVL2024"},
+            "VisioStd2024Volume": {"display_name": "Visio Standard 2024 (Volume)", "channel": "PerpetualVL2024"},
+            "ProjectPro2024Volume": {"display_name": "Project Professional 2024 (Volume)", "channel": "PerpetualVL2024"},
+            "ProjectStd2024Volume": {"display_name": "Project Standard 2024 (Volume)", "channel": "PerpetualVL2024"},
+        }
+        
         office_apps = {}
         for product_id, info in suites.items():
             for arch in ["64", "32"]:
