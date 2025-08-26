@@ -1429,6 +1429,7 @@ class TekDT_AIS(QMainWindow):
             "PublisherRetail": {"display_name": "Publisher (Retail)", "channel": "Retail"},
             
             # Volume / LTSC Suites
+            "Office2021Volume": {"display_name": "Office LTSC Professional Plus 2021", "channel": "PerpetualVL2021"},
             "ProPlus2019Volume": {"display_name": "Office Professional Plus 2019 (Volume)", "channel": "PerpetualVL2019"},
             "Standard2019Volume": {"display_name": "Office Standard 2019 (Volume)", "channel": "PerpetualVL2019"},
             "VisioPro2019Volume": {"display_name": "Visio Professional 2019 (Volume)", "channel": "PerpetualVL2019"},
