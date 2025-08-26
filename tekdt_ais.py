@@ -901,6 +901,8 @@ class AppItemWidget(QWidget):
         self.icon_label.setFixedSize(48, 48)
         self.icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         icon_file = app_info.get('icon_file', '')
+        if not isinstance(icon_file, str):
+            icon_file = ''
         icon_path = APPS_DIR / app_key / icon_file if icon_file else ''
         default_icon_path = resource_path('Images/default_icon.png')
         
