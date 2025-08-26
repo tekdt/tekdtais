@@ -1428,8 +1428,20 @@ class TekDT_AIS(QMainWindow):
             "OneNoteFreeRetail": {"display_name": "OneNote Free (Retail)", "channel": "Retail"},
             "PublisherRetail": {"display_name": "Publisher (Retail)", "channel": "Retail"},
             
+            "ProPlus2016Volume": {"display_name": "Office Professional Plus 2016 (Volume)", "channel": "PerpetualVL2016"},
+            "Standard2016Volume": {"display_name": "Office Standard 2016 (Volume)", "channel": "PerpetualVL2016"},
+            "VisioPro2016Volume": {"display_name": "Visio Professional 2016 (Volume)", "channel": "PerpetualVL2016"},
+            "VisioStd2016Volume": {"display_name": "Visio Standard 2016 (Volume)", "channel": "PerpetualVL2016"},
+            "ProjectPro2016Volume": {"display_name": "Project Professional 2016 (Volume)", "channel": "PerpetualVL2016"},
+            "ProjectStd2016Volume": {"display_name": "Project Standard 2016 (Volume)", "channel": "PerpetualVL2016"},
+            
             # Volume / LTSC Suites
             "Office2021Volume": {"display_name": "Office LTSC Professional Plus 2021", "channel": "PerpetualVL2021"},
+            "Standard2021Volume": {"display_name": "Office Standard 2021 (Volume)", "channel": "PerpetualVL2021"},
+            "VisioPro2021Volume": {"display_name": "Visio Professional 2021 (Volume)", "channel": "PerpetualVL2021"},
+            "VisioStd2021Volume": {"display_name": "Visio Standard 2021 (Volume)", "channel": "PerpetualVL2021"},
+            "ProjectPro2021Volume": {"display_name": "Project Professional 2021 (Volume)", "channel": "PerpetualVL2021"},
+            "ProjectStd2021Volume": {"display_name": "Project Standard 2021 (Volume)", "channel": "PerpetualVL2021"},
             "ProPlus2019Volume": {"display_name": "Office Professional Plus 2019 (Volume)", "channel": "PerpetualVL2019"},
             "Standard2019Volume": {"display_name": "Office Standard 2019 (Volume)", "channel": "PerpetualVL2019"},
             "VisioPro2019Volume": {"display_name": "Visio Professional 2019 (Volume)", "channel": "PerpetualVL2019"},
@@ -1439,6 +1451,8 @@ class TekDT_AIS(QMainWindow):
             
             # Proofing Tools for 2019
             "ProofingTools": {"display_name": "Proofing Tools (Office 2019)", "channel": "Retail"},
+            "ProofingTools2021": {"display_name": "Proofing Tools (Office 2021)", "channel": "Retail"},
+            "ProofingTools2024": {"display_name": "Proofing Tools (Office 2024)", "channel": "Retail"},
 
             # LTSC 2024 Volume
             "ProPlus2024Volume": {"display_name": "Office Professional Plus 2024 (Volume)", "channel": "PerpetualVL2024"},
