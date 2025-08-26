@@ -2131,7 +2131,7 @@ class TekDT_AIS(QMainWindow):
             worker.tasks_batch_completed.connect(
                 lambda completed_items: self.on_worker_finished(list(completed_items.keys())[0])
             )
-            
+            worker.finished.connect(lambda: self.on_worker_finished(key))
             # Lưu worker vào dictionary quản lý và bắt đầu chạy
             self.active_workers[key] = worker
             worker.start()
@@ -2296,30 +2296,43 @@ class TekDT_AIS(QMainWindow):
                             widget.action_button.clicked.connect(on_complete_action)
                 break
     
+    # def on_worker_finished(self, app_key):
+        # """
+        # Được gọi khi một worker độc lập hoàn thành tác vụ.
+        # Cập nhật trạng thái trong bộ nhớ một cách trực tiếp và mạnh mẽ.
+        # """
+        # # Xóa worker khỏi danh sách quản lý
+        # if app_key in self.active_workers:
+            # del self.active_workers[app_key]
+
+        # # Lấy thông tin mới nhất của phần mềm từ danh sách remote
+        # remote_info = self.remote_apps.get("app_items", {}).get(app_key)
+        # if remote_info:
+            # # GHI ĐÈ TRỰC TIẾP phiên bản mới vào bộ nhớ (self.local_apps)
+            # # Bước này đảm bảo trạng thái trong bộ nhớ là MỚI NHẤT
+            # # trước khi cập nhật giao diện.
+            # self.local_apps.setdefault(app_key, {}).update(remote_info)
+            
+            # # Đồng bộ cả vào self.config để nhất quán
+            # self.config['app_items'].setdefault(app_key, {}).update(remote_info)
+
+        # # Bây giờ, gọi hàm cập nhật widget.
+        # # Nó sẽ đọc trạng thái mới nhất mà chúng ta vừa ghi đè ở trên.
+        # self.update_single_app_widget(app_key)
     def on_worker_finished(self, app_key):
         """
         Được gọi khi một worker độc lập hoàn thành tác vụ.
-        Cập nhật trạng thái trong bộ nhớ một cách trực tiếp và mạnh mẽ.
+        Chỉ cần xóa worker và kích hoạt cập nhật giao diện.
+        Dữ liệu đã được cập nhật bởi on_tasks_batch_completed.
         """
-        # Xóa worker khỏi danh sách quản lý
         if app_key in self.active_workers:
             del self.active_workers[app_key]
 
-        # --- THAY ĐỔI QUAN TRỌNG ---
-        # Lấy thông tin mới nhất của phần mềm từ danh sách remote
-        remote_info = self.remote_apps.get("app_items", {}).get(app_key)
-        if remote_info:
-            # GHI ĐÈ TRỰC TIẾP phiên bản mới vào bộ nhớ (self.local_apps)
-            # Bước này đảm bảo trạng thái trong bộ nhớ là MỚI NHẤT
-            # trước khi cập nhật giao diện.
-            self.local_apps.setdefault(app_key, {}).update(remote_info)
-            
-            # Đồng bộ cả vào self.config để nhất quán
-            self.config['app_items'].setdefault(app_key, {}).update(remote_info)
-
-        # Bây giờ, gọi hàm cập nhật widget.
-        # Nó sẽ đọc trạng thái mới nhất mà chúng ta vừa ghi đè ở trên.
+        # Dữ liệu chính xác đã được cập nhật vào self.local_apps
+        # bởi slot on_tasks_batch_completed trước đó.
+        # Bây giờ chỉ cần gọi hàm cập nhật giao diện để làm mới lại nút bấm.
         self.update_single_app_widget(app_key)
+    
     
     def filter_apps(self, text):
         text = text.lower().strip()
