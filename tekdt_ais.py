@@ -558,21 +558,15 @@ class InstallWorker(QThread):
 
         # Tạo file XML để download
         xml_content = f"""
-        <Configuration>
-          <Add OfficeClientEdition="{app_info['architecture'][1:]}" Channel="{app_info['channel']}">
-            <Product ID="{app_info['product_id']}">
-              <Language ID="vi-vn" />
-            </Product>
-            <Product ID="{app_info['visio_id']}">
-              <Language ID="vi-vn" />
-            </Product>
-            <Product ID="{app_info['project_id']}">
-              <Language ID="vi-vn" />
-            </Product>
-          </Add>
-          <Property Name="FORCEAPPSHUTDOWN" Value="FALSE" />
-        </Configuration>
-        """
+<Configuration>
+  <Add OfficeClientEdition="{app_info['architecture'][1:]}" Channel="{app_info['channel']}">
+    <Product ID="{app_info['product_id']}">
+      <Language ID="vi-vn" />
+    </Product>
+  </Add>
+  <Property Name="FORCEAPPSHUTDOWN" Value="FALSE" />
+</Configuration>
+"""
         config_path = app_dir / "download_config.xml"
         with open(config_path, 'w', encoding='utf-8') as f:
             f.write(xml_content.strip())
@@ -713,22 +707,16 @@ class InstallWorker(QThread):
                 app_dir = APPS_DIR / app_key
                 # Tạo file XML để install
                 xml_content = f"""
-                <Configuration>
-                  <Add OfficeClientEdition="{app_info['architecture'][1:]}" Channel="{app_info['channel']}" SourcePath="{app_dir}">
-                    <Product ID="{app_info['product_id']}">
-                      <Language ID="vi-vn" />
-                    </Product>
-                    <Product ID="{app_info['visio_id']}">
-                      <Language ID="vi-vn" />
-                    </Product>
-                    <Product ID="{app_info['project_id']}">
-                      <Language ID="vi-vn" />
-                    </Product>
-                  </Add>
-                  <Display Level="None" AcceptEULA="TRUE" />
-                  <Property Name="FORCEAPPSHUTDOWN" Value="TRUE" />
-                </Configuration>
-                """
+<Configuration>
+  <Add OfficeClientEdition="{app_info['architecture'][1:]}" Channel="{app_info['channel']}" SourcePath="{app_dir}">
+    <Product ID="{app_info['product_id']}">
+      <Language ID="vi-vn" />
+    </Product>
+  </Add>
+  <Display Level="None" AcceptEULA="TRUE" />
+  <Property Name="FORCEAPPSHUTDOWN" Value="TRUE" />
+</Configuration>
+"""
                 config_path = app_dir / "install_config.xml"
                 with open(config_path, 'w', encoding='utf-8') as f:
                     f.write(xml_content.strip())
@@ -1378,20 +1366,16 @@ class TekDT_AIS(QMainWindow):
         """
         Tạo thông tin cho các bộ Office để hiển thị trong danh sách.
         """
-        # suites = {
-            # # ProductID từ: https://learn.microsoft.com/en-us/microsoft-365/troubleshoot/installation/product-ids-supported-office-deployment-tool
-            # "O365ProPlusRetail": {"display_name": "Microsoft 365 Apps for enterprise", "channel": "Current"},
-            # "O365BusinessRetail": {"display_name": "Microsoft 365 Apps for business", "channel": "Current"},
-            # "Office2021Volume": {"display_name": "Office LTSC Professional Plus 2021", "channel": "PerpetualVL2021"},
-            # "ProPlus2019Volume": {"display_name": "Office Professional Plus 2019", "channel": "PerpetualVL2019"},
-        # }
-        
         suites = {
             # Microsoft 365 Apps
             "O365ProPlusRetail": {"display_name": "Microsoft 365 Apps for enterprise", "channel": "Current"},
             "O365BusinessRetail": {"display_name": "Microsoft 365 Apps for business", "channel": "Current"},
             "O365ProPlusEEANoTeamsRetail": {"display_name": "M365 Apps for enterprise (No Teams)", "channel": "Current"},
             "O365BusinessEEANoTeamsRetail": {"display_name": "M365 Apps for business (No Teams)", "channel": "Current"},
+
+            # Microsoft 365 Other Channels
+            "O365ProPlusMonthlyEnterprise": {"display_name": "Microsoft 365 Apps for enterprise (Monthly Enterprise Channel)", "channel": "MonthlyEnterprise"},
+            "O365ProPlusSemiAnnual": {"display_name": "Microsoft 365 Apps for enterprise (Semi-Annual Channel)", "channel": "SemiAnnual"},
 
             # Non-365 Retail Suites
             "HomeBusinessRetail": {"display_name": "Office Home Business (Retail)", "channel": "Retail"},
@@ -1406,7 +1390,7 @@ class TekDT_AIS(QMainWindow):
             "ProfessionalRetail": {"display_name": "Office Professional (Retail)", "channel": "Retail"},
             "Professional2019Retail": {"display_name": "Office Professional 2019", "channel": "Retail"},
             "Personal2019Retail": {"display_name": "Office Personal 2019", "channel": "Retail"},
-            
+
             # Component Apps Retail
             "AccessRetail": {"display_name": "Access (Retail)", "channel": "Retail"},
             "Access2019Retail": {"display_name": "Access 2019", "channel": "Retail"},
@@ -1427,29 +1411,40 @@ class TekDT_AIS(QMainWindow):
             "OneNoteRetail": {"display_name": "OneNote (Retail)", "channel": "Retail"},
             "OneNoteFreeRetail": {"display_name": "OneNote Free (Retail)", "channel": "Retail"},
             "PublisherRetail": {"display_name": "Publisher (Retail)", "channel": "Retail"},
-            
-            "ProPlus2016Volume": {"display_name": "Office Professional Plus 2016 (Volume)", "channel": "PerpetualVL2016"},
-            "Standard2016Volume": {"display_name": "Office Standard 2016 (Volume)", "channel": "PerpetualVL2016"},
-            "VisioPro2016Volume": {"display_name": "Visio Professional 2016 (Volume)", "channel": "PerpetualVL2016"},
-            "VisioStd2016Volume": {"display_name": "Visio Standard 2016 (Volume)", "channel": "PerpetualVL2016"},
-            "ProjectPro2016Volume": {"display_name": "Project Professional 2016 (Volume)", "channel": "PerpetualVL2016"},
-            "ProjectStd2016Volume": {"display_name": "Project Standard 2016 (Volume)", "channel": "PerpetualVL2016"},
-            
-            # Volume / LTSC Suites
-            "Office2021Volume": {"display_name": "Office LTSC Professional Plus 2021", "channel": "PerpetualVL2021"},
-            "Standard2021Volume": {"display_name": "Office Standard 2021 (Volume)", "channel": "PerpetualVL2021"},
-            "VisioPro2021Volume": {"display_name": "Visio Professional 2021 (Volume)", "channel": "PerpetualVL2021"},
-            "VisioStd2021Volume": {"display_name": "Visio Standard 2021 (Volume)", "channel": "PerpetualVL2021"},
-            "ProjectPro2021Volume": {"display_name": "Project Professional 2021 (Volume)", "channel": "PerpetualVL2021"},
-            "ProjectStd2021Volume": {"display_name": "Project Standard 2021 (Volume)", "channel": "PerpetualVL2021"},
+
+            # Volume / LTSC Suites 2019
             "ProPlus2019Volume": {"display_name": "Office Professional Plus 2019 (Volume)", "channel": "PerpetualVL2019"},
             "Standard2019Volume": {"display_name": "Office Standard 2019 (Volume)", "channel": "PerpetualVL2019"},
             "VisioPro2019Volume": {"display_name": "Visio Professional 2019 (Volume)", "channel": "PerpetualVL2019"},
             "VisioStd2019Volume": {"display_name": "Visio Standard 2019 (Volume)", "channel": "PerpetualVL2019"},
             "ProjectPro2019Volume": {"display_name": "Project Professional 2019 (Volume)", "channel": "PerpetualVL2019"},
             "ProjectStd2019Volume": {"display_name": "Project Standard 2019 (Volume)", "channel": "PerpetualVL2019"},
-            
-            # Proofing Tools for 2019
+
+            # Office 2021 Volume / LTSC
+            "Office2021Volume": {"display_name": "Office LTSC Professional Plus 2021", "channel": "PerpetualVL2021"},
+            "Standard2021Volume": {"display_name": "Office Standard 2021 (Volume)", "channel": "PerpetualVL2021"},
+            "VisioPro2021Volume": {"display_name": "Visio Professional 2021 (Volume)", "channel": "PerpetualVL2021"},
+            "VisioStd2021Volume": {"display_name": "Visio Standard 2021 (Volume)", "channel": "PerpetualVL2021"},
+            "ProjectPro2021Volume": {"display_name": "Project Professional 2021 (Volume)", "channel": "PerpetualVL2021"},
+            "ProjectStd2021Volume": {"display_name": "Project Standard 2021 (Volume)", "channel": "PerpetualVL2021"},
+
+            # Office 2016 Volume
+            "ProPlus2016Volume": {"display_name": "Office Professional Plus 2016 (Volume)", "channel": "PerpetualVL2016"},
+            "Standard2016Volume": {"display_name": "Office Standard 2016 (Volume)", "channel": "PerpetualVL2016"},
+            "VisioPro2016Volume": {"display_name": "Visio Professional 2016 (Volume)", "channel": "PerpetualVL2016"},
+            "VisioStd2016Volume": {"display_name": "Visio Standard 2016 (Volume)", "channel": "PerpetualVL2016"},
+            "ProjectPro2016Volume": {"display_name": "Project Professional 2016 (Volume)", "channel": "PerpetualVL2016"},
+            "ProjectStd2016Volume": {"display_name": "Project Standard 2016 (Volume)", "channel": "PerpetualVL2016"},
+
+            # Office 2013 Volume
+            "ProPlus2013Volume": {"display_name": "Office Professional Plus 2013 (Volume)", "channel": "PerpetualVL2013"},
+            "Standard2013Volume": {"display_name": "Office Standard 2013 (Volume)", "channel": "PerpetualVL2013"},
+            "VisioPro2013Volume": {"display_name": "Visio Professional 2013 (Volume)", "channel": "PerpetualVL2013"},
+            "VisioStd2013Volume": {"display_name": "Visio Standard 2013 (Volume)", "channel": "PerpetualVL2013"},
+            "ProjectPro2013Volume": {"display_name": "Project Professional 2013 (Volume)", "channel": "PerpetualVL2013"},
+            "ProjectStd2013Volume": {"display_name": "Project Standard 2013 (Volume)", "channel": "PerpetualVL2013"},
+
+            # Proofing Tools
             "ProofingTools": {"display_name": "Proofing Tools (Office 2019)", "channel": "Retail"},
             "ProofingTools2021": {"display_name": "Proofing Tools (Office 2021)", "channel": "Retail"},
             "ProofingTools2024": {"display_name": "Proofing Tools (Office 2024)", "channel": "Retail"},
@@ -1462,7 +1457,8 @@ class TekDT_AIS(QMainWindow):
             "ProjectPro2024Volume": {"display_name": "Project Professional 2024 (Volume)", "channel": "PerpetualVL2024"},
             "ProjectStd2024Volume": {"display_name": "Project Standard 2024 (Volume)", "channel": "PerpetualVL2024"},
         }
-        
+
+
         office_apps = {}
         for product_id, info in suites.items():
             for arch in ["64", "32"]:
@@ -1479,9 +1475,6 @@ class TekDT_AIS(QMainWindow):
                     "product_id": product_id,
                     "architecture": f"x{arch}",
                     "channel": info['channel'],
-                    # Các ID cho Visio và Project tương ứng
-                    "visio_id": "VisioProRetail" if "Retail" in product_id else "VisioPro2021Volume",
-                    "project_id": "ProjectProRetail" if "Retail" in product_id else "ProjectPro2021Volume",
                 }
         return office_apps
     
