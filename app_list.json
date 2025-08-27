@@ -404,7 +404,7 @@
     "FurMarkROG": {
       "display_name": "FurMark 2 ROG Edition",
       "version": "2.9.0.0",
-      "category": "Công cụ",
+      "category": "Kiểm tra hệ thống",
       "description": "FurMark ROG Edition là phiên bản cải tiến mạnh mẽ của công cụ FurMark phổ biến dành cho ASUS. FurMark ROG Edition đi kèm với các bài kiểm tra ứng suất hiện đại và trình quét hiện vật dựa trên OpenGL và Vulkan.",
       "type": "installer",
       "architecture": "64bit",

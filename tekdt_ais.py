@@ -400,8 +400,8 @@ class InstallWorker(QThread):
     update_widget_status = Signal(str, str)
     tasks_batch_completed = Signal(dict)
     
-    def __init__(self, worker_tasks):
-        super().__init__()
+    def __init__(self, worker_tasks, parent=None):
+        super().__init__(parent)
         self.worker_tasks = worker_tasks # {app_key: {'action': ..., 'info': ...}}
         self._is_stopped = False
         
@@ -615,9 +615,11 @@ class InstallWorker(QThread):
     def _on_download_finished(self, app_key, success):
         with self.lock:
             task_def = self.worker_tasks[app_key]
+            display_name = task_def['info'].get('display_name', app_key)
             
             if success:
                 self.update_widget_status.emit(app_key, "success")
+                self.progress.emit(app_key, "success", f"Đã tải {display_name} thành công!")
                 self._commit_config_changes({app_key: task_def})
             else:
                 status = "stopped" if self._is_stopped else "failed"
@@ -818,7 +820,8 @@ class InstallWorker(QThread):
     def _download_icon_if_needed(self, app_key, app_info):
         """Hàm helper chỉ để tải icon."""
         icon_url = app_info.get('icon_url')
-        if not icon_url: return
+        if not isinstance(icon_url, str) or not icon_url:
+            return
         
         icon_filename = Path(icon_url).name
         icon_path = APPS_DIR / app_key / icon_filename
@@ -900,10 +903,14 @@ class AppItemWidget(QWidget):
         self.icon_label = QLabel()
         self.icon_label.setFixedSize(48, 48)
         self.icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        icon_file = app_info.get('icon_file', '')
-        if not isinstance(icon_file, str):
-            icon_file = ''
-        icon_path = APPS_DIR / app_key / icon_file if icon_file else ''
+        icon_file_value = app_info.get('icon_file')
+        if isinstance(icon_file_value, str) and icon_file_value:
+            try:
+                icon_path = APPS_DIR / app_key / icon_file_value
+            except TypeError:
+                icon_path = None
+        else:
+            icon_path = None
         default_icon_path = resource_path('Images/default_icon.png')
         
         pixmap_path = str(icon_path) if icon_path and Path(icon_path).exists() else str(default_icon_path)
@@ -988,51 +995,6 @@ class AppItemWidget(QWidget):
     def reset_status_ui(self):
         """Hàm call-back an toàn để reset trạng thái UI."""
         self.set_status("")
-    
-    # def set_status(self, status):
-        # self.status_label.setMovie(None)
-        # self.status_label.setPixmap(QPixmap())
-
-        # if status == "success":
-            # self._progress_animation.stop()
-            # self.status_label.setPixmap(QPixmap(resource_path('Images/success.png')).scaled(24, 24, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
-            # self.name_label.setStyleSheet("color: #4CAF50; font-weight: bold; font-size: 12pt;")
-            # self.action_button.setEnabled(True) # Re-enable after process
-            # self._current_progress = 0
-            # self.progress_overlay.hide()
-            # self.progress_overlay.setGeometry(0, 0, 0, self.height())
-            # self.status_label.show()
-            # # QTimer.singleShot(2000, self.reset_status_ui)
-            # timer = QTimer(self)
-            # timer.setSingleShot(True)
-            # timer.timeout.connect(self.reset_status_ui)
-            # timer.start(2000)
-        # elif status == "failed":
-            # self._progress_animation.stop()
-            # self.status_label.setPixmap(QPixmap(resource_path('Images/failed.png')).scaled(24, 24, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
-            # self.name_label.setStyleSheet("color: #F44336; font-weight: bold; font-size: 12pt;")
-            # self.action_button.setEnabled(True) # Re-enable after process
-            # self._current_progress = 0
-            # self.progress_overlay.hide()
-            # self.status_label.show()
-        # elif status == "processing": # Downloading
-            # movie = QMovie(resource_path('Images/loading.gif'))
-            # self.status_label.setMovie(movie)
-            # movie.start()
-            # self.action_button.setEnabled(False)
-            # self.status_label.show()
-        # elif status == "installing": # Installing (new status)
-            # movie = QMovie(resource_path('Images/loading.gif'))
-            # self.status_label.setMovie(movie)
-            # movie.start()
-            # self.action_button.setEnabled(False)
-            # self.status_label.show()
-        # else: # Idle
-            # self.status_label.hide()
-            # self.name_label.setStyleSheet("font-weight: bold; font-size: 12pt;")
-            # self.action_button.setEnabled(True)
-            # self._current_progress = 0
-            # self.progress_overlay.hide()
 
     def set_status(self, status):
         # Dừng mọi animation và movie cũ trước khi bắt đầu cái mới
@@ -1228,22 +1190,6 @@ class TekDT_AIS(QMainWindow):
         return msg_box.exec()
 
     def show_startup_status(self, message):
-        # if not self.startup_label:
-            # self.startup_label = QLabel(message, self)
-            # self.startup_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            
-            # self.startup_label.setStyleSheet("background-color: rgba(0, 0, 0, 0.7); color: white; font-size: 14pt; border-radius: 10px; padding: 20px;")
-            # self.startup_label.setWordWrap(True)
-            # self.startup_label.setMinimumWidth(400)
-            # self.startup_label.setMinimumHeight(100)
-            # self.tool_manager.progress_update.connect(lambda msg: self.startup_label.setText(msg))
-        
-        # self.startup_label.setText(message)
-        # self.startup_label.adjustSize()
-        # self.startup_label.move(int((self.width() - self.startup_label.width()) / 2), int((self.height() - self.startup_label.height()) / 2))
-        # self.startup_label.show()
-        # self.startup_label.raise_()
-        
         if not self.startup_label:
             # Tạo một widget container cho overlay
             self.startup_overlay = QWidget(self)
@@ -1304,9 +1250,15 @@ class TekDT_AIS(QMainWindow):
         if not self.embed_mode and 'selected' in self._scroll_positions:
             QTimer.singleShot(0, lambda: self.selected_list_widget.verticalScrollBar().setValue(self._scroll_positions['selected']))
     
+    def cleanup_worker(self, app_key):
+        """Dọn dẹp worker khỏi danh sách active_workers một cách an toàn."""
+        if app_key in self.active_workers:
+            # In ra để kiểm tra (tùy chọn)
+            print(f"Cleaning up worker for {app_key}")
+            del self.active_workers[app_key]
+    
     def on_tool_check_finished(self, success, message):
         self.tool_manager_thread.quit()
-        self.tool_manager_thread.wait()
         
         # Ẩn overlay khởi động
         if hasattr(self, 'startup_overlay'):
@@ -1459,7 +1411,6 @@ class TekDT_AIS(QMainWindow):
             "ProjectPro2024Volume": {"display_name": "Project Professional 2024 (Volume)", "channel": "PerpetualVL2024"},
             "ProjectStd2024Volume": {"display_name": "Project Standard 2024 (Volume)", "channel": "PerpetualVL2024"},
         }
-
 
         office_apps = {}
         for product_id, info in suites.items():
@@ -1813,6 +1764,12 @@ class TekDT_AIS(QMainWindow):
             with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
                 json.dump(self.config, f, indent=2, ensure_ascii=False)
 
+        for key, item in self.config.get('app_items', {}).items():
+            icon_file = item.get('icon_file')
+            if not isinstance(icon_file, str):
+                item['icon_file'] = 'default_icon.png'  # Sửa bool hoặc None thành str default
+                self.save_config()
+        
         # Luôn đảm bảo các khóa chính tồn tại
         self.config.setdefault('settings', {})
         self.config.setdefault('app_items', {})
@@ -1936,7 +1893,8 @@ class TekDT_AIS(QMainWindow):
             for key, app_info in compatible_apps.items():
                 icon_file = app_info.get('icon_file')
                 icon_url = app_info.get('icon_url')
-                if not icon_url: continue
+                if not isinstance(icon_url, str) or not icon_url:
+                    continue
 
                 icon_filename = Path(icon_url).name
                 app_dir = APPS_DIR / key
@@ -2087,17 +2045,19 @@ class TekDT_AIS(QMainWindow):
 
     def find_widget_by_key(self, app_key):
         """Tìm widget trong available_list_widget hoặc selected_list_widget theo app_key."""
+        # Tìm trong available
         for i in range(self.available_list_widget.count()):
             item = self.available_list_widget.item(i)
-            widget = self.available_list_widget.itemWidget(item)
-            if hasattr(widget, 'app_key') and widget.app_key == app_key:
-                return widget
+            if item.data(Qt.ItemDataRole.UserRole) == app_key:
+                return self.available_list_widget.itemWidget(item)
+        
         if not self.embed_mode:
+            # Tìm trong selected
             for i in range(self.selected_list_widget.count()):
                 item = self.selected_list_widget.item(i)
-                widget = self.selected_list_widget.itemWidget(item)
-                if hasattr(widget, 'app_key') and widget.app_key == app_key:
-                    return widget
+                if item.data(Qt.ItemDataRole.UserRole) == app_key:
+                    return self.selected_list_widget.itemWidget(item)
+        
         return None
     
     def update_widget_status(self, app_key, status):
@@ -2116,7 +2076,7 @@ class TekDT_AIS(QMainWindow):
         if reply == QMessageBox.StandardButton.Yes:
             # Không gán cho self.install_worker nữa, mà tạo worker cục bộ
             worker_tasks = {key: {'info': info, 'action': 'download'}}
-            worker = InstallWorker(worker_tasks)
+            worker = InstallWorker({key: {'info': info, 'action': 'download'}}, parent=self)
             
             # Kết nối các tín hiệu như cũ
             worker.progress.connect(self.update_install_progress)
@@ -2124,14 +2084,15 @@ class TekDT_AIS(QMainWindow):
             worker.error.connect(lambda e: self.show_styled_message_box(QMessageBox.Icon.Critical, "Lỗi Worker", str(e)))
             worker.update_widget_status.connect(self.update_widget_status)
             worker.tasks_batch_completed.connect(self.on_tasks_batch_completed)
-
-            # THAY ĐỔI QUAN TRỌNG:
-            # Kết nối tín hiệu finished tới hàm xử lý mới (on_worker_finished).
-            # Dùng lambda để truyền app_key, đảm bảo hàm xử lý biết worker nào đã xong.
             worker.tasks_batch_completed.connect(
                 lambda completed_items: self.on_worker_finished(list(completed_items.keys())[0])
             )
-            worker.finished.connect(lambda: self.on_worker_finished(key))
+
+            # Giữ lại kết nối deleteLater
+            worker.finished.connect(worker.deleteLater)
+
+            # Gọi hàm dọn dẹp danh sách CHỈ KHI luồng đã thực sự kết thúc
+            worker.finished.connect(lambda k=key: self.cleanup_worker(k))
             # Lưu worker vào dictionary quản lý và bắt đầu chạy
             self.active_workers[key] = worker
             worker.start()
@@ -2153,7 +2114,7 @@ class TekDT_AIS(QMainWindow):
         if reply == QMessageBox.StandardButton.Yes:
             # Tương tự confirm_download, tạo worker cục bộ
             worker_tasks = {key: {'info': info, 'action': 'update'}}
-            worker = InstallWorker(worker_tasks)
+            worker = InstallWorker({key: {'info': info, 'action': 'update'}}, parent=self)
             
             # Kết nối các tín hiệu
             worker.progress.connect(self.update_install_progress)
@@ -2161,17 +2122,15 @@ class TekDT_AIS(QMainWindow):
             worker.error.connect(lambda e: self.show_styled_message_box(QMessageBox.Icon.Critical, "Lỗi Worker", str(e)))
             worker.update_widget_status.connect(self.update_widget_status)
             worker.tasks_batch_completed.connect(self.on_tasks_batch_completed)
-            
-            # THAY ĐỔI QUAN TRỌNG:
-            # Khi worker xong, nó sẽ tự gọi on_worker_finished để làm mới giao diện.
-            # Sau đó, chúng ta mới thực hiện hành động 'on_complete' (như chuyển sang khung bên phải).
-            # Việc này đảm bảo giao diện được cập nhật đúng trước khi có hành động tiếp theo.
+            worker.finished.connect(on_update_and_action)
+
+            # Giữ lại kết nối deleteLater
+            worker.finished.connect(worker.deleteLater)
             def on_update_and_action():
                 self.on_worker_finished(key)
                 if on_complete:
                     on_complete()
-            
-            worker.finished.connect(on_update_and_action)
+            worker.finished.connect(lambda k=key: self.cleanup_worker(k))
             
             # Lưu worker và bắt đầu
             self.active_workers[key] = worker
@@ -2231,6 +2190,7 @@ class TekDT_AIS(QMainWindow):
         list_item = QListWidgetItem()
         list_item.setSizeHint(QSize(0, 70))
         list_item.setData(Qt.ItemDataRole.UserRole, key)
+        list_item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
         self.selected_list_widget.addItem(list_item)
         self.selected_list_widget.setItemWidget(list_item, item_widget)
         
@@ -2241,9 +2201,9 @@ class TekDT_AIS(QMainWindow):
         self._update_office_selection_state()
 
     def remove_app_from_selection(self, key, info):
-        for i in range(self.selected_list_widget.count()):
+        for i in range(self.selected_list_widget.count() - 1, -1, -1):  # Duyệt ngược để tránh index shift nếu takeItem
             item = self.selected_list_widget.item(i)
-            if item and self.selected_list_widget.itemWidget(item).app_key == key:
+            if item.data(Qt.ItemDataRole.UserRole) == key:
                 self.selected_list_widget.takeItem(i)
                 break
 
@@ -2258,42 +2218,43 @@ class TekDT_AIS(QMainWindow):
     def update_available_item_state(self, key, is_selected):
         for i in range(self.available_list_widget.count()):
             item = self.available_list_widget.item(i)
-            widget = self.available_list_widget.itemWidget(item)
-            if hasattr(widget, 'app_key') and widget.app_key == key:
-                widget.action_button.setDisabled(is_selected)
-                if is_selected:
-                    widget.action_button.setStyleSheet(
-                        "background-color: #95a5a6; color: white; border: none; padding: 8px 16px; border-radius: 4px; font-weight: bold;"
-                    )
-                    widget.action_button.setText("Đã chọn")
-                else:
-                    # Khi một item được bỏ chọn, tái tạo lại nút của nó ở danh sách bên trái
-                    widget.action_button.setEnabled(True)
-                    
-                    is_downloaded = self.is_app_downloaded(key, widget.app_info)
-                    local_ver_str = self.local_apps.get(key, {}).get('version', '0')
-                    remote_ver_str = self.remote_apps.get('app_items', {}).get(key, {}).get('version', '0')
-                    is_update_available = is_downloaded and parse_version(remote_ver_str) > parse_version(local_ver_str)
-                    
-                    # Ngắt kết nối cũ để tránh gọi nhiều lần
-                    try: widget.action_button.clicked.disconnect()
-                    except TypeError: pass
-
-                    if not is_downloaded:
-                        widget.action_button.setText("Tải")
-                        widget.action_button.setToolTip(f"Tải về {widget.app_info['display_name']}")
-                        widget.action_button.setStyleSheet("background-color: #f39c12; color: white;")
-                        widget.action_button.clicked.connect(lambda _, k=key, i=widget.app_info, w=widget: self.confirm_download(k, i, w))
-                    else: # Đã tải về
-                        widget.action_button.setText("Thêm")
-                        widget.action_button.setToolTip(f"Thêm {widget.app_info['display_name']} vào danh sách")
-                        widget.action_button.setStyleSheet("background-color: #4CAF50; color: white;")
+            if item.data(Qt.ItemDataRole.UserRole) == key:
+                widget = self.available_list_widget.itemWidget(item)
+                if widget:
+                    widget.action_button.setDisabled(is_selected)
+                    if is_selected:
+                        widget.action_button.setStyleSheet(
+                            "background-color: #95a5a6; color: white; border: none; padding: 8px 16px; border-radius: 4px; font-weight: bold;"
+                        )
+                        widget.action_button.setText("Đã chọn")
+                    else:
+                        # Khi một item được bỏ chọn, tái tạo lại nút của nó ở danh sách bên trái
+                        widget.action_button.setEnabled(True)
                         
-                        on_complete_action = lambda: self.move_app_to_selection(key, widget.app_info)
-                        if is_update_available:
-                            widget.action_button.clicked.connect(lambda _, k=key, i=widget.app_info, w=widget, lv=local_ver_str, rv=remote_ver_str, cb=on_complete_action: self.confirm_update(k, i, w, lv, rv, on_complete=cb))
-                        else:
-                            widget.action_button.clicked.connect(on_complete_action)
+                        is_downloaded = self.is_app_downloaded(key, widget.app_info)
+                        local_ver_str = self.local_apps.get(key, {}).get('version', '0')
+                        remote_ver_str = self.remote_apps.get('app_items', {}).get(key, {}).get('version', '0')
+                        is_update_available = is_downloaded and parse_version(remote_ver_str) > parse_version(local_ver_str)
+                        
+                        # Ngắt kết nối cũ để tránh gọi nhiều lần
+                        try: widget.action_button.clicked.disconnect()
+                        except TypeError: pass
+
+                        if not is_downloaded:
+                            widget.action_button.setText("Tải")
+                            widget.action_button.setToolTip(f"Tải về {widget.app_info['display_name']}")
+                            widget.action_button.setStyleSheet("background-color: #f39c12; color: white;")
+                            widget.action_button.clicked.connect(lambda _, k=key, i=widget.app_info, w=widget: self.confirm_download(k, i, w))
+                        else:  # Đã tải về
+                            widget.action_button.setText("Thêm")
+                            widget.action_button.setToolTip(f"Thêm {widget.app_info['display_name']} vào danh sách")
+                            widget.action_button.setStyleSheet("background-color: #4CAF50; color: white;")
+                            
+                            on_complete_action = lambda: self.move_app_to_selection(key, widget.app_info)
+                            if is_update_available:
+                                widget.action_button.clicked.connect(lambda _, k=key, i=widget.app_info, w=widget, lv=local_ver_str, rv=remote_ver_str, cb=on_complete_action: self.confirm_update(k, i, w, lv, rv, on_complete=cb))
+                            else:
+                                widget.action_button.clicked.connect(on_complete_action)
                 break
     
     # def on_worker_finished(self, app_key):
@@ -2319,6 +2280,7 @@ class TekDT_AIS(QMainWindow):
         # # Bây giờ, gọi hàm cập nhật widget.
         # # Nó sẽ đọc trạng thái mới nhất mà chúng ta vừa ghi đè ở trên.
         # self.update_single_app_widget(app_key)
+    
     def on_worker_finished(self, app_key):
         """
         Được gọi khi một worker độc lập hoàn thành tác vụ.
@@ -2332,7 +2294,6 @@ class TekDT_AIS(QMainWindow):
         # bởi slot on_tasks_batch_completed trước đó.
         # Bây giờ chỉ cần gọi hàm cập nhật giao diện để làm mới lại nút bấm.
         self.update_single_app_widget(app_key)
-    
     
     def filter_apps(self, text):
         text = text.lower().strip()
@@ -2532,7 +2493,7 @@ class TekDT_AIS(QMainWindow):
                     if worker and worker.isRunning():
                         worker.stop()
 
-        if self.tool_manager_thread.isRunning():
+        if hasattr(self, 'tool_manager_thread') and self.tool_manager_thread and self.tool_manager_thread.isRunning():
             self.tool_manager_thread.quit()
             self.tool_manager_thread.wait(5000)
         
