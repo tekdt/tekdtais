@@ -2178,12 +2178,29 @@ class TekDT_AIS(QMainWindow):
         self.update_available_item_state(key, is_selected=True)
 
         item_widget = AppItemWidget(key, info)
+        
+        try:
+            icon_filename = (
+                self.local_apps.get(key, {}).get('icon_file')
+                or info.get('icon_file')
+                or Path(info.get('icon_url', '')).name
+            )
+            icon_path = APPS_DIR / key / icon_filename
+            if icon_path.exists():
+                item_widget.icon_label.setPixmap(QIcon(str(icon_path)).pixmap(48, 48))
+        except Exception:
+            # im lặng nếu lỗi, không làm crash UI
+            pass
+        
         item_widget.action_button.setText("Bỏ")
         item_widget.action_button.setToolTip(f"Bỏ {info['display_name']} khỏi danh sách")
         item_widget.action_button.setStyleSheet(
             "background-color: #e74c3c; color: white; border: none; padding: 8px 16px; border-radius: 4px; font-weight: bold;"
         )
-        item_widget.action_button.clicked.disconnect()
+        try:
+            item_widget.action_button.clicked.disconnect()
+        except Exception:
+            pass
         item_widget.action_button.clicked.connect(lambda: item_widget.remove_requested.emit(key, info))
         item_widget.remove_requested.connect(self.remove_app_from_selection)
         
@@ -2199,6 +2216,7 @@ class TekDT_AIS(QMainWindow):
         self.save_config()
         self.update_counts()
         self._update_office_selection_state()
+        QTimer.singleShot(0, lambda k=key: self.update_available_item_state(k, True))
 
     def remove_app_from_selection(self, key, info):
         for i in range(self.selected_list_widget.count() - 1, -1, -1):  # Duyệt ngược để tránh index shift nếu takeItem
@@ -2250,11 +2268,11 @@ class TekDT_AIS(QMainWindow):
                             widget.action_button.setToolTip(f"Thêm {widget.app_info['display_name']} vào danh sách")
                             widget.action_button.setStyleSheet("background-color: #4CAF50; color: white;")
                             
-                            on_complete_action = lambda: self.move_app_to_selection(key, widget.app_info)
+                            on_complete_action = lambda k=key, i=widget.app_info: self.move_app_to_selection(k, i)
                             if is_update_available:
-                                widget.action_button.clicked.connect(lambda _, k=key, i=widget.app_info, w=widget, lv=local_ver_str, rv=remote_ver_str, cb=on_complete_action: self.confirm_update(k, i, w, lv, rv, on_complete=cb))
+                                widget.action_button.clicked.connect(lambda _=None, k=key, i=widget.app_info, w=widget, lv=local_ver_str, rv=remote_ver_str, cb=on_complete_action: self.confirm_update(k, i, w, lv, rv, on_complete=cb))
                             else:
-                                widget.action_button.clicked.connect(on_complete_action)
+                                widget.action_button.clicked.connect(lambda _=None, cb=on_complete_action: cb())
                 break
     
     # def on_worker_finished(self, app_key):
