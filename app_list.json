@@ -414,6 +414,32 @@
       "install_params": "/verysilent",
       "icon_url": "https://geeks3d.com/furmark/rog/gallery/i/asus-rog-logo.png"
     },
+    "FurMark2_64": {
+      "display_name": "FurMark 2 (64bit)",
+      "version": "2.9.0.0",
+      "category": "Kiểm tra hệ thống",
+      "description": "FurMark 2 là phiên bản kế nhiệm của FurMark 1 đáng kính và là một bài kiểm tra sức chịu đựng GPU rất chuyên sâu trên nền tảng Windows. Đây cũng là một bài kiểm tra chuẩn đồ họa OpenGL và Vulkan nhanh chóng với điểm số trực tuyến.",
+      "type": "Portable",
+      "architecture": "64bit",
+      "compatible_os_arch": "64bit",
+      "download_url": "https://geeks3d.com/dl/get/815",
+      "output_filename": "FurMark2_64.zip|FurMark_GUI.exe",
+      "install_params":"",
+      "icon_url": "https://geeks3d.com/furmark/favicon.ico"
+    },
+    "FurMark2_32": {
+      "display_name": "FurMark 2 (32bit)",
+      "version": "2.9.0.0",
+      "category": "Kiểm tra hệ thống",
+      "description": "FurMark 2 là phiên bản kế nhiệm của FurMark 1 đáng kính và là một bài kiểm tra sức chịu đựng GPU rất chuyên sâu trên nền tảng Windows. Đây cũng là một bài kiểm tra chuẩn đồ họa OpenGL và Vulkan nhanh chóng với điểm số trực tuyến.",
+      "type": "Portable",
+      "architecture": "32bit",
+      "compatible_os_arch": "both",
+      "download_url": "https://geeks3d.com/dl/get/817",
+      "output_filename": "FurMark2_32.zip|FurMark_GUI.exe",
+      "install_params": "",
+      "icon_url": "https://geeks3d.com/furmark/favicon.ico"
+    },
     "Ultraviewer": {
       "display_name": "Ultraviewer",
       "version": "6.6.0",
