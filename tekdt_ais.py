@@ -1769,10 +1769,19 @@ class TekDT_AIS(QMainWindow):
                 json.dump(self.config, f, indent=2, ensure_ascii=False)
 
         for key, item in self.config.get('app_items', {}).items():
+            # Sửa icon_file nếu không phải str
             icon_file = item.get('icon_file')
             if not isinstance(icon_file, str):
-                item['icon_file'] = 'default_icon.png'  # Sửa bool hoặc None thành str default
-                self.save_config()
+                item['icon_file'] = 'default_icon.png'
+                config_needs_saving = True
+                print(f"Đã sửa 'icon_file' cho {key} từ {type(icon_file)} thành string.")
+            
+            # THÊM: Sửa icon_url nếu không phải str
+            icon_url = item.get('icon_url')
+            if not isinstance(icon_url, str):
+                item['icon_url'] = ''
+                config_needs_saving = True
+                print(f"Đã sửa 'icon_url' cho {key} từ {type(icon_url)} thành string.")
         
         # Luôn đảm bảo các khóa chính tồn tại
         self.config.setdefault('settings', {})
@@ -1833,6 +1842,10 @@ class TekDT_AIS(QMainWindow):
         app_info = self.remote_apps.get('app_items', {}).get(app_key, {})
         local_info = self.local_apps.get(app_key, {})
         app_info.update(local_info)
+        if not isinstance(app_info.get('icon_file'), str):
+            app_info['icon_file'] = 'default_icon.png'
+        if not isinstance(app_info.get('icon_url'), str):
+            app_info['icon_url'] = ''
         widget.app_info = app_info # Cập nhật thông tin trong widget
 
         # Lấy lại trạng thái mới
@@ -1966,6 +1979,15 @@ class TekDT_AIS(QMainWindow):
             return
         
         icon_filename = Path(icon_url).name
+        if not isinstance(icon_filename, str):
+            print(f"Lỗi: icon_filename không phải string ({type(icon_filename)}: {icon_filename}). Set default.")
+            icon_filename = 'default_icon.png'
+
+        if not isinstance(app_key, str):
+            print(f"Lỗi: app_key không phải string ({type(app_key)}: {app_key}). Bỏ qua.")
+            return
+        
+        
         icon_path = APPS_DIR / app_key / icon_filename
         if not icon_path.exists():
             try:
@@ -2202,16 +2224,24 @@ class TekDT_AIS(QMainWindow):
         item_widget = AppItemWidget(key, local_info)
         
         try:
-            icon_filename = (
-                self.local_apps.get(key, {}).get('icon_file')
-                or info.get('icon_file')
-                or Path(info.get('icon_url', '')).name
-            )
+            icon_file_local = self.local_apps.get(key, {}).get('icon_file')
+            if not isinstance(icon_file_local, str):
+                icon_file_local = 'default_icon.png'
+            
+            icon_file_info = info.get('icon_file')
+            if not isinstance(icon_file_info, str):
+                icon_file_info = 'default_icon.png'
+            
+            icon_url = info.get('icon_url', '')
+            if not isinstance(icon_url, str):
+                icon_url = ''
+            
+            icon_filename = icon_file_local or icon_file_info or Path(icon_url).name or 'default_icon.png'
+            
             icon_path = APPS_DIR / key / icon_filename
             if icon_path.exists():
                 item_widget.icon_label.setPixmap(QIcon(str(icon_path)).pixmap(48, 48))
         except Exception:
-            # im lặng nếu lỗi, không làm crash UI
             pass
         
         item_widget.action_button.setText("Bỏ")
