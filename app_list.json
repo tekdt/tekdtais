@@ -422,7 +422,7 @@
       "type": "Portable",
       "architecture": "64bit",
       "compatible_os_arch": "64bit",
-      "download_url": "https://geeks3d.com/dl/get/815",
+      "download_url": "https://geeks3d.com/downloads/2025/fm2/FurMark_2.9.0.0_win64.zip",
       "output_filename": "FurMark2_64.zip|FurMark_GUI.exe",
       "install_params":"",
       "icon_url": "https://geeks3d.com/furmark/favicon.ico"
@@ -435,7 +435,7 @@
       "type": "Portable",
       "architecture": "32bit",
       "compatible_os_arch": "both",
-      "download_url": "https://geeks3d.com/dl/get/817",
+      "download_url": "https://gpumagick.com/downloads/files/2025/fm2/FurMark_2.9.0.0_win32.zip",
       "output_filename": "FurMark2_32.zip|FurMark_GUI.exe",
       "install_params": "",
       "icon_url": "https://geeks3d.com/furmark/favicon.ico"
