@@ -2177,7 +2177,8 @@ class TekDT_AIS(QMainWindow):
 
         self.update_available_item_state(key, is_selected=True)
 
-        item_widget = AppItemWidget(key, info)
+        app_info_with_icon = self.local_apps.get(key, info.copy())
+        item_widget = AppItemWidget(key, app_info_with_icon)
         
         try:
             icon_filename = (
@@ -2201,7 +2202,9 @@ class TekDT_AIS(QMainWindow):
             item_widget.action_button.clicked.disconnect()
         except Exception:
             pass
-        item_widget.action_button.clicked.connect(lambda: item_widget.remove_requested.emit(key, info))
+        item_widget.action_button.clicked.connect(
+            lambda checked, k=key, i=app_info_with_icon: item_widget.remove_requested.emit(k, i)
+        )
         item_widget.remove_requested.connect(self.remove_app_from_selection)
         
         list_item = QListWidgetItem()
@@ -2233,6 +2236,18 @@ class TekDT_AIS(QMainWindow):
         self.update_counts()
         self._update_office_selection_state()
         
+    def find_widget_by_key(self, app_key, list_widget=None):
+        """Tìm widget trong list_widget cụ thể theo app_key"""
+        if list_widget is None:
+            list_widget = self.available_list_widget
+        
+        for i in range(list_widget.count()):
+            item = list_widget.item(i)
+            widget = list_widget.itemWidget(item)
+            if hasattr(widget, 'app_key') and widget.app_key == app_key:
+                return widget
+        return None
+    
     def update_available_item_state(self, key, is_selected):
         for i in range(self.available_list_widget.count()):
             item = self.available_list_widget.item(i)
@@ -2264,15 +2279,24 @@ class TekDT_AIS(QMainWindow):
                             widget.action_button.setStyleSheet("background-color: #f39c12; color: white;")
                             widget.action_button.clicked.connect(lambda _, k=key, i=widget.app_info, w=widget: self.confirm_download(k, i, w))
                         else:  # Đã tải về
-                            widget.action_button.setText("Thêm")
-                            widget.action_button.setToolTip(f"Thêm {widget.app_info['display_name']} vào danh sách")
-                            widget.action_button.setStyleSheet("background-color: #4CAF50; color: white;")
+                            # Kiểm tra nếu là Office suite và đã có Office khác được chọn
+                            is_office = widget.app_info.get('type') == 'office_suite'
+                            office_selected = any(self.remote_apps.get('app_items', {}).get(k, {}).get('type') == 'office_suite' 
+                                                for k in self.selected_for_install)
                             
-                            on_complete_action = lambda k=key, i=widget.app_info: self.move_app_to_selection(k, i)
-                            if is_update_available:
-                                widget.action_button.clicked.connect(lambda _=None, k=key, i=widget.app_info, w=widget, lv=local_ver_str, rv=remote_ver_str, cb=on_complete_action: self.confirm_update(k, i, w, lv, rv, on_complete=cb))
+                            if is_office and office_selected and key not in self.selected_for_install:
+                                widget.action_button.setDisabled(True)
+                                widget.action_button.setToolTip("Chỉ có thể chọn một phiên bản Office để cài đặt.")
                             else:
-                                widget.action_button.clicked.connect(lambda _=None, cb=on_complete_action: cb())
+                                widget.action_button.setText("Thêm")
+                                widget.action_button.setToolTip(f"Thêm {widget.app_info['display_name']} vào danh sách")
+                                widget.action_button.setStyleSheet("background-color: #4CAF50; color: white;")
+                                
+                                on_complete_action = lambda: self.move_app_to_selection(key, widget.app_info)
+                                if is_update_available:
+                                    widget.action_button.clicked.connect(lambda _, k=key, i=widget.app_info, w=widget, lv=local_ver_str, rv=remote_ver_str, cb=on_complete_action: self.confirm_update(k, i, w, lv, rv, on_complete=cb))
+                                else:
+                                    widget.action_button.clicked.connect(on_complete_action)
                 break
     
     # def on_worker_finished(self, app_key):
@@ -2308,10 +2332,12 @@ class TekDT_AIS(QMainWindow):
         if app_key in self.active_workers:
             del self.active_workers[app_key]
 
-        # Dữ liệu chính xác đã được cập nhật vào self.local_apps
-        # bởi slot on_tasks_batch_completed trước đó.
-        # Bây giờ chỉ cần gọi hàm cập nhật giao diện để làm mới lại nút bấm.
+        # Cập nhật trạng thái cho widget trong available list
         self.update_single_app_widget(app_key)
+        
+        # Đảm bảo nút chuyển đúng trạng thái "Đã chọn" nếu app đã được chọn
+        if app_key in self.selected_for_install:
+            self.update_available_item_state(app_key, is_selected=True)
     
     def filter_apps(self, text):
         text = text.lower().strip()
