@@ -1092,6 +1092,69 @@ class AppItemWidget(QWidget):
             QTimer.singleShot(self._progress_animation.duration(), lambda: self.progress_overlay.setGeometry(0, 0, self.width(), self.height()))
             QTimer.singleShot(500, lambda: self.set_status("success"))
 
+class AppListLoader(QObject):
+    """
+    Worker chạy trên luồng riêng để tải danh sách phần mềm và các icon,
+    tránh làm treo giao diện chính.
+    """
+    progress_update = Signal(str)
+    # Tín hiệu hoàn thành: trả về (dict_danh_sách_app, thành_công_hay_không)
+    finished = Signal(dict, bool)
+
+    def __init__(self, session, local_apps_data):
+        super().__init__()
+        self.session = session
+        self.local_apps = local_apps_data
+
+    def run(self):
+        """Hàm chính thực thi các tác vụ mạng."""
+        try:
+            # Tải danh sách phần mềm từ xa
+            self.progress_update.emit("Đang tải danh sách phần mềm từ máy chủ...")
+            response = self.session.get(REMOTE_APP_LIST_URL, timeout=10)
+            response.raise_for_status()
+            remote_apps = response.json()
+
+            # Bổ sung các bộ Office
+            generated_office_apps = TekDT_AIS._generate_office_suites_info(None) # Gọi phương thức tĩnh
+            remote_apps.get("app_items", {}).update(generated_office_apps)
+            
+            # Tải các icon cần thiết
+            self.progress_update.emit("Đang tải và kiểm tra icon phần mềm...")
+            all_apps = remote_apps.get("app_items", {})
+            config_needs_saving = False
+
+            for key, app_info in all_apps.items():
+                icon_url = app_info.get('icon_url')
+                if not isinstance(icon_url, str) or not icon_url:
+                    continue
+
+                icon_filename = Path(icon_url).name
+                app_dir = APPS_DIR / key
+                icon_path = app_dir / icon_filename
+
+                # Kiểm tra xem icon đã có trong config local và file đã tồn tại chưa
+                local_icon_file = self.local_apps.get(key, {}).get('icon_file')
+                if not local_icon_file or not icon_path.exists():
+                    try:
+                        app_dir.mkdir(exist_ok=True)
+                        icon_response = self.session.get(icon_url, timeout=5)
+                        icon_response.raise_for_status()
+                        with open(icon_path, 'wb') as f:
+                            f.write(icon_response.content)
+                        # Đánh dấu để lưu lại thông tin icon file vào config
+                        app_info['icon_file'] = icon_filename
+
+                    except requests.RequestException:
+                        app_info['icon_file'] = 'default_icon.png'
+
+            self.finished.emit(remote_apps, True)
+
+        except requests.RequestException as e:
+            print(f"Lỗi mạng khi tải danh sách/icon: {e}")
+            # Nếu lỗi mạng, vẫn trả về danh sách local để chạy offline
+            self.finished.emit({"app_items": self.local_apps.copy()}, False)
+
 # --- CỬA SỔ CHÍNH ---
 class TekDT_AIS(QMainWindow):
     def __init__(self, embed_mode=False, embed_size=None, is_cli_mode=False, cli_args=None):
@@ -1258,30 +1321,75 @@ class TekDT_AIS(QMainWindow):
     
     def on_tool_check_finished(self, success, message):
         self.tool_manager_thread.quit()
-        
-        # Ẩn overlay khởi động
-        if hasattr(self, 'startup_overlay'):
-            self.startup_overlay.hide()
-        
+        self.tool_manager_thread.wait() # Đợi luồng kết thúc hẳn
+
         if not success:
+            if hasattr(self, 'startup_overlay'):
+                self.startup_overlay.hide()
             self.show_styled_message_box(QMessageBox.Icon.Warning, "Lỗi công cụ", message)
             if not (ARIA2_EXEC.exists() and SEVENZ_EXEC.exists()):
                 QApplication.quit()
                 return
         
+        # --- LOGIC MỚI: BẮT ĐẦU TẢI DANH SÁCH APP TRÊN LUỒNG MỚI ---
+        # 1. Tải config local trước để có dữ liệu icon cache
+        self.load_config_and_apps(populate=False)
+
+        # 2. Khởi tạo worker tải app list
+        self.app_loader_thread = QThread()
+        self.app_loader = AppListLoader(self.session, self.local_apps)
+        self.app_loader.moveToThread(self.app_loader_thread)
+
+        # 3. Kết nối tín hiệu
+        self.app_loader.progress_update.connect(self.update_startup_status)
+        self.app_loader.finished.connect(self.on_app_load_finished)
+        self.app_loader_thread.started.connect(self.app_loader.run)
+
+        # 4. Bắt đầu
+        self.app_loader_thread.start()
+
+    def on_app_load_finished(self, remote_apps_data, is_online):
+        """
+        Callback được gọi khi AppListLoader hoàn thành việc tải danh sách và icon.
+        """
+        self.app_loader_thread.quit()
+        self.app_loader_thread.wait()
+
+        self.remote_apps = remote_apps_data
+        
+        # Nếu đang ở chế độ offline, lọc danh sách để chỉ giữ lại các app đã được tải về.
+        if not is_online:
+            if not self.is_cli_mode:
+                self.show_styled_message_box(QMessageBox.Icon.Warning, "Lỗi mạng", f"Không thể tải danh sách phần mềm từ máy chủ.\nChương trình sẽ chỉ hiển thị các phần mềm đã có thông tin cục bộ.")
+            else:
+                print(f"Lưu ý: Không thể tải danh sách phần mềm từ máy chủ. Tiếp tục với dữ liệu cục bộ.")
+
+            all_local_apps = self.remote_apps.get("app_items", {})
+            downloaded_apps_only = {
+                key: info for key, info in all_local_apps.items()
+                if self.is_app_downloaded(key, info)
+            }
+            self.remote_apps["app_items"] = downloaded_apps_only
+            if hasattr(self, 'status_label') and self.status_label:
+                self.status_label.setText("Chế độ Offline. Hiển thị các phần mềm đã tải.")
+        else:
+            status_text = "Tải danh sách thành công. Sẵn sàng."
+            if hasattr(self, 'status_label') and self.status_label: self.status_label.setText(status_text)
+
+        # Ẩn overlay khởi động
+        if hasattr(self, 'startup_overlay'):
+            self.startup_overlay.hide()
+        
         # Bật lại giao diện chính
         if self.central_widget_ref:
             self.central_widget_ref.setEnabled(True)
 
-        # --- LOGIC QUYẾT ĐỊNH CHẾ ĐỘ CHẠY ---
+        # --- LOGIC QUYẾT ĐỊNH CHẾ ĐỘ CHẠY (giống như trong on_tool_check_finished cũ) ---
         if self.is_cli_mode:
-            # Nếu là chế độ dòng lệnh, gọi hàm xử lý CLI
-            # Dùng QTimer để đảm bảo giao diện được vẽ xong trước khi bắt đầu xử lý nặng
             QTimer.singleShot(100, lambda: self.handle_cli_args(self.cli_args))
         else:
-            # Nếu là chế độ giao diện thông thường, tải danh sách ứng dụng
-            self.load_config_and_apps()
-
+            self.populate_lists()
+    
     def setup_embed_ui(self):
         self.setWindowTitle(f"{APP_NAME}")
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
@@ -1315,7 +1423,7 @@ class TekDT_AIS(QMainWindow):
         main_layout.addWidget(self.search_box)
         main_layout.addWidget(self.available_list_widget)
 
-    def _generate_office_suites_info(self):
+    def _generate_office_suites_info(self=None):
         """
         Tạo thông tin cho các bộ Office để hiển thị trong danh sách.
         """
@@ -1770,7 +1878,10 @@ class TekDT_AIS(QMainWindow):
             self.start_button.setStyleSheet("background-color: #3498db; color: white;")
     
     def load_config_and_apps(self, populate=True):
-        # Load local config
+        """
+        Đã được đơn giản hóa: Chỉ tải cấu hình cục bộ (local config).
+        Việc tải từ xa và tải icon được xử lý bởi AppListLoader.
+        """
         if CONFIG_FILE.exists():
             try:
                 with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
@@ -1783,75 +1894,14 @@ class TekDT_AIS(QMainWindow):
             with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
                 json.dump(self.config, f, indent=2, ensure_ascii=False)
 
-        for key, item in self.config.get('app_items', {}).items():
-            # Sửa icon_file nếu không phải str
-            icon_file = item.get('icon_file')
-            if 'icon_file' not in item or not isinstance(item.get('icon_file'), str):
-                icon_url = item.get('icon_url', '')
-                item['icon_file'] = Path(icon_url).name if icon_url else 'default_icon.png'
-            config_needs_saving = True
-            
-            # THÊM: Sửa icon_url nếu không phải str
-            icon_url = item.get('icon_url')
-            if not isinstance(icon_url, str):
-                item['icon_url'] = ''
-                config_needs_saving = True
-                print(f"Đã sửa 'icon_url' cho {key} từ {type(icon_url)} thành string.")
-        
-        # Luôn đảm bảo các khóa chính tồn tại
         self.config.setdefault('settings', {})
         self.config.setdefault('app_items', {})
-
         self.local_apps = self.config.get("app_items", {})
         
         if not self.embed_mode:
             self.selected_for_install = self.config.get("settings", {}).get("selected_for_install", [])
             if not isinstance(self.selected_for_install, list):
                 self.selected_for_install = []
-        
-        is_online = False
-        
-        try:
-            status_text = "Đang tải danh sách phần mềm từ máy chủ..."
-            if hasattr(self, 'status_label') and self.status_label: self.status_label.setText(status_text)
-            response = self.session.get(REMOTE_APP_LIST_URL, timeout=10)
-            response.raise_for_status()
-            self.remote_apps = response.json()
-            
-            for key, item in self.remote_apps.get('app_items', {}).items():
-                icon_file = item.get('icon_file')
-                if 'icon_file' not in item or not isinstance(item.get('icon_file'), str):
-                    icon_url = item.get('icon_url', '')
-                    item['icon_file'] = Path(icon_url).name if icon_url else 'default_icon.png'
-            
-            is_online = True
-            status_text = "Tải danh sách thành công. Sẵn sàng."
-            if hasattr(self, 'status_label') and self.status_label: self.status_label.setText(status_text)
-        except requests.RequestException as e:
-            if not self.is_cli_mode:
-                self.show_styled_message_box(QMessageBox.Icon.Warning, "Lỗi mạng", f"Không thể tải danh sách phần mềm từ máy chủ: {e}\nChương trình sẽ chỉ hiển thị các phần mềm đã có thông tin cục bộ.")
-            else:
-                print(f"Lưu ý: Không thể tải danh sách phần mềm từ máy chủ. Tiếp tục với dữ liệu cục bộ.")
-            self.remote_apps = {"app_items": self.local_apps.copy()}
-            if hasattr(self, 'status_label') and self.status_label:
-                self.status_label.setText("Chế độ Offline. Hiển thị các phần mềm đã tải.")
-        
-        if is_online: # Chỉ hiển thị các bộ Office khi có mạng
-            generated_office_apps = self._generate_office_suites_info()
-            self.remote_apps.get("app_items", {}).update(generated_office_apps)
-        
-        # Nếu đang ở chế độ offline, lọc danh sách để chỉ giữ lại các app đã được tải về.
-        if not is_online:
-            all_local_apps = self.remote_apps.get("app_items", {})
-            downloaded_apps_only = {
-                key: info for key, info in all_local_apps.items()
-                if self.is_app_downloaded(key, info)
-            }
-            self.remote_apps["app_items"] = downloaded_apps_only
-        
-        # Chỉ populate list nếu được yêu cầu (tránh làm việc thừa khi chạy CLI)
-        if populate:
-            self.populate_lists()
         
     def update_single_app_widget(self, app_key):
         """Tìm và cập nhật trạng thái của chỉ một AppItemWidget mà không vẽ lại toàn bộ danh sách."""
@@ -1927,38 +1977,6 @@ class TekDT_AIS(QMainWindow):
         for key, local_info in self.local_apps.items():
             if key in compatible_apps:
                 compatible_apps[key].update(local_info)
-
-        config_needs_saving = False
-        try:
-            self.session.get("https://www.google.com", timeout=3)
-            for key, app_info in compatible_apps.items():
-                icon_file = app_info.get('icon_file')
-                icon_url = app_info.get('icon_url')
-                if not isinstance(icon_url, str) or not icon_url:
-                    continue
-
-                icon_filename = Path(icon_url).name
-                app_dir = APPS_DIR / key
-                icon_path = app_dir / icon_filename
-
-                if not icon_file or not icon_path.exists():
-                    try:
-                        app_dir.mkdir(exist_ok=True)
-                        icon_response = self.session.get(icon_url, timeout=5)
-                        icon_response.raise_for_status()
-                        with open(icon_path, 'wb') as f:
-                            f.write(icon_response.content)
-                        compatible_apps[key]['icon_file'] = icon_filename
-                        self.config['app_items'].setdefault(key, {})
-                        self.config['app_items'][key]['icon_file'] = icon_filename
-                        config_needs_saving = True
-                    except requests.RequestException:
-                        compatible_apps[key]['icon_file'] = 'default_icon.png'
-        except requests.ConnectionError:
-            pass
-
-        if config_needs_saving:
-            self.save_config()
 
         categories = sorted(list(set(app.get('category', 'Chưa phân loại') for app in compatible_apps.values())))
         
