@@ -888,22 +888,37 @@ class AppItemWidget(QWidget):
         self.icon_label.setFixedSize(48, 48)
         self.icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         icon_file_value = app_info.get('icon_file')
-        if isinstance(icon_file_value, str) and icon_file_value:
-            try:
-                icon_path = APPS_DIR / app_key / icon_file_value
-            except TypeError:
-                icon_path = None
-        else:
-            icon_path = None
+        icon_path = None
         default_icon_path = resource_path('Images/default_icon.png')
         
-        pixmap_path = str(icon_path) if icon_path and Path(icon_path).exists() else str(default_icon_path)
-        icon = QIcon(pixmap_path)
+        # Lấy tên file icon từ app_info
+        icon_filename = self.app_info.get('icon_file')
+
+        # Chỉ xử lý nếu app_key và icon_filename đều là chuỗi hợp lệ
+        if isinstance(self.app_key, str) and isinstance(icon_filename, str) and icon_filename:
+            try:
+                # Tạo đường dẫn đầy đủ tới file icon
+                candidate_path = APPS_DIR / self.app_key / icon_filename
+                # Chỉ sử dụng đường dẫn này nếu file thực sự tồn tại
+                if candidate_path.exists():
+                    icon_path = candidate_path
+            except TypeError:
+                # Bỏ qua nếu có lỗi khi ghép đường dẫn (hiếm khi xảy ra)
+                pass
+
+        # Quyết định pixmap cuối cùng để hiển thị
+        pixmap_to_show = str(icon_path) if icon_path else str(default_icon_path)
+        icon = QIcon(pixmap_to_show)
+
+        # Đặt pixmap cho label
         if not icon.isNull():
             self.icon_label.setPixmap(icon.pixmap(48, 48))
         else:
             self.icon_label.setText("?")
             self.icon_label.setStyleSheet("color: #ecf0f1; background-color: #34495e; border: 1px solid #3498db;")
+
+        # KẾT THÚC THAY THẾ
+
         self.layout.addWidget(self.icon_label)
         
         # Thông tin
@@ -1771,10 +1786,10 @@ class TekDT_AIS(QMainWindow):
         for key, item in self.config.get('app_items', {}).items():
             # Sửa icon_file nếu không phải str
             icon_file = item.get('icon_file')
-            if not isinstance(icon_file, str):
-                item['icon_file'] = 'default_icon.png'
-                config_needs_saving = True
-                print(f"Đã sửa 'icon_file' cho {key} từ {type(icon_file)} thành string.")
+            if 'icon_file' not in item or not isinstance(item.get('icon_file'), str):
+                icon_url = item.get('icon_url', '')
+                item['icon_file'] = Path(icon_url).name if icon_url else 'default_icon.png'
+            config_needs_saving = True
             
             # THÊM: Sửa icon_url nếu không phải str
             icon_url = item.get('icon_url')
@@ -1802,6 +1817,13 @@ class TekDT_AIS(QMainWindow):
             response = self.session.get(REMOTE_APP_LIST_URL, timeout=10)
             response.raise_for_status()
             self.remote_apps = response.json()
+            
+            for key, item in self.remote_apps.get('app_items', {}).items():
+                icon_file = item.get('icon_file')
+                if 'icon_file' not in item or not isinstance(item.get('icon_file'), str):
+                    icon_url = item.get('icon_url', '')
+                    item['icon_file'] = Path(icon_url).name if icon_url else 'default_icon.png'
+            
             is_online = True
             status_text = "Tải danh sách thành công. Sẵn sàng."
             if hasattr(self, 'status_label') and self.status_label: self.status_label.setText(status_text)
@@ -1842,9 +1864,11 @@ class TekDT_AIS(QMainWindow):
         app_info = self.remote_apps.get('app_items', {}).get(app_key, {})
         local_info = self.local_apps.get(app_key, {})
         app_info.update(local_info)
-        if not isinstance(app_info.get('icon_file'), str):
-            app_info['icon_file'] = 'default_icon.png'
+        if 'icon_file' not in app_info or not isinstance(app_info['icon_file'], str):
+            icon_url = app_info.get('icon_url', '')
+            app_info['icon_file'] = Path(icon_url).name if icon_url else 'default_icon.png'
         if not isinstance(app_info.get('icon_url'), str):
+            print(f"Debug: Sửa icon_url sau update cho {app_key}: {type(app_info.get('icon_url'))}")
             app_info['icon_url'] = ''
         widget.app_info = app_info # Cập nhật thông tin trong widget
 
@@ -1874,7 +1898,7 @@ class TekDT_AIS(QMainWindow):
         widget.action_button.setEnabled(True)
 
         # Kết nối lại hành động mới cho nút
-        on_complete_action = lambda k=app_key, i=app_info: self.move_app_to_selection(k, i)
+        on_complete_action = lambda: self.move_app_to_selection(app_key, app_info)
         if is_update_available:
             widget.action_button.clicked.connect(lambda _, k=app_key, i=app_info, w=widget, lv=local_ver_str, rv=remote_ver_str, cb=on_complete_action: self.confirm_update(k, i, w, lv, rv, on_complete=cb))
         else:
@@ -2107,35 +2131,33 @@ class TekDT_AIS(QMainWindow):
         widget = self.find_widget_by_key(app_key)
         if widget and widget.parent():  # Kiểm tra widget còn tồn tại và có parent
             widget.set_status(status)
-    
+
     def confirm_download(self, key, info, widget):
         reply = self.show_styled_message_box(
             QMessageBox.Icon.Question,
             "Tải phần mềm",
-            f"Bạn có muốn tải về {info['display_name']} không?\n\nSau khi tải xong, phần mềm sẽ tự động được thêm vào danh sách cài đặt.",
+            f"Bạn có muốn tải về {info['display_name']} không?",
             buttons=QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         )
         if reply == QMessageBox.StandardButton.Yes:
-            # Không gán cho self.install_worker nữa, mà tạo worker cục bộ
-            worker_tasks = {key: {'info': info, 'action': 'download'}}
             worker = InstallWorker({key: {'info': info, 'action': 'download'}}, parent=self)
             
-            # Kết nối các tín hiệu như cũ
+            # --- Chỉ giữ lại các kết nối cần thiết ---
+
+            # 1. Kết nối để nhận dữ liệu và xử lý tất cả logic sau khi xong
+            worker.tasks_batch_completed.connect(self.on_worker_finished)
+
+            # 2. Kết nối các tín hiệu phụ (tiến trình, lỗi, trạng thái)
             worker.progress.connect(self.update_install_progress)
             worker.progress_percentage.connect(self.update_download_progress_anywhere)
             worker.error.connect(lambda e: self.show_styled_message_box(QMessageBox.Icon.Critical, "Lỗi Worker", str(e)))
             worker.update_widget_status.connect(self.update_widget_status)
-            worker.tasks_batch_completed.connect(self.on_tasks_batch_completed)
-            worker.tasks_batch_completed.connect(
-                lambda completed_items: self.on_worker_finished(list(completed_items.keys())[0])
-            )
 
-            # Giữ lại kết nối deleteLater
+            # 3. Kết nối tín hiệu finished CHỈ để tự động xóa worker
             worker.finished.connect(worker.deleteLater)
-
-            # Gọi hàm dọn dẹp danh sách CHỈ KHI luồng đã thực sự kết thúc
-            worker.finished.connect(lambda k=key: self.cleanup_worker(k))
-            # Lưu worker vào dictionary quản lý và bắt đầu chạy
+            
+            # Xóa tất cả các kết nối worker.finished.connect(...) khác nếu có
+            
             self.active_workers[key] = worker
             worker.start()
 
@@ -2154,27 +2176,26 @@ class TekDT_AIS(QMainWindow):
             return
 
         if reply == QMessageBox.StandardButton.Yes:
-            # Tương tự confirm_download, tạo worker cục bộ
-            worker_tasks = {key: {'info': info, 'action': 'update'}}
             worker = InstallWorker({key: {'info': info, 'action': 'update'}}, parent=self)
-            
-            # Kết nối các tín hiệu
+
+            def on_update_and_action(completed_items):
+                # Hàm này sẽ được gọi sau khi worker hoàn thành và đã ghi config
+                self.on_worker_finished(completed_items)
+                # Sau khi cập nhật giao diện xong, thực hiện hành động tiếp theo (ví dụ: chuyển sang khung phải)
+                if on_complete:
+                    QTimer.singleShot(50, on_complete) # Dùng QTimer để đảm bảo UI đã refresh
+
             worker.progress.connect(self.update_install_progress)
             worker.progress_percentage.connect(self.update_download_progress_anywhere)
             worker.error.connect(lambda e: self.show_styled_message_box(QMessageBox.Icon.Critical, "Lỗi Worker", str(e)))
             worker.update_widget_status.connect(self.update_widget_status)
-            worker.tasks_batch_completed.connect(self.on_tasks_batch_completed)
-            worker.finished.connect(on_update_and_action)
-
-            # Giữ lại kết nối deleteLater
-            worker.finished.connect(worker.deleteLater)
-            def on_update_and_action():
-                self.on_worker_finished(key)
-                if on_complete:
-                    on_complete()
-            worker.finished.connect(lambda k=key: self.cleanup_worker(k))
             
-            # Lưu worker và bắt đầu
+            # Kết nối đến hàm callback lồng nhau ở trên
+            worker.tasks_batch_completed.connect(on_update_and_action)
+            
+            # Tự động xóa worker
+            worker.finished.connect(worker.deleteLater)
+            
             self.active_workers[key] = worker
             worker.start()
 
@@ -2209,43 +2230,40 @@ class TekDT_AIS(QMainWindow):
                         widget.action_button.setStyleSheet("background-color: #f39c12; color: white;")
     
     def move_app_to_selection(self, key, info):
-        if self.is_cli_mode and key not in self.cli_target_apps:
+        if not isinstance(key, str) or not key:
+            print(f"Lỗi: key không hợp lệ (không phải string hoặc rỗng): {key}. Bỏ qua di chuyển.")
             return
+
+        # sau đó cập nhật/ghi đè bởi local_apps nếu có - đảm bảo icon_file không bị mất ---
+        app_info_latest = {}
+        if isinstance(info, dict):
+            app_info_latest.update(info)
+
+        local_info = self.local_apps.get(key)
+        if isinstance(local_info, dict):
+            # local_info ghi đè các trường cần thiết (ví dụ version) nhưng không xóa icon_file nếu đã có
+            app_info_latest.update(local_info)
+
+        # Nếu vẫn trống (rất hiếm), fallback về remote
+        if not app_info_latest:
+            app_info_latest = self.remote_apps.get('app_items', {}).get(key, {})
+            if not app_info_latest:
+                print(f"Lỗi: Không tìm thấy thông tin cho '{key}' ở cả local và remote.")
+                return
+
         # Kiểm tra xem item đã tồn tại trong danh sách chọn chưa
         for i in range(self.selected_list_widget.count()):
             item = self.selected_list_widget.item(i)
-            if item and self.selected_list_widget.itemWidget(item).app_key == key:
-                return # Đã tồn tại, không thêm lại
+            widget = self.selected_list_widget.itemWidget(item)
+            if widget and getattr(widget, 'app_key', None) == key:
+                return  # Đã tồn tại, không thêm lại
 
-        self.update_available_item_state(key, is_selected=True)
+        # Tạo widget mới cho khung bên phải với dữ liệu MỚI NHẤT (đã merge)
+        item_widget = AppItemWidget(key, app_info_latest)
 
-        local_info = self.local_apps.get(key, info)
-        self._download_icon_if_needed(key, local_info)
-        item_widget = AppItemWidget(key, local_info)
-        
-        try:
-            icon_file_local = self.local_apps.get(key, {}).get('icon_file')
-            if not isinstance(icon_file_local, str):
-                icon_file_local = 'default_icon.png'
-            
-            icon_file_info = info.get('icon_file')
-            if not isinstance(icon_file_info, str):
-                icon_file_info = 'default_icon.png'
-            
-            icon_url = info.get('icon_url', '')
-            if not isinstance(icon_url, str):
-                icon_url = ''
-            
-            icon_filename = icon_file_local or icon_file_info or Path(icon_url).name or 'default_icon.png'
-            
-            icon_path = APPS_DIR / key / icon_filename
-            if icon_path.exists():
-                item_widget.icon_label.setPixmap(QIcon(str(icon_path)).pixmap(48, 48))
-        except Exception:
-            pass
-        
+        # Thiết lập nút "Bỏ" và kết nối sự kiện
         item_widget.action_button.setText("Bỏ")
-        item_widget.action_button.setToolTip(f"Bỏ {info['display_name']} khỏi danh sách")
+        item_widget.action_button.setToolTip(f"Bỏ {app_info_latest.get('display_name', key)} khỏi danh sách")
         item_widget.action_button.setStyleSheet(
             "background-color: #e74c3c; color: white; border: none; padding: 8px 16px; border-radius: 4px; font-weight: bold;"
         )
@@ -2254,22 +2272,24 @@ class TekDT_AIS(QMainWindow):
         except Exception:
             pass
         item_widget.action_button.clicked.connect(
-            lambda checked, k=key, i=local_info: item_widget.remove_requested.emit(k, i)
+            lambda checked, k=key, i=app_info_latest: self.remove_app_from_selection(k, i)
         )
-        item_widget.remove_requested.connect(self.remove_app_from_selection)
-        
+
+        # Thêm widget vào danh sách bên phải (selected_list_widget)
         list_item = QListWidgetItem()
         list_item.setSizeHint(QSize(0, 70))
         list_item.setData(Qt.ItemDataRole.UserRole, key)
-        list_item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
         self.selected_list_widget.addItem(list_item)
         self.selected_list_widget.setItemWidget(list_item, item_widget)
-        
+
+        # Cập nhật danh sách và lưu cấu hình
         if key not in self.selected_for_install:
             self.selected_for_install.append(key)
         self.save_config()
-        self.update_available_item_state(key, is_selected=True)
+
+        # Cập nhật giao diện
         self.update_counts()
+        self.update_available_item_state(key, is_selected=True)
         self._update_office_selection_state()
 
     def remove_app_from_selection(self, key, info):
@@ -2285,18 +2305,21 @@ class TekDT_AIS(QMainWindow):
             self.selected_for_install.remove(key)
         self.save_config()
         self.update_counts()
-        widget = self.find_widget_by_key(key, self.available_list_widget)
+        widget = self.find_widget_by_key(key)
         if widget:
-            widget.action_button.setEnabled(True)
+            # Đồng bộ lại app_info từ local để icon đúng
+            latest_info = self.local_apps.get(key, self.remote_apps.get('app_items', {}).get(key, {}))
+            widget.app_info.update(latest_info)
+            # Khôi phục nút "Thêm" xanh và reconnect
             widget.action_button.setText("Thêm")
             widget.action_button.setStyleSheet("background-color: #4CAF50; color: white;")
-            # Reconnect hành động "Thêm"
+            widget.action_button.setEnabled(True)
             try:
                 widget.action_button.clicked.disconnect()
             except TypeError:
                 pass
-            on_complete_action = lambda: self.move_app_to_selection(key, widget.app_info)
-            widget.action_button.clicked.connect(on_complete_action)
+            on_complete = lambda: self.move_app_to_selection(key, latest_info)
+            widget.action_button.clicked.connect(on_complete)
         self.update_available_item_state(key, is_selected=False)
         self._update_office_selection_state()
         
@@ -2358,58 +2381,47 @@ class TekDT_AIS(QMainWindow):
                                 widget.action_button.clicked.connect(on_complete_action)
                 break
     
-    # def on_worker_finished(self, app_key):
-        # """
-        # Được gọi khi một worker độc lập hoàn thành tác vụ.
-        # Cập nhật trạng thái trong bộ nhớ một cách trực tiếp và mạnh mẽ.
-        # """
-        # # Xóa worker khỏi danh sách quản lý
-        # if app_key in self.active_workers:
-            # del self.active_workers[app_key]
+    def on_worker_finished(self, completed_items):
+        """
+        Được gọi khi một worker độc lập hoàn thành.
+        Hàm này nhận dữ liệu MỚI NHẤT trực tiếp từ worker qua signal,
+        cập nhật trạng thái trong bộ nhớ, làm mới giao diện và dọn dẹp worker.
+        """
+        if not completed_items:
+            return
 
-        # # Lấy thông tin mới nhất của phần mềm từ danh sách remote
-        # remote_info = self.remote_apps.get("app_items", {}).get(app_key)
-        # if remote_info:
-            # # GHI ĐÈ TRỰC TIẾP phiên bản mới vào bộ nhớ (self.local_apps)
-            # # Bước này đảm bảo trạng thái trong bộ nhớ là MỚI NHẤT
-            # # trước khi cập nhật giao diện.
-            # self.local_apps.setdefault(app_key, {}).update(remote_info)
-            
-            # # Đồng bộ cả vào self.config để nhất quán
-            # self.config['app_items'].setdefault(app_key, {}).update(remote_info)
+        # Lấy app_key và thông tin MỚI NHẤT, đầy đủ nhất từ worker
+        # completed_items có dạng: { 'app_key': { 'display_name': ..., 'version': ..., 'icon_file': 'correct_icon.png' } }
+        app_key = list(completed_items.keys())[0]
+        new_app_info = completed_items[app_key]
 
-        # # Bây giờ, gọi hàm cập nhật widget.
-        # # Nó sẽ đọc trạng thái mới nhất mà chúng ta vừa ghi đè ở trên.
-        # self.update_single_app_widget(app_key)
-    
-    def on_worker_finished(self, app_key):
-        if app_key in self.active_workers:
-            del self.active_workers[app_key]
+        # BƯỚC 1: Dọn dẹp worker khỏi danh sách đang hoạt động
+        self.cleanup_worker(app_key)
 
-        # Đảm bảo dữ liệu local được cập nhật từ file
-        self.load_config_and_apps(populate=False)
+        # BƯỚC 2: Cập nhật trạng thái trong bộ nhớ (self.local_apps) với dữ liệu MỚI NHẤT.
+        # Thao tác này giải quyết Vấn đề 2, đảm bảo 'icon_file' đúng được lưu trữ.
+        self.local_apps[app_key] = new_app_info
         
-        # Cập nhật widget trong available list
+        # Đồng bộ cả vào self.remote_apps để nhất quán trong phiên làm việc hiện tại
+        if self.remote_apps.get('app_items', {}).get(app_key):
+            self.remote_apps['app_items'][app_key].update(new_app_info)
+
+        # BƯỚC 3: Cập nhật widget ở khung bên trái (danh sách có sẵn).
+        # Thao tác này đảm bảo nút "Tải" chuyển thành nút "Thêm" với logic đúng.
         self.update_single_app_widget(app_key)
-        
-        # Nếu app đã ở selected, cập nhật cả selected list
-        if app_key in self.selected_for_install:
-            # Xóa item cũ trong selected list (nếu có)
+
+        # BƯỚC 4: Nếu phần mềm này đang nằm trong danh sách "Đã chọn" (trường hợp update),
+        # ta cần làm mới widget của nó ở khung bên phải.
+        if not self.embed_mode and app_key in self.selected_for_install:
+            # Tìm và xóa widget cũ
             for i in range(self.selected_list_widget.count() - 1, -1, -1):
                 item = self.selected_list_widget.item(i)
                 if item.data(Qt.ItemDataRole.UserRole) == app_key:
                     self.selected_list_widget.takeItem(i)
                     break
             
-            # Thêm lại với thông tin mới (đã có icon)
-            app_info = self.local_apps.get(app_key, self.remote_apps.get('app_items', {}).get(app_key, {}))
-            self.move_app_to_selection(app_key, app_info)
-            
-            # THÊM: Force update state nút ở available thành "Đã chọn"
-            self.update_available_item_state(app_key, is_selected=True)
-        
-        # THÊM: Delay nhẹ để UI render icon/state mới (tránh race)
-        QTimer.singleShot(100, lambda: self.update_counts())  # Cập nhật count và force repaint
+            # Thêm lại widget mới với thông tin đã được cập nhật chính xác
+            self.move_app_to_selection(app_key, new_app_info)
     
     def filter_apps(self, text):
         text = text.lower().strip()
