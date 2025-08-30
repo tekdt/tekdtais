@@ -683,7 +683,7 @@ class InstallWorker(QThread):
                 self.update_widget_status.emit(app_key, "failed")
                 self.progress.emit(app_key, "failed", f"Lỗi khi chạy cài đặt: {e}")
                 
-        elif app_info.get('type') == 'portable' or action == 'download':
+        elif app_info.get('type') == 'Portable' or action == 'download':
             # Đối với portable hoặc chỉ download, tải xong là thành công
             self.update_widget_status.emit(app_key, "success")
             self.progress.emit(app_key, "success", f"Đã xử lý {display_name} thành công!")
@@ -744,7 +744,7 @@ class InstallWorker(QThread):
                      self.update_widget_status.emit(app_key, "failed")
             
             # --- Xử lý Cài đặt/Tải về ---
-            if action == "download" or app_info.get('type') == 'portable':
+            if action == "download" or app_info.get('type') == 'Portable':
                 # Với 'download' hoặc portable, chỉ cần tải xong là thành công
                 self.update_widget_status.emit(app_key, "success")
                 self.progress.emit(app_key, "success", f"Đã xử lý {display_name} thành công!")
@@ -2107,7 +2107,7 @@ class TekDT_AIS(QMainWindow):
 
         else: # Chế độ thông thường
             # --- TRƯỜNG HỢP 3: ĐÃ TẢI VỀ (CHẾ ĐỘ THƯỜNG) ---
-            if info.get('type') == 'portable':
+            if info.get('type') == 'Portable':
                 item_widget.action_button.setText("Chạy")
                 item_widget.action_button.setToolTip(f"Chạy {info['display_name']} trực tiếp")
                 item_widget.action_button.setStyleSheet("background-color: #3498db; color: white;")  # Màu xanh dương để phân biệt
@@ -2412,7 +2412,7 @@ class TekDT_AIS(QMainWindow):
                             widget.action_button.setStyleSheet("background-color: #f39c12; color: white;")
                             widget.action_button.clicked.connect(lambda _, k=key, i=current_info, w=widget: self.confirm_download(k, i, w))
                         else:  # Đã tải về
-                            if current_info.get('type') == 'portable':
+                            if current_info.get('type') == 'Portable':
                                 widget.action_button.setText("Chạy")
                                 widget.action_button.setToolTip(f"Chạy {current_info['display_name']} trực tiếp")
                                 widget.action_button.setStyleSheet("background-color: #3498db; color: white;")
