@@ -52,7 +52,7 @@ IMAGES_DIR_DATA = APP_DATA_DIR / "Images"
 ARIA2_DIR = TOOLS_DIR / "aria2"
 SEVENZ_DIR = TOOLS_DIR / "7z"
 ARIA2_EXEC = ARIA2_DIR / "aria2c.exe"
-SEVENZ_EXEC = SEVENZ_DIR / "7za.exe"
+SEVENZ_EXEC = SEVENZ_DIR / "7z.exe"
 ARIA2_API_URL = "https://api.github.com/repos/aria2/aria2/releases/latest"
 SEVENZIP_API_URL = "https://api.github.com/repos/ip7z/7zip/releases/latest"
 ODT_SETUP_URL = "https://download.microsoft.com/download/6c1eeb25-cf8b-41d9-8d0d-cc1dbc032140/officedeploymenttool_19029-20136.exe"
@@ -71,7 +71,6 @@ def initialize_directories_and_tools():
     if getattr(sys, 'frozen', False):
         bundled_tools = {
             resource_path("Tools/aria2/aria2c.exe"): ARIA2_EXEC,
-            resource_path("Tools/7z/7za.exe"): SEVENZ_EXEC,
             resource_path("Tools/ODT/setup.exe"): ODT_EXEC
         }
         for src_path_str, dest_path in bundled_tools.items():
@@ -157,7 +156,6 @@ class ToolManager(QObject):
         exec_file = SEVENZ_EXEC
         tool_name = "7-Zip"
         api_url = SEVENZIP_API_URL
-        asset_name = '7zr.exe'
         tool_dir.mkdir(exist_ok=True, parents=True)
         version_file = tool_dir / ".version"
         local_version = version_file.read_text().strip() if version_file.exists() else "0"
@@ -169,6 +167,7 @@ class ToolManager(QObject):
         if remote_version != local_version or not exec_file.exists():
             self.progress_update.emit(f"Đang tìm {tool_name} phiên bản {remote_version}...")
 
+            asset_name = f"7z{remote_version.replace('.', '')}.msi"
             download_url = ""
             for asset in latest_release['assets']:
                 if asset['name'] == asset_name:
@@ -180,19 +179,45 @@ class ToolManager(QObject):
 
             self.progress_update.emit(f"Đang tải {tool_name} ({asset_name})...")
 
-            # Tải file thực thi
+            # Tải file .msi vào TOOLS_DIR
             file_response = self.session.get(download_url)
             file_response.raise_for_status()
             file_content = file_response.content
-
-            for item in tool_dir.iterdir():
-                if item.is_file(): item.unlink()
-                elif item.is_dir(): shutil.rmtree(item)
-            
-            self.progress_update.emit(f"Đang cài đặt {tool_name}...")
-            with open(exec_file, 'wb') as f:
+            msi_path = TOOLS_DIR / asset_name
+            with open(msi_path, 'wb') as f:
                 f.write(file_content)
 
+            # Giải nén .msi bằng msiexec (administrative install)
+            self.progress_update.emit(f"Đang giải nén {tool_name}...")
+            extract_dir = TOOLS_DIR / "7z_extract_temp"
+            if extract_dir.exists():
+                shutil.rmtree(extract_dir)
+            extract_dir.mkdir(parents=True, exist_ok=True)
+            
+            command = ['msiexec', '/a', str(msi_path), '/qb', f'TARGETDIR={str(extract_dir)}']
+            process = subprocess.run(command, capture_output=True, text=True, timeout=300, check=False, creationflags=subprocess.CREATE_NO_WINDOW)
+            
+            if process.returncode != 0:
+                error_message = process.stderr or process.stdout
+                raise Exception(f"Giải nén .msi thất bại: {error_message}")
+
+            # Kiểm tra cấu trúc sau giải nén
+            source_dir = extract_dir / "Files" / "7-Zip"
+            if not source_dir.exists():
+                raise Exception(f"Không tìm thấy thư mục 'Files/7-Zip' sau khi giải nén.")
+
+            # Xóa tool_dir cũ nếu tồn tại để cập nhật mới
+            if tool_dir.exists():
+                shutil.rmtree(tool_dir)
+            
+            # Copy nội dung từ source_dir ra tool_dir
+            shutil.copytree(source_dir, tool_dir)
+
+            # Dọn dẹp: Xóa thư mục tạm và file .msi
+            shutil.rmtree(extract_dir)
+            msi_path.unlink()
+
+            # Lưu phiên bản mới vào .version
             version_file.write_text(remote_version)
             self.progress_update.emit(f"Đã cập nhật {tool_name} thành công!")
         else:
