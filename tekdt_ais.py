@@ -2107,19 +2107,31 @@ class TekDT_AIS(QMainWindow):
 
         else: # Chế độ thông thường
             # --- TRƯỜNG HỢP 3: ĐÃ TẢI VỀ (CHẾ ĐỘ THƯỜNG) ---
-            item_widget.action_button.setText("Thêm")
-            item_widget.action_button.setToolTip(f"Thêm {info['display_name']} vào danh sách")
-            item_widget.action_button.setStyleSheet("background-color: #4CAF50; color: white;")
-            
-            # Hành động Thêm:
-            # 1. Kiểm tra cập nhật (nếu có)
-            # 2. Sau đó chuyển sang khung bên phải
-            on_complete_action = lambda: self.move_app_to_selection(key, info)
-            if is_update_available:
-                # Nếu có cập nhật -> gọi confirm_update với hành động sau cùng là chuyển khung
-                item_widget.action_button.clicked.connect(lambda _, k=key, i=info, w=item_widget, lv=local_ver_str, rv=remote_ver_str, cb=on_complete_action: self.confirm_update(k, i, w, lv, rv, on_complete=cb))
+            if app_info.get('type') == 'portable':
+                item_widget.action_button.setText("Chạy")
+                item_widget.action_button.setToolTip(f"Chạy {info['display_name']} trực tiếp")
+                item_widget.action_button.setStyleSheet("background-color: #3498db; color: white;")  # Màu xanh dương để phân biệt
+                # Hành động Chạy: Không thêm vào khung 2, mà xử lý giải nén và chạy trực tiếp
+                on_run_action = lambda: self.run_portable_app(key, info)
+                if is_update_available:
+                    # Nếu có cập nhật -> gọi confirm_update với hành động sau cùng là chạy
+                    item_widget.action_button.clicked.connect(lambda _, k=key, i=info, w=item_widget, lv=local_ver_str, rv=remote_ver_str, cb=on_run_action: self.confirm_update(k, i, w, lv, rv, on_complete=cb))
+                else:
+                    item_widget.action_button.clicked.connect(on_run_action)
             else:
-                item_widget.action_button.clicked.connect(on_complete_action)
+                item_widget.action_button.setText("Thêm")
+                item_widget.action_button.setToolTip(f"Thêm {info['display_name']} vào danh sách")
+                item_widget.action_button.setStyleSheet("background-color: #4CAF50; color: white;")
+                
+                # Hành động Thêm:
+                # 1. Kiểm tra cập nhật (nếu có)
+                # 2. Sau đó chuyển sang khung phải
+                on_complete_action = lambda: self.move_app_to_selection(key, info)
+                if is_update_available:
+                    # Nếu có cập nhật -> gọi confirm_update với hành động sau cùng là chuyển khung
+                    item_widget.action_button.clicked.connect(lambda _, k=key, i=info, w=item_widget, lv=local_ver_str, rv=remote_ver_str, cb=on_complete_action: self.confirm_update(k, i, w, lv, rv, on_complete=cb))
+                else:
+                    item_widget.action_button.clicked.connect(on_complete_action)
 
         list_item = QListWidgetItem()
         list_item.setSizeHint(QSize(0, 70))
@@ -2400,16 +2412,46 @@ class TekDT_AIS(QMainWindow):
                             widget.action_button.setStyleSheet("background-color: #f39c12; color: white;")
                             widget.action_button.clicked.connect(lambda _, k=key, i=current_info, w=widget: self.confirm_download(k, i, w))
                         else:  # Đã tải về
-                            widget.action_button.setText("Thêm")
-                            widget.action_button.setToolTip(f"Thêm {current_info['display_name']} vào danh sách")
-                            widget.action_button.setStyleSheet("background-color: #4CAF50; color: white;")
-                            
-                            on_complete_action = lambda: self.move_app_to_selection(key, current_info)
-                            if is_update_available:
-                                widget.action_button.clicked.connect(lambda _, k=key, i=current_info, w=widget, lv=local_ver_str, rv=remote_ver_str, cb=on_complete_action: self.confirm_update(k, i, w, lv, rv, on_complete=cb))
+                            if current_info.get('type') == 'portable':
+                                widget.action_button.setText("Chạy")
+                                widget.action_button.setToolTip(f"Chạy {current_info['display_name']} trực tiếp")
+                                widget.action_button.setStyleSheet("background-color: #3498db; color: white;")
+                                on_run_action = lambda: self.run_portable_app(key, current_info)
+                                if is_update_available:
+                                    widget.action_button.clicked.connect(lambda _, k=key, i=current_info, w=widget, lv=local_ver_str, rv=remote_ver_str, cb=on_run_action: self.confirm_update(k, i, w, lv, rv, on_complete=cb))
+                                else:
+                                    widget.action_button.clicked.connect(on_run_action)
                             else:
-                                widget.action_button.clicked.connect(on_complete_action)
+                                widget.action_button.setText("Thêm")
+                                widget.action_button.setToolTip(f"Thêm {current_info['display_name']} vào danh sách")
+                                widget.action_button.setStyleSheet("background-color: #4CAF50; color: white;")
+                                
+                                on_complete_action = lambda: self.move_app_to_selection(key, current_info)
+                                if is_update_available:
+                                    widget.action_button.clicked.connect(lambda _, k=key, i=current_info, w=widget, lv=local_ver_str, rv=remote_ver_str, cb=on_complete_action: self.confirm_update(k, i, w, lv, rv, on_complete=cb))
+                                else:
+                                    widget.action_button.clicked.connect(on_complete_action)
                 break
+    
+    
+    def _find_executable(self, search_dir, pattern):
+        """
+        Tìm kiếm file thực thi theo pattern.
+        Ưu tiên tìm ở thư mục gốc, sau đó tìm đệ quy trong các thư mục con.
+        """
+        search_path = Path(search_dir)
+        
+        # 1. Tìm trong thư mục gốc trước
+        found_files = list(search_path.glob(pattern))
+        if found_files:
+            return found_files[0] # Trả về file đầu tiên tìm thấy
+
+        # 2. Nếu không thấy, tìm đệ quy (recursive glob)
+        found_files_recursive = list(search_path.rglob(pattern))
+        if found_files_recursive:
+            return found_files_recursive[0] # Trả về file đầu tiên tìm thấy
+            
+        return None # Không tìm thấy file nào
     
     def on_worker_finished(self, completed_items):
         """
@@ -2452,6 +2494,52 @@ class TekDT_AIS(QMainWindow):
             
             # Thêm lại widget mới với thông tin đã được cập nhật chính xác
             self.move_app_to_selection(app_key, new_app_info)
+    
+    def run_portable_app(self, app_key, app_info):
+        """Hàm chạy trực tiếp phần mềm portable: Giải nén nếu cần và chạy executable."""
+        # Tương tự logic trong _process_remaining_tasks
+        output_filename_str = app_info.get('output_filename', Path(app_info.get('download_url', '')).name)
+        archive_name = output_filename_str.split('|', 1)[0] if '|' in output_filename_str else output_filename_str
+        executable_pattern = output_filename_str.split('|', 1)[1] if '|' in output_filename_str else output_filename_str
+        
+        download_path = APPS_DIR / app_key / archive_name
+        if not download_path.exists():
+            self.show_styled_message_box(QMessageBox.Icon.Warning, "Lỗi chạy", f"File tải về '{archive_name}' không tồn tại.")
+            return
+        
+        search_base_dir = APPS_DIR / app_key  # Mặc định thư mục app
+        is_archive = any(archive_name.lower().endswith(ext) for ext in ['.zip', '.7z', '.rar', '.tar', '.iso', '.img'])
+        
+        extraction_dir = EXTRACTION_BASE_DIR / app_key
+        if is_archive:
+            extraction_dir.mkdir(parents=True, exist_ok=True)
+            # Gọi hàm giải nén (copy từ _extract_archive trong InstallWorker)
+            command = [
+                str(SEVENZ_EXEC),
+                'x',
+                str(download_path),
+                f'-o{str(extraction_dir)}',
+                '-y'
+            ]
+            process = subprocess.run(command, capture_output=True, text=True, timeout=300, check=False, creationflags=subprocess.CREATE_NO_WINDOW)
+            if process.returncode != 0:
+                error_message = process.stderr or process.stdout
+                self.show_styled_message_box(QMessageBox.Icon.Critical, "Lỗi giải nén", f"Giải nén '{archive_name}' thất bại: {error_message}")
+                return
+            search_base_dir = extraction_dir  # Cập nhật đường dẫn tìm kiếm sau giải nén
+        
+        # Tìm và chạy executable
+        executable_path = self._find_executable(search_base_dir, executable_pattern)  # Copy hàm từ InstallWorker nếu chưa có
+        if not executable_path:
+            self.show_styled_message_box(QMessageBox.Icon.Warning, "Lỗi chạy", f"Không tìm thấy file thực thi '{executable_pattern}'.")
+            return
+        
+        install_params = app_info.get('install_params', '')
+        install_command = [str(executable_path)] + shlex.split(install_params)
+        try:
+            subprocess.Popen(install_command, creationflags=subprocess.CREATE_NO_WINDOW)
+        except Exception as e:
+            self.show_styled_message_box(QMessageBox.Icon.Critical, "Lỗi chạy", f"Lỗi khi chạy '{executable_pattern}': {e}")
     
     def filter_apps(self, text):
         text = text.lower().strip()
