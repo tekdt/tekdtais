@@ -21,7 +21,7 @@ from packaging.version import parse as parse_version
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
                              QListWidget, QListWidgetItem, QLabel, QPushButton, QLineEdit,
                              QFrame, QScrollArea, QGraphicsOpacityEffect, QToolTip,
-                             QMessageBox, QSizePolicy, QTextEdit)
+                             QMessageBox, QSizePolicy, QTextEdit, QGridLayout)
 from PySide6.QtGui import QIcon, QPixmap, QColor, QPalette, QFont, QMovie
 from PySide6.QtCore import (Qt, QSize, QThread, Signal, QObject, QPropertyAnimation,
                           QEasingCurve, QTimer, QRect, QCoreApplication)
@@ -1253,17 +1253,15 @@ class TekDT_AIS(QMainWindow):
 
     def show_startup_status(self, message):
         if not self.startup_label:
-            # Tạo một widget container cho overlay
             self.startup_overlay = QWidget(self)
             self.startup_overlay.setStyleSheet("background-color: rgba(0, 0, 0, 0.7);")
             self.startup_overlay.setAutoFillBackground(True)
             
-            overlay_layout = QVBoxLayout(self.startup_overlay)
-            overlay_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            overlay_layout = QGridLayout(self.startup_overlay)
 
-            # Thêm ảnh GIF
+            # --- KHU VỰC NỘI DUNG ---
             self.loading_movie_label = QLabel()
-            movie = QMovie(resource_path('Images/loading.gif')) # Thay bằng tên GIF của bạn
+            movie = QMovie(resource_path('Images/loading.gif'))
             gif_size = QSize(128, 128)
             self.loading_movie_label.setFixedSize(gif_size)
             movie.setScaledSize(gif_size)
@@ -1271,20 +1269,29 @@ class TekDT_AIS(QMainWindow):
             self.loading_movie_label.setStyleSheet("background-color: transparent;")
             movie.start()
             
-            # Label cho thông điệp
             self.startup_label = QLabel(message)
-            self.startup_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            # self.startup_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.startup_label.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop)
             self.startup_label.setStyleSheet("background-color: transparent; color: white; font-size: 14pt; padding: 10px;")
             self.startup_label.setWordWrap(True)
 
-            overlay_layout.addWidget(self.loading_movie_label)
-            overlay_layout.addWidget(self.startup_label)
-        
-        # Cập nhật kích thước và vị trí của overlay để lấp đầy cửa sổ
+            # --- THAY ĐỔI CÁCH SẮP XẾP ---
+            # Chuyển nội dung xuống hàng 1 và 2 để chừa hàng 0 làm đệm
+            overlay_layout.addWidget(self.loading_movie_label, 1, 0, Qt.AlignmentFlag.AlignCenter) # Hàng 1
+            overlay_layout.addWidget(self.startup_label, 2, 0, Qt.AlignmentFlag.AlignCenter)         # Hàng 2
+
+            # --- THAY ĐỔI CÁCH CO GIÃN ---
+            # Chỉ cho các hàng TRỐNG ở trên và dưới được co giãn
+            # Điều này sẽ dồn nội dung vào giữa theo chiều dọc
+            overlay_layout.setRowStretch(0, 1) # Hàng đệm trên
+            # Hàng 1 (icon) và 2 (text) không co giãn, sẽ có chiều cao tự nhiên
+            overlay_layout.setRowStretch(3, 1) # Hàng đệm dưới
+            
+            # Giữ nguyên co giãn cho cột để căn giữa theo chiều ngang
+            overlay_layout.setColumnStretch(0, 1)
+
         self.startup_overlay.setGeometry(self.rect())
         self.startup_label.setText(message)
-        self.startup_label.adjustSize()
-        self.startup_label.move(int((self.width() - self.startup_label.width()) / 2), int((self.height() - self.startup_label.height()) / 2))
         self.startup_overlay.show()
         self.startup_overlay.raise_()
 
