@@ -825,12 +825,16 @@ class InstallWorker(QThread):
                 # Xử lý đặc biệt cho file .bat
                 if executable_path.suffix.lower() == '.bat':
                     install_command = ['cmd.exe', '/c'] + install_command
+                    # Loại bỏ CREATE_NO_WINDOW cho .bat
+                    creation_flags = 0
+                else:
+                    creation_flags = subprocess.CREATE_NO_WINDOW
 
                 # Đặt thư mục làm việc là thư mục chứa file thực thi
                 cwd = str(executable_path.parent)
                 
                 try:
-                    install_process = subprocess.Popen(install_command, cwd=cwd, creationflags=subprocess.CREATE_NO_WINDOW)
+                    install_process = subprocess.Popen(install_command, cwd=cwd, creationflags=creation_flags)
                     install_process.wait(timeout=600)
 
                     if install_process.returncode == 0:
@@ -2595,41 +2599,6 @@ class TekDT_AIS(QMainWindow):
             subprocess.Popen(install_command, cwd=cwd, creationflags=creation_flags)
         except Exception as e:
             self.show_styled_message_box(QMessageBox.Icon.Critical, "Lỗi chạy", f"Lỗi khi chạy '{executable_pattern}': {e}")
-
-    # --- Tương tự, sửa trong _process_remaining_tasks của InstallWorker cho trường hợp 'installer' nếu executable là .bat ---
-
-    # Trong _process_remaining_tasks, sau khi tìm executable_path:
-    install_params = app_info.get('install_params', '')
-    install_command = [str(executable_path)] + shlex.split(install_params)
-
-    # Xử lý đặc biệt cho file .bat
-    if executable_path.suffix.lower() == '.bat':
-        install_command = ['cmd.exe', '/c'] + install_command
-        # Loại bỏ CREATE_NO_WINDOW cho .bat
-        creation_flags = 0
-    else:
-        creation_flags = subprocess.CREATE_NO_WINDOW
-
-    # Đặt thư mục làm việc là thư mục chứa file thực thi
-    cwd = str(executable_path.parent)
-
-    try:
-        install_process = subprocess.Popen(install_command, cwd=cwd, creationflags=creation_flags)
-        install_process.wait(timeout=600)
-
-        if install_process.returncode == 0:
-            self.update_widget_status.emit(app_key, "success")
-            self.progress.emit(app_key, "success", f"Đã xử lý {display_name} thành công!")
-            task_successful = True
-        else:
-            self.update_widget_status.emit(app_key, "failed")
-            self.progress.emit(app_key, "failed", f"Cài đặt thất bại (mã lỗi: {install_process.returncode}).")
-    except subprocess.TimeoutExpired:
-        self.update_widget_status.emit(app_key, "failed")
-        self.progress.emit(app_key, "failed", f"Cài đặt quá thời gian cho phép.")
-    except Exception as e:
-        self.update_widget_status.emit(app_key, "failed")
-        self.progress.emit(app_key, "failed", f"Lỗi khi chạy cài đặt: {e}")
     
     def filter_apps(self, text):
         text = text.lower().strip()
