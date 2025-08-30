@@ -431,7 +431,9 @@ class InstallWorker(QThread):
                 if app_info.get('type') == 'office_suite':
                     office_tasks[key] = task
                 else:
-                    download_path = APPS_DIR / key / app_info.get('output_filename', Path(app_info.get('download_url', '')).name)
+                    output_filename_str = app_info.get('output_filename', Path(app_info.get('download_url', '')).name)
+                    archive_name = output_filename_str.split('|', 1)[0] if '|' in output_filename_str else output_filename_str
+                    download_path = APPS_DIR / key / archive_name
                     
                     # Chỉ tải nếu file chưa tồn tại, hoặc nếu hành động là 'update'
                     needs_download = not download_path.exists() or task['action'] == 'update'
@@ -466,9 +468,10 @@ class InstallWorker(QThread):
                     
                     if task_def['action'] == 'update':
                         # Xóa file cũ trước khi tạo lệnh tải mới
-                        file_name = app_info.get('output_filename', Path(app_info['download_url']).name)
-                        if (app_dir / file_name).exists():
-                            (app_dir / file_name).unlink()
+                        output_filename_str = app_info.get('output_filename', Path(app_info['download_url']).name)
+                        archive_name = output_filename_str.split('|', 1)[0] if '|' in output_filename_str else output_filename_str
+                        if (app_dir / archive_name).exists():
+                            (app_dir / archive_name).unlink()
                     
                     command = self._build_aria_command(app_info, app_dir)
                     downloader = AriaDownloader(app_key, command, app_dir)
@@ -601,7 +604,8 @@ class InstallWorker(QThread):
     
     def _build_aria_command(self, app_info, app_dir):
         download_url = app_info['download_url']
-        file_name = app_info.get('output_filename', Path(download_url).name)
+        output_filename_str = app_info.get('output_filename', Path(download_url).name)
+        file_name = output_filename_str.split('|', 1)[0] if '|' in output_filename_str else output_filename_str
         command = [
             str(ARIA2_EXEC), "--dir", str(app_dir), "--out", file_name,
             "--max-connection-per-server=16", "--split=16", "--min-split-size=1M",
@@ -610,6 +614,7 @@ class InstallWorker(QThread):
         ]
         if 'referer' in app_info:
             command.extend(["--header", f"Referer: {app_info['referer']}"])
+        print(command)
         return command
 
     def _on_download_finished(self, app_key, success):
