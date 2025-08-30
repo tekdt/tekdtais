@@ -1605,7 +1605,8 @@ class TekDT_AIS(QMainWindow):
         if not download_url:
             return False
 
-        file_name = app_info.get('output_filename', Path(download_url).name)
+        output_filename_str = app_info.get('output_filename', Path(app_info.get('download_url', '')).name)
+        file_name = output_filename_str.split('|', 1)[0] if '|' in output_filename_str else output_filename_str
         download_path = APPS_DIR / app_key / file_name
         
         # Tạo đường dẫn tới file control của aria2
