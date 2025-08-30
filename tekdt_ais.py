@@ -189,7 +189,6 @@ class ToolManager(QObject):
                 if item.is_file(): item.unlink()
                 elif item.is_dir(): shutil.rmtree(item)
             
-            # Lưu trực tiếp file thực thi (7zr.exe) với tên là 7za.exe
             self.progress_update.emit(f"Đang cài đặt {tool_name}...")
             with open(exec_file, 'wb') as f:
                 f.write(file_content)
@@ -1954,17 +1953,28 @@ class TekDT_AIS(QMainWindow):
             pass # Bỏ qua nếu không có kết nối nào
 
         # Thiết lập lại nút bấm với hành động mới ("Thêm" thay vì "Tải")
-        widget.action_button.setText("Thêm")
-        widget.action_button.setToolTip(f"Thêm {app_info['display_name']} vào danh sách")
-        widget.action_button.setStyleSheet("background-color: #4CAF50; color: white;")
-        widget.action_button.setEnabled(True)
-
-        # Kết nối lại hành động mới cho nút
-        on_complete_action = lambda: self.move_app_to_selection(app_key, app_info)
-        if is_update_available:
-            widget.action_button.clicked.connect(lambda _, k=app_key, i=app_info, w=widget, lv=local_ver_str, rv=remote_ver_str, cb=on_complete_action: self.confirm_update(k, i, w, lv, rv, on_complete=cb))
+        if app_info.get('type') == 'portable':
+            widget.action_button.setText("Chạy")
+            widget.action_button.setToolTip(f"Chạy {app_info['display_name']} trực tiếp")
+            widget.action_button.setStyleSheet("background-color: #3498db; color: white;")
+            # Hành động Chạy: Không thêm vào khung 2, mà chạy trực tiếp
+            on_run_action = lambda: self.run_portable_app(app_key, app_info)
+            if is_update_available:
+                widget.action_button.clicked.connect(lambda _, k=app_key, i=app_info, w=widget, lv=local_ver_str, rv=remote_ver_str, cb=on_run_action: self.confirm_update(k, i, w, lv, rv, on_complete=cb))
+            else:
+                widget.action_button.clicked.connect(on_run_action)
         else:
-            widget.action_button.clicked.connect(on_complete_action)
+            widget.action_button.setText("Thêm")
+            widget.action_button.setToolTip(f"Thêm {app_info['display_name']} vào danh sách")
+            widget.action_button.setStyleSheet("background-color: #4CAF50; color: white;")
+            widget.action_button.setEnabled(True)
+            
+            # Kết nối lại hành động mới cho nút
+            on_complete_action = lambda: self.move_app_to_selection(app_key, app_info)
+            if is_update_available:
+                widget.action_button.clicked.connect(lambda _, k=app_key, i=app_info, w=widget, lv=local_ver_str, rv=remote_ver_str, cb=on_complete_action: self.confirm_update(k, i, w, lv, rv, on_complete=cb))
+            else:
+                widget.action_button.clicked.connect(on_complete_action)
     
     def populate_lists(self):
         if hasattr(self, '_populate_timer'):
