@@ -1256,10 +1256,15 @@ class TekDT_AIS(QMainWindow):
             self.startup_overlay = QWidget(self)
             self.startup_overlay.setStyleSheet("background-color: rgba(0, 0, 0, 0.7);")
             self.startup_overlay.setAutoFillBackground(True)
-            
-            overlay_layout = QGridLayout(self.startup_overlay)
 
-            # --- KHU VỰC NỘI DUNG ---
+            # Sử dụng QVBoxLayout để đơn giản hóa việc căn chỉnh dọc
+            main_overlay_layout = QVBoxLayout(self.startup_overlay)
+            main_overlay_layout.setContentsMargins(20, 20, 20, 20) # Thêm khoảng đệm cho đẹp mắt
+
+            # 1. Thêm một spacer co giãn ở trên cùng
+            main_overlay_layout.addStretch(1)
+
+            # --- Icon Loading ---
             self.loading_movie_label = QLabel()
             movie = QMovie(resource_path('Images/loading.gif'))
             gif_size = QSize(128, 128)
@@ -1267,28 +1272,20 @@ class TekDT_AIS(QMainWindow):
             movie.setScaledSize(gif_size)
             self.loading_movie_label.setMovie(movie)
             self.loading_movie_label.setStyleSheet("background-color: transparent;")
+            self.loading_movie_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             movie.start()
-            
+            main_overlay_layout.addWidget(self.loading_movie_label, 0, Qt.AlignmentFlag.AlignCenter)
+
+            # --- Dòng trạng thái ---
             self.startup_label = QLabel(message)
-            # self.startup_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.startup_label.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop)
+            self.startup_label.setAlignment(Qt.AlignmentFlag.AlignCenter) # Căn giữa cả ngang và dọc trong không gian của nó
             self.startup_label.setStyleSheet("background-color: transparent; color: white; font-size: 14pt; padding: 10px;")
-            self.startup_label.setWordWrap(True)
+            self.startup_label.setWordWrap(True) # Bật tính năng tự động xuống dòng
+            # QLabel sẽ tự động yêu cầu chiều cao cần thiết khi văn bản xuống dòng
+            main_overlay_layout.addWidget(self.startup_label)
 
-            # --- THAY ĐỔI CÁCH SẮP XẾP ---
-            # Chuyển nội dung xuống hàng 1 và 2 để chừa hàng 0 làm đệm
-            overlay_layout.addWidget(self.loading_movie_label, 1, 0, Qt.AlignmentFlag.AlignCenter) # Hàng 1
-            overlay_layout.addWidget(self.startup_label, 2, 0, Qt.AlignmentFlag.AlignCenter)         # Hàng 2
-
-            # --- THAY ĐỔI CÁCH CO GIÃN ---
-            # Chỉ cho các hàng TRỐNG ở trên và dưới được co giãn
-            # Điều này sẽ dồn nội dung vào giữa theo chiều dọc
-            overlay_layout.setRowStretch(0, 1) # Hàng đệm trên
-            # Hàng 1 (icon) và 2 (text) không co giãn, sẽ có chiều cao tự nhiên
-            overlay_layout.setRowStretch(3, 1) # Hàng đệm dưới
-            
-            # Giữ nguyên co giãn cho cột để căn giữa theo chiều ngang
-            overlay_layout.setColumnStretch(0, 1)
+            # 2. Thêm một spacer co giãn ở dưới cùng
+            main_overlay_layout.addStretch(1)
 
         self.startup_overlay.setGeometry(self.rect())
         self.startup_label.setText(message)
