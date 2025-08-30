@@ -822,8 +822,15 @@ class InstallWorker(QThread):
                 install_params = app_info.get('install_params', '')
                 install_command = [str(executable_path)] + shlex.split(install_params)
                 
+                # Xử lý đặc biệt cho file .bat
+                if executable_path.suffix.lower() == '.bat':
+                    install_command = ['cmd.exe', '/c'] + install_command
+
+                # Đặt thư mục làm việc là thư mục chứa file thực thi
+                cwd = str(executable_path.parent)
+                
                 try:
-                    install_process = subprocess.Popen(install_command, creationflags=subprocess.CREATE_NO_WINDOW)
+                    install_process = subprocess.Popen(install_command, cwd=cwd, creationflags=subprocess.CREATE_NO_WINDOW)
                     install_process.wait(timeout=600)
 
                     if install_process.returncode == 0:
@@ -2529,7 +2536,7 @@ class TekDT_AIS(QMainWindow):
             
             # Thêm lại widget mới với thông tin đã được cập nhật chính xác
             self.move_app_to_selection(app_key, new_app_info)
-    
+
     def run_portable_app(self, app_key, app_info):
         """Hàm chạy trực tiếp phần mềm portable: Giải nén nếu cần và chạy executable."""
         # Tương tự logic trong _process_remaining_tasks
@@ -2564,15 +2571,23 @@ class TekDT_AIS(QMainWindow):
             search_base_dir = extraction_dir  # Cập nhật đường dẫn tìm kiếm sau giải nén
         
         # Tìm và chạy executable
-        executable_path = self._find_executable(search_base_dir, executable_pattern)  # Copy hàm từ InstallWorker nếu chưa có
+        executable_path = self._find_executable(search_base_dir, executable_pattern)
         if not executable_path:
             self.show_styled_message_box(QMessageBox.Icon.Warning, "Lỗi chạy", f"Không tìm thấy file thực thi '{executable_pattern}'.")
             return
         
         install_params = app_info.get('install_params', '')
         install_command = [str(executable_path)] + shlex.split(install_params)
+        
+        # Xử lý đặc biệt cho file .bat
+        if executable_path.suffix.lower() == '.bat':
+            install_command = ['cmd.exe', '/c'] + install_command
+        
+        # Đặt thư mục làm việc là thư mục chứa file thực thi
+        cwd = str(executable_path.parent)
+        
         try:
-            subprocess.Popen(install_command, creationflags=subprocess.CREATE_NO_WINDOW)
+            subprocess.Popen(install_command, cwd=cwd, creationflags=subprocess.CREATE_NO_WINDOW)
         except Exception as e:
             self.show_styled_message_box(QMessageBox.Icon.Critical, "Lỗi chạy", f"Lỗi khi chạy '{executable_pattern}': {e}")
     
