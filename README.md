@@ -3,8 +3,8 @@ TekDT AIS là công cụ cài đặt các phần mềm khác hàng loạt một 
 - Tên phần mềm: TekDT AIS
 - Tác giả: TekDT
 - Mô tả: TekDT AIS là công cụ cài đặt các phần mềm khác hàng loạt một cách tự động, hỗ trợ chế độ dòng lệnh.
-- Ngày phát hành: 22-08-2025
-- Phiên bản: 1.0.1
+- Ngày phát hành: 30-08-2025
+- Phiên bản: 1.0.2
 - Email: dinhtrungtek@gmail.com
 - Telegram: @tekdt1152
 - Facebook: @tekdtcom
