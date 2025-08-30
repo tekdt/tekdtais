@@ -2107,7 +2107,7 @@ class TekDT_AIS(QMainWindow):
 
         else: # Chế độ thông thường
             # --- TRƯỜNG HỢP 3: ĐÃ TẢI VỀ (CHẾ ĐỘ THƯỜNG) ---
-            if app_info.get('type') == 'portable':
+            if info.get('type') == 'portable':
                 item_widget.action_button.setText("Chạy")
                 item_widget.action_button.setToolTip(f"Chạy {info['display_name']} trực tiếp")
                 item_widget.action_button.setStyleSheet("background-color: #3498db; color: white;")  # Màu xanh dương để phân biệt
