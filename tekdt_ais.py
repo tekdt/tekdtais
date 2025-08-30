@@ -674,7 +674,7 @@ class InstallWorker(QThread):
 
         # Logic xử lý chính: Dù là 'install' hay 'update', cuối cùng cũng sẽ chạy trình cài đặt
         # nếu đó là loại 'installer'.
-        if app_info.get('type') == 'installer':
+        if app_info.get('type', '').lower() == 'installer':
             output_filename_str = app_info.get('output_filename', Path(app_info['download_url']).name)
             archive_name = output_filename_str.split('|', 1)[0] if '|' in output_filename_str else output_filename_str
             download_path = APPS_DIR / key / archive_name
@@ -707,7 +707,7 @@ class InstallWorker(QThread):
                 self.update_widget_status.emit(app_key, "failed")
                 self.progress.emit(app_key, "failed", f"Lỗi khi chạy cài đặt: {e}")
                 
-        elif app_info.get('type') == 'Portable' or action == 'download':
+        elif app_info.get('type').lower() == 'Portable' or action == 'download':
             # Đối với portable hoặc chỉ download, tải xong là thành công
             self.update_widget_status.emit(app_key, "success")
             self.progress.emit(app_key, "success", f"Đã xử lý {display_name} thành công!")
@@ -732,7 +732,7 @@ class InstallWorker(QThread):
             # --- Tải Icon (luôn thực hiện) ---
             self._download_icon_if_needed(app_key, app_info)
 
-            if app_info.get('type') == 'office_suite' and action in ["install", "update"]:
+            if app_info.get('type', '').lower() == 'office_suite' and action in ["install", "update"]:
                 # --- LOGIC CÀI ĐẶT OFFICE ---
                 self.update_widget_status.emit(app_key, "installing")
                 self.progress.emit(app_key, "installing", f"Đang cài đặt {display_name}...")
@@ -768,13 +768,13 @@ class InstallWorker(QThread):
                      self.update_widget_status.emit(app_key, "failed")
             
             # --- Xử lý Cài đặt/Tải về ---
-            if action == "download" or app_info.get('type') == 'Portable':
+            if action == "download" or app_info.get('type', '').lower() == 'portable':
                 # Với 'download' hoặc portable, chỉ cần tải xong là thành công
                 self.update_widget_status.emit(app_key, "success")
                 self.progress.emit(app_key, "success", f"Đã xử lý {display_name} thành công!")
                 task_successful = True
 
-            elif (action == "install" or action == "update") and app_info.get('type') == 'installer':
+            elif (action == "install" or action == "update") and app_info.get('type', '').lower() == 'installer':
                 output_filename_str = app_info.get('output_filename', Path(app_info.get('download_url', '')).name)
                 
                 # 1. Phân tích output_filename để lấy file nén và file thực thi
@@ -1978,11 +1978,10 @@ class TekDT_AIS(QMainWindow):
             pass # Bỏ qua nếu không có kết nối nào
 
         # Thiết lập lại nút bấm với hành động mới ("Thêm" thay vì "Tải")
-        if app_info.get('type') == 'portable':
+        if app_info.get('type', '').lower() == 'portable':
             widget.action_button.setText("Chạy")
             widget.action_button.setToolTip(f"Chạy {app_info['display_name']} trực tiếp")
             widget.action_button.setStyleSheet("background-color: #3498db; color: white;")
-            # Hành động Chạy: Không thêm vào khung 2, mà chạy trực tiếp
             on_run_action = lambda: self.run_portable_app(app_key, app_info)
             if is_update_available:
                 widget.action_button.clicked.connect(lambda _, k=app_key, i=app_info, w=widget, lv=local_ver_str, rv=remote_ver_str, cb=on_run_action: self.confirm_update(k, i, w, lv, rv, on_complete=cb))
@@ -1992,9 +1991,7 @@ class TekDT_AIS(QMainWindow):
             widget.action_button.setText("Thêm")
             widget.action_button.setToolTip(f"Thêm {app_info['display_name']} vào danh sách")
             widget.action_button.setStyleSheet("background-color: #4CAF50; color: white;")
-            widget.action_button.setEnabled(True)
             
-            # Kết nối lại hành động mới cho nút
             on_complete_action = lambda: self.move_app_to_selection(app_key, app_info)
             if is_update_available:
                 widget.action_button.clicked.connect(lambda _, k=app_key, i=app_info, w=widget, lv=local_ver_str, rv=remote_ver_str, cb=on_complete_action: self.confirm_update(k, i, w, lv, rv, on_complete=cb))
@@ -2140,16 +2137,13 @@ class TekDT_AIS(QMainWindow):
             
             item_widget.auto_install_toggled.connect(self.on_auto_install_toggled)
 
-        else: # Chế độ thông thường
-            # --- TRƯỜNG HỢP 3: ĐÃ TẢI VỀ (CHẾ ĐỘ THƯỜNG) ---
-            if info.get('type') == 'Portable':
+        else:  # Chế độ thông thường
+            if info.get('type', '').lower() == 'portable':
                 item_widget.action_button.setText("Chạy")
                 item_widget.action_button.setToolTip(f"Chạy {info['display_name']} trực tiếp")
-                item_widget.action_button.setStyleSheet("background-color: #3498db; color: white;")  # Màu xanh dương để phân biệt
-                # Hành động Chạy: Không thêm vào khung 2, mà xử lý giải nén và chạy trực tiếp
+                item_widget.action_button.setStyleSheet("background-color: #3498db; color: white;")
                 on_run_action = lambda: self.run_portable_app(key, info)
                 if is_update_available:
-                    # Nếu có cập nhật -> gọi confirm_update với hành động sau cùng là chạy
                     item_widget.action_button.clicked.connect(lambda _, k=key, i=info, w=item_widget, lv=local_ver_str, rv=remote_ver_str, cb=on_run_action: self.confirm_update(k, i, w, lv, rv, on_complete=cb))
                 else:
                     item_widget.action_button.clicked.connect(on_run_action)
@@ -2158,12 +2152,8 @@ class TekDT_AIS(QMainWindow):
                 item_widget.action_button.setToolTip(f"Thêm {info['display_name']} vào danh sách")
                 item_widget.action_button.setStyleSheet("background-color: #4CAF50; color: white;")
                 
-                # Hành động Thêm:
-                # 1. Kiểm tra cập nhật (nếu có)
-                # 2. Sau đó chuyển sang khung phải
                 on_complete_action = lambda: self.move_app_to_selection(key, info)
                 if is_update_available:
-                    # Nếu có cập nhật -> gọi confirm_update với hành động sau cùng là chuyển khung
                     item_widget.action_button.clicked.connect(lambda _, k=key, i=info, w=item_widget, lv=local_ver_str, rv=remote_ver_str, cb=on_complete_action: self.confirm_update(k, i, w, lv, rv, on_complete=cb))
                 else:
                     item_widget.action_button.clicked.connect(on_complete_action)
@@ -2388,15 +2378,25 @@ class TekDT_AIS(QMainWindow):
             latest_info = self.local_apps.get(key, self.remote_apps.get('app_items', {}).get(key, {}))
             widget.app_info.update(latest_info)
             # Khôi phục nút "Thêm" xanh và reconnect
-            widget.action_button.setText("Thêm")
-            widget.action_button.setStyleSheet("background-color: #4CAF50; color: white;")
-            widget.action_button.setEnabled(True)
-            try:
-                widget.action_button.clicked.disconnect()
-            except TypeError:
-                pass
-            on_complete = lambda: self.move_app_to_selection(key, latest_info)
-            widget.action_button.clicked.connect(on_complete)
+            if current_info.get('type', '').lower() == 'portable':
+                widget.action_button.setText("Chạy")
+                widget.action_button.setToolTip(f"Chạy {current_info['display_name']} trực tiếp")
+                widget.action_button.setStyleSheet("background-color: #3498db; color: white;")
+                on_run_action = lambda: self.run_portable_app(key, current_info)
+                if is_update_available:
+                    widget.action_button.clicked.connect(lambda _, k=key, i=current_info, w=widget, lv=local_ver_str, rv=remote_ver_str, cb=on_run_action: self.confirm_update(k, i, w, lv, rv, on_complete=cb))
+                else:
+                    widget.action_button.clicked.connect(on_run_action)
+            else:
+                widget.action_button.setText("Thêm")
+                widget.action_button.setToolTip(f"Thêm {current_info['display_name']} vào danh sách")
+                widget.action_button.setStyleSheet("background-color: #4CAF50; color: white;")
+                
+                on_complete_action = lambda: self.move_app_to_selection(key, current_info)
+                if is_update_available:
+                    widget.action_button.clicked.connect(lambda _, k=key, i=current_info, w=widget, lv=local_ver_str, rv=remote_ver_str, cb=on_complete_action: self.confirm_update(k, i, w, lv, rv, on_complete=cb))
+                else:
+                    widget.action_button.clicked.connect(on_complete_action)
         self.update_available_item_state(key, is_selected=False)
         self._update_office_selection_state()
         
