@@ -651,7 +651,9 @@ class InstallWorker(QThread):
         # Logic xử lý chính: Dù là 'install' hay 'update', cuối cùng cũng sẽ chạy trình cài đặt
         # nếu đó là loại 'installer'.
         if app_info.get('type') == 'installer':
-            download_path = APPS_DIR / app_key / app_info.get('output_filename', Path(app_info['download_url']).name)
+            output_filename_str = app_info.get('output_filename', Path(app_info['download_url']).name)
+            archive_name = output_filename_str.split('|', 1)[0] if '|' in output_filename_str else output_filename_str
+            download_path = APPS_DIR / key / archive_name
             if not download_path.exists():
                 self.update_widget_status.emit(app_key, "failed")
                 self.progress.emit(app_key, "failed", f"Lỗi: Không tìm thấy file đã tải của {display_name}.")
