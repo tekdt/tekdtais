@@ -1952,22 +1952,21 @@ class TekDT_AIS(QMainWindow):
     def update_single_app_widget(self, app_key):
         """
         Tìm và cập nhật trạng thái của chỉ một AppItemWidget mà không vẽ lại toàn bộ danh sách.
-        *** PHIÊN BẢN HOÀN CHỈNH: Sửa lỗi cho cả nút "Thêm" và "Xoá" trong embed-mode ***
         """
         widget = self.find_widget_by_key(app_key)
         if not widget:
             print(f"Không tìm thấy widget cho {app_key} để cập nhật.")
             return
 
-        # Tải thông tin mới nhất của phần mềm
+        # Tải thông tin mới nhất của phần mềm từ remote và local
         app_info = self.remote_apps.get('app_items', {}).get(app_key, {})
         local_info = self.local_apps.get(app_key, {})
-        app_info.update(local_info)
+        app_info.update(local_info) # Ghi đè thông tin từ local vào để có trạng thái mới nhất
         widget.app_info = app_info
 
-        # Kiểm tra phiên bản và cập nhật
+        # Kiểm tra phiên bản và cập nhật giao diện
         is_downloaded = self.is_app_downloaded(app_key, app_info)
-        local_ver_str = self.local_apps.get(app_key, {}).get('version', '0')
+        local_ver_str = local_info.get('version', '0')
         remote_ver_str = self.remote_apps.get('app_items', {}).get(app_key, {}).get('version', '0')
         is_update_available = is_downloaded and parse_version(remote_ver_str) > parse_version(local_ver_str)
 
@@ -1977,49 +1976,45 @@ class TekDT_AIS(QMainWindow):
             widget.version_label.setText(f"Cập nhật: {local_ver_str} -> {remote_ver_str}")
             widget.version_label.setStyleSheet("color: #2ecc71; font-weight: bold;")
 
-        # Luôn ngắt kết nối cũ trước khi kết nối hành động mới
+        # Luôn ngắt kết nối cũ trước khi kết nối hành động mới để tránh lỗi gọi nhiều lần
         try:
             widget.action_button.clicked.disconnect()
         except (TypeError, RuntimeError):
             pass
 
         if self.embed_mode:
-            # Lấy trạng thái auto_install hiện tại từ config
             is_auto = self.local_apps.get(app_key, {}).get('auto_install', False)
 
             if is_auto:
-                # TRƯỜNG HỢP 1: Phần mềm đã được chọn -> Nút là "Xoá"
-                # Hành động khi nhấn nút là tắt auto_install và đổi nút lại thành "Thêm"
-                on_remove_action = lambda: (
-                    widget.auto_install_toggled.emit(app_key, False),
-                    widget.set_auto_install_button_state(False)
-                )
-                widget.action_button.clicked.connect(on_remove_action)
+                # TRƯỜNG HỢP 1: Phần mềm ĐÃ được chọn -> Nút phải là "Xoá".
+                widget.set_auto_install_button_state(True) # Đặt giao diện nút là "Xoá" (màu đỏ)
+                # Hành động khi nhấn là tắt auto_install.
+                # Hàm on_auto_install_toggled sau đó sẽ tự gọi lại chính hàm này để cập nhật nút thành "Thêm".
+                widget.action_button.clicked.connect(lambda: self.on_auto_install_toggled(app_key, False))
             else:
-                # TRƯỜNG HỢP 2: Phần mềm chưa được chọn -> Nút là "Thêm"
-                # Hành động khi nhấn nút là bật auto_install và đổi nút lại thành "Xoá"
-                on_add_action = lambda: (
-                    widget.auto_install_toggled.emit(app_key, True),
-                    widget.set_auto_install_button_state(True)
-                )
+                # TRƯỜNG HỢP 2: Phần mềm CHƯA được chọn -> Nút phải là "Thêm".
+                widget.set_auto_install_button_state(False) # Đặt giao diện nút là "Thêm" (màu xanh)
                 
-                # Kiểm tra cập nhật trước khi cho phép "Thêm"
+                # Hành động khi nhấn là bật auto_install.
+                on_add_action = lambda: self.on_auto_install_toggled(app_key, True)
+                
+                # Kiểm tra xem có cần hỏi xác nhận cập nhật trước khi thêm không
                 if is_update_available:
-                    widget.action_button.clicked.connect(lambda _, k=app_key, i=app_info, w=widget, lv=local_ver_str, rv=remote_ver_str, cb=on_add_action: self.confirm_update(k, i, w, lv, rv, on_complete=cb))
+                    widget.action_button.clicked.connect(
+                        lambda _, k=app_key, i=app_info, w=widget, lv=local_ver_str, rv=remote_ver_str, cb=on_add_action: 
+                        self.confirm_update(k, i, w, lv, rv, on_complete=cb)
+                    )
                 else:
                     widget.action_button.clicked.connect(on_add_action)
-            
-            # Cuối cùng, đặt lại trạng thái hiển thị của nút (màu sắc, văn bản) cho đúng
-            widget.set_auto_install_button_state(is_auto)
-
-        else: # Chế độ thông thường (logic không đổi)
+        
+        else: 
             if app_info.get('type', '').lower() == 'portable':
                 widget.action_button.setText("Chạy")
                 widget.action_button.setToolTip(f"Chạy {app_info['display_name']} trực tiếp")
                 widget.action_button.setStyleSheet("background-color: #3498db; color: white;")
                 on_run_action = lambda: self.run_portable_app(app_key, app_info)
                 if is_update_available:
-                    widget.action_button.clicked.connect(lambda _, k=key, i=app_info, w=widget, lv=local_ver_str, rv=remote_ver_str, cb=on_run_action: self.confirm_update(k, i, w, lv, rv, on_complete=cb))
+                    widget.action_button.clicked.connect(lambda _, k=app_key, i=app_info, w=widget, lv=local_ver_str, rv=remote_ver_str, cb=on_run_action: self.confirm_update(k, i, w, lv, rv, on_complete=cb))
                 else:
                     widget.action_button.clicked.connect(on_run_action)
             else:
@@ -2029,7 +2024,7 @@ class TekDT_AIS(QMainWindow):
                 
                 on_complete_action = lambda: self.move_app_to_selection(app_key, app_info)
                 if is_update_available:
-                    widget.action_button.clicked.connect(lambda _, k=key, i=app_info, w=widget, lv=local_ver_str, rv=remote_ver_str, cb=on_complete_action: self.confirm_update(k, i, w, lv, rv, on_complete=cb))
+                    widget.action_button.clicked.connect(lambda _, k=app_key, i=app_info, w=widget, lv=local_ver_str, rv=remote_ver_str, cb=on_complete_action: self.confirm_update(k, i, w, lv, rv, on_complete=cb))
                 else:
                     widget.action_button.clicked.connect(on_complete_action)
     
@@ -2205,11 +2200,22 @@ class TekDT_AIS(QMainWindow):
             self.update_available_item_state(key, is_selected=True)
 
     def on_auto_install_toggled(self, key, state):
-        self.config['app_items'].setdefault(key, {})
+        """
+        Xử lý khi trạng thái auto_install của một phần mềm được thay đổi trong embed_mode.
+        Hàm này cập nhật config và sau đó gọi cập nhật lại chỉ widget liên quan.
+        """
+        # Đảm bảo các key cần thiết tồn tại trong cấu hình
+        self.config.setdefault('app_items', {}).setdefault(key, {})
+        
+        # Cập nhật trạng thái mới
         self.config['app_items'][key]['auto_install'] = state
         self.save_config()
+        
+        # Ở chế độ embed, thay vì vẽ lại toàn bộ danh sách,
+        # chúng ta chỉ cần cập nhật lại widget vừa được thay đổi.
+        # Điều này hiệu quả hơn và giải quyết được gốc rễ của lỗi.
         if self.embed_mode:
-            self.populate_lists()
+            self.update_single_app_widget(key)
 
     def find_widget_by_key(self, app_key):
         """Tìm widget trong available_list_widget hoặc selected_list_widget theo app_key."""
