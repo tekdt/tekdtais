@@ -1,4 +1,3 @@
-# tekdt_ais.py
 import sys
 import os
 import json
@@ -28,7 +27,7 @@ from PySide6.QtCore import (Qt, QSize, QThread, Signal, QObject, QPropertyAnimat
 
 # --- CÁC HẰNG SỐ VÀ CẤU HÌNH ---
 APP_NAME = "TekDT AIS"
-APP_VERSION = "1.0.2"
+APP_VERSION = "1.0.3"
 GITHUB_REPO_URL = "https://github.com/tekdt/tekdtais"
 REMOTE_APP_LIST_URL = "https://raw.githubusercontent.com/tekdt/tekdtais/refs/heads/main/app_list.json"
     
@@ -1951,63 +1950,88 @@ class TekDT_AIS(QMainWindow):
                 self.selected_for_install = []
         
     def update_single_app_widget(self, app_key):
-        """Tìm và cập nhật trạng thái của chỉ một AppItemWidget mà không vẽ lại toàn bộ danh sách."""
+        """
+        Tìm và cập nhật trạng thái của chỉ một AppItemWidget mà không vẽ lại toàn bộ danh sách.
+        *** PHIÊN BẢN HOÀN CHỈNH: Sửa lỗi cho cả nút "Thêm" và "Xoá" trong embed-mode ***
+        """
         widget = self.find_widget_by_key(app_key)
         if not widget:
             print(f"Không tìm thấy widget cho {app_key} để cập nhật.")
             return
 
-        # Tải thông tin mới nhất của phần mềm (đã được worker cập nhật trong config)
+        # Tải thông tin mới nhất của phần mềm
         app_info = self.remote_apps.get('app_items', {}).get(app_key, {})
         local_info = self.local_apps.get(app_key, {})
         app_info.update(local_info)
-        if 'icon_file' not in app_info or not isinstance(app_info['icon_file'], str):
-            icon_url = app_info.get('icon_url', '')
-            app_info['icon_file'] = Path(icon_url).name if icon_url else 'default_icon.png'
-        if not isinstance(app_info.get('icon_url'), str):
-            print(f"Debug: Sửa icon_url sau update cho {app_key}: {type(app_info.get('icon_url'))}")
-            app_info['icon_url'] = ''
-        widget.app_info = app_info # Cập nhật thông tin trong widget
+        widget.app_info = app_info
 
-        # Lấy lại trạng thái mới
-        is_downloaded = self.is_app_downloaded(app_key, app_info) # Bây giờ phải là True
+        # Kiểm tra phiên bản và cập nhật
+        is_downloaded = self.is_app_downloaded(app_key, app_info)
         local_ver_str = self.local_apps.get(app_key, {}).get('version', '0')
         remote_ver_str = self.remote_apps.get('app_items', {}).get(app_key, {}).get('version', '0')
         is_update_available = is_downloaded and parse_version(remote_ver_str) > parse_version(local_ver_str)
 
-        # Cập nhật lại nhãn phiên bản
         widget.version_label.setText(f"Phiên bản: {app_info.get('version', 'N/A')}")
-        widget.version_label.setStyleSheet("color: #bdc3c7; font-size: 10pt;") # Reset về style mặc định
+        widget.version_label.setStyleSheet("color: #bdc3c7; font-size: 10pt;")
         if is_update_available:
             widget.version_label.setText(f"Cập nhật: {local_ver_str} -> {remote_ver_str}")
             widget.version_label.setStyleSheet("color: #2ecc71; font-weight: bold;")
 
-        # Ngắt kết nối cũ của nút để tránh gọi nhiều lần
+        # Luôn ngắt kết nối cũ trước khi kết nối hành động mới
         try:
             widget.action_button.clicked.disconnect()
         except (TypeError, RuntimeError):
-            pass # Bỏ qua nếu không có kết nối nào
+            pass
 
-        # Thiết lập lại nút bấm với hành động mới ("Thêm" thay vì "Tải")
-        if app_info.get('type', '').lower() == 'portable':
-            widget.action_button.setText("Chạy")
-            widget.action_button.setToolTip(f"Chạy {app_info['display_name']} trực tiếp")
-            widget.action_button.setStyleSheet("background-color: #3498db; color: white;")
-            on_run_action = lambda: self.run_portable_app(app_key, app_info)
-            if is_update_available:
-                widget.action_button.clicked.connect(lambda _, k=app_key, i=app_info, w=widget, lv=local_ver_str, rv=remote_ver_str, cb=on_run_action: self.confirm_update(k, i, w, lv, rv, on_complete=cb))
+        if self.embed_mode:
+            # Lấy trạng thái auto_install hiện tại từ config
+            is_auto = self.local_apps.get(app_key, {}).get('auto_install', False)
+
+            if is_auto:
+                # TRƯỜNG HỢP 1: Phần mềm đã được chọn -> Nút là "Xoá"
+                # Hành động khi nhấn nút là tắt auto_install và đổi nút lại thành "Thêm"
+                on_remove_action = lambda: (
+                    widget.auto_install_toggled.emit(app_key, False),
+                    widget.set_auto_install_button_state(False)
+                )
+                widget.action_button.clicked.connect(on_remove_action)
             else:
-                widget.action_button.clicked.connect(on_run_action)
-        else:
-            widget.action_button.setText("Thêm")
-            widget.action_button.setToolTip(f"Thêm {app_info['display_name']} vào danh sách")
-            widget.action_button.setStyleSheet("background-color: #4CAF50; color: white;")
+                # TRƯỜNG HỢP 2: Phần mềm chưa được chọn -> Nút là "Thêm"
+                # Hành động khi nhấn nút là bật auto_install và đổi nút lại thành "Xoá"
+                on_add_action = lambda: (
+                    widget.auto_install_toggled.emit(app_key, True),
+                    widget.set_auto_install_button_state(True)
+                )
+                
+                # Kiểm tra cập nhật trước khi cho phép "Thêm"
+                if is_update_available:
+                    widget.action_button.clicked.connect(lambda _, k=app_key, i=app_info, w=widget, lv=local_ver_str, rv=remote_ver_str, cb=on_add_action: self.confirm_update(k, i, w, lv, rv, on_complete=cb))
+                else:
+                    widget.action_button.clicked.connect(on_add_action)
             
-            on_complete_action = lambda: self.move_app_to_selection(app_key, app_info)
-            if is_update_available:
-                widget.action_button.clicked.connect(lambda _, k=app_key, i=app_info, w=widget, lv=local_ver_str, rv=remote_ver_str, cb=on_complete_action: self.confirm_update(k, i, w, lv, rv, on_complete=cb))
+            # Cuối cùng, đặt lại trạng thái hiển thị của nút (màu sắc, văn bản) cho đúng
+            widget.set_auto_install_button_state(is_auto)
+
+        else: # Chế độ thông thường (logic không đổi)
+            if app_info.get('type', '').lower() == 'portable':
+                widget.action_button.setText("Chạy")
+                widget.action_button.setToolTip(f"Chạy {app_info['display_name']} trực tiếp")
+                widget.action_button.setStyleSheet("background-color: #3498db; color: white;")
+                on_run_action = lambda: self.run_portable_app(app_key, app_info)
+                if is_update_available:
+                    widget.action_button.clicked.connect(lambda _, k=key, i=app_info, w=widget, lv=local_ver_str, rv=remote_ver_str, cb=on_run_action: self.confirm_update(k, i, w, lv, rv, on_complete=cb))
+                else:
+                    widget.action_button.clicked.connect(on_run_action)
             else:
-                widget.action_button.clicked.connect(on_complete_action)
+                widget.action_button.setText("Thêm")
+                widget.action_button.setToolTip(f"Thêm {app_info['display_name']} vào danh sách")
+                widget.action_button.setStyleSheet("background-color: #4CAF50; color: white;")
+                
+                on_complete_action = lambda: self.move_app_to_selection(app_key, app_info)
+                if is_update_available:
+                    widget.action_button.clicked.connect(lambda _, k=key, i=app_info, w=widget, lv=local_ver_str, rv=remote_ver_str, cb=on_complete_action: self.confirm_update(k, i, w, lv, rv, on_complete=cb))
+                else:
+                    widget.action_button.clicked.connect(on_complete_action)
     
     def populate_lists(self):
         if hasattr(self, '_populate_timer'):
@@ -2501,35 +2525,36 @@ class TekDT_AIS(QMainWindow):
     
     def on_worker_finished(self, completed_items):
         """
-        Được gọi khi một worker độc lập hoàn thành.
+        Được gọi khi một worker độc lập (ví dụ: worker chỉ tải 1 app) hoàn thành.
         Hàm này nhận dữ liệu MỚI NHẤT trực tiếp từ worker qua signal,
         cập nhật trạng thái trong bộ nhớ, làm mới giao diện và dọn dẹp worker.
         """
         if not completed_items:
             return
 
-        # Lấy app_key và thông tin MỚI NHẤT, đầy đủ nhất từ worker
+        # Lấy app_key và thông tin MỚI NHẤT, đầy đủ nhất từ worker.
         # completed_items có dạng: { 'app_key': { 'display_name': ..., 'version': ..., 'icon_file': 'correct_icon.png' } }
         app_key = list(completed_items.keys())[0]
         new_app_info = completed_items[app_key]
 
-        # BƯỚC 1: Dọn dẹp worker khỏi danh sách đang hoạt động
+        # BƯỚC 1: Dọn dẹp worker khỏi danh sách đang hoạt động để giải phóng bộ nhớ.
         self.cleanup_worker(app_key)
 
         # BƯỚC 2: Cập nhật trạng thái trong bộ nhớ (self.local_apps) với dữ liệu MỚI NHẤT.
-        # Thao tác này giải quyết Vấn đề 2, đảm bảo 'icon_file' đúng được lưu trữ.
+        # Thao tác này đảm bảo các thông tin như 'icon_file', 'version' được lưu trữ đúng.
         self.local_apps[app_key] = new_app_info
         
-        # Đồng bộ cả vào self.remote_apps để nhất quán trong phiên làm việc hiện tại
+        # Đồng bộ cả vào self.remote_apps để nhất quán trong phiên làm việc hiện tại.
         if self.remote_apps.get('app_items', {}).get(app_key):
             self.remote_apps['app_items'][app_key].update(new_app_info)
 
-        # BƯỚC 3: Cập nhật widget ở khung bên trái (danh sách có sẵn).
-        # Thao tác này đảm bảo nút "Tải" chuyển thành nút "Thêm" với logic đúng.
+        # BƯỚC 3: Gọi hàm cập nhật widget ở khung bên trái (danh sách có sẵn).
+        # Đây là bước quan trọng nhất, nó sẽ gọi đến hàm đã được sửa lỗi bên dưới
+        # để đảm bảo nút "Tải" chuyển thành nút "Thêm" với hành động được kết nối đúng.
         self.update_single_app_widget(app_key)
 
         # BƯỚC 4: Nếu phần mềm này đang nằm trong danh sách "Đã chọn" (trường hợp update),
-        # ta cần làm mới widget của nó ở khung bên phải.
+        # ta cần làm mới widget của nó ở khung bên phải. (Không ảnh hưởng embed-mode)
         if not self.embed_mode and app_key in self.selected_for_install:
             # Tìm và xóa widget cũ
             for i in range(self.selected_list_widget.count() - 1, -1, -1):
