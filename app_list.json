@@ -972,7 +972,6 @@
       "output_filename": "TempCleaner.zip|TempCleaner.exe",
       "install_params": "",
       "icon_url": "https://www.sordum.org/wp-content/uploads/2023/05/temp_cleaner.png"
-    }
   },
     "epm_portable": {
       "display_name": "EaseUS Partition Master",
