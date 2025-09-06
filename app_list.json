@@ -946,6 +946,32 @@
       "output_filename": "FolderPainter.zip|FolderPainter.exe",
       "install_params": "",
       "icon_url": "https://www.sordum.org/wp-content/uploads/2023/05/folder_painter.png"
+    },
+    "bluelife_hosts_editor": {
+      "display_name": "BlueLife Hosts Editor",
+      "version": "1.6",
+      "category": "Công cụ hệ thống",
+      "description": "BlueLife Hosts Editor là trình chỉnh sửa file hosts miễn phí, di động và cho phép bạn dễ dàng thêm, xóa, chặn, cập nhật tên miền vào file hosts của mình.",
+      "type": "Portable",
+      "architecture": "32bit",
+      "compatible_os_arch": "both",
+      "download_url": "https://www.sordum.org/files/download/host-editor/HostsEditor.zip",
+      "output_filename": "HostsEditor.zip|hEdit.exe",
+      "install_params": "",
+      "icon_url": "https://www.sordum.org/wp-content/uploads/2020/08/bluelife_hosts_editor.jpg"
+    },
+    "temp_cleaner": {
+      "display_name": "Temp Cleaner",
+      "version": "1.3",
+      "category": "Công cụ hệ thống",
+      "description": "Phần mềm này có thể dọn dẹp thư mục tạm của bạn một cách dễ dàng (chỉ cần chạy nó). Phần mềm chỉ xóa các tệp không sử dụng trong thư mục %Temp% và %SystemRoot%\\Temp",
+      "type": "Portable",
+      "architecture": "32bit",
+      "compatible_os_arch": "both",
+      "download_url": "https://www.sordum.org/files/download/temp-cleaner/TempCleaner.zip",
+      "output_filename": "TempCleaner.zip|TempCleaner.exe",
+      "install_params": "",
+      "icon_url": "https://www.sordum.org/wp-content/uploads/2023/05/temp_cleaner.png"
     }
   }
 }
