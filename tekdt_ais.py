@@ -1653,10 +1653,14 @@ class TekDT_AIS(QMainWindow):
             self.local_apps[app_key] = item_info
             self.remote_apps.setdefault('app_items', {})[app_key] = item_info
         
-        # THÊM: Reload config từ file để đồng bộ icon/version mới nhất
+        # Reload config từ file để đồng bộ icon/version mới nhất
         self.load_config_and_apps(populate=False)  # Không populate để tránh vẽ lại toàn bộ
         
-        # THAY THẾ populate_lists() bằng cập nhật từng widget
+        if self.is_processing:
+            for app_key in completed_items.keys():
+                self.update_single_app_widget(app_key) # Cập nhật trạng thái ở list trái
+            return # Dừng lại, không chạy code bên dưới
+        
         for app_key in completed_items.keys():
             self.update_single_app_widget(app_key)
             
@@ -1671,7 +1675,8 @@ class TekDT_AIS(QMainWindow):
                 
                 # Add lại với info mới (từ local_apps, đã reload)
                 app_info = self.local_apps.get(app_key, {})
-                self.move_app_to_selection(app_key, app_info)
+                if app_info: # Đảm bảo có thông tin để thêm lại
+                    self.move_app_to_selection(app_key, app_info)
     
     def is_app_downloaded(self, app_key, app_info):
         """
@@ -2770,7 +2775,7 @@ class TekDT_AIS(QMainWindow):
             target_widget.set_status(status)
     
     def on_installation_finished(self):
-        self.is_processing = False
+        # self.is_processing = False
         if self.install_worker and not self.install_worker._is_stopped:
             status_text = "Hoàn tất! Nhấn 'Xong' để tiếp tục."
             if not self.embed_mode:
@@ -2807,7 +2812,7 @@ class TekDT_AIS(QMainWindow):
             for i in range(self.selected_list_widget.count()):
                 item = self.selected_list_widget.item(i)
                 widget = self.selected_list_widget.itemWidget(item)
-                if hasattr(widget, 'action_button'):
+                if widget and hasattr(widget, 'action_button'):
                     widget.set_status("") # Ẩn icon success/failed
                     widget.action_button.show() # Hiện lại nút "Bỏ"
 
