@@ -27,7 +27,7 @@ from PySide6.QtCore import (Qt, QSize, QThread, Signal, QObject, QPropertyAnimat
 
 # --- CÁC HẰNG SỐ VÀ CẤU HÌNH ---
 APP_NAME = "TekDT AIS"
-APP_VERSION = "1.0.3"
+APP_VERSION = "1.0.4"
 GITHUB_REPO_URL = "https://github.com/tekdt/tekdtais"
 REMOTE_APP_LIST_URL = "https://raw.githubusercontent.com/tekdt/tekdtais/refs/heads/main/app_list.json"
     
@@ -495,8 +495,8 @@ class InstallWorker(QThread):
                         archive_name = output_filename_str.split('|', 1)[0] if '|' in output_filename_str else output_filename_str
                         if (app_dir / archive_name).exists():
                             (app_dir / archive_name).unlink()
-                    
-                    command = self._build_aria_command(app_info, app_dir)
+
+                    command = self._build_aria_command(app_key, app_info, app_dir)
                     downloader = AriaDownloader(app_key, command, app_dir)
                     
                     # Kết nối tín hiệu từ downloader con đến tín hiệu của worker chính
@@ -624,20 +624,48 @@ class InstallWorker(QThread):
         except Exception as e:
             self.update_widget_status.emit(app_key, "failed")
             self.progress.emit(app_key, "failed", f"Lỗi tải Office: {e}")
-    
-    def _build_aria_command(self, app_info, app_dir):
+        
+    def _build_aria_command(self, app_key, app_info, app_dir):
         download_url = app_info['download_url']
-        output_filename_str = app_info.get('output_filename', Path(download_url).name)
-        file_name = output_filename_str.split('|', 1)[0] if '|' in output_filename_str else output_filename_str
-        command = [
-            str(ARIA2_EXEC), "--dir", str(app_dir), "--out", file_name,
-            "--max-connection-per-server=16", "--split=16", "--min-split-size=1M",
-            "--show-console-readout=false", "--summary-interval=1",
-            download_url
-        ]
+        
+        # Logic xử lý file .torrent
+        if download_url.lower().endswith('.torrent'):
+            try:
+                self.progress.emit(app_key, "processing", "Đang tải tệp .torrent...")
+                torrent_response = self.session.get(download_url, timeout=30)
+                torrent_response.raise_for_status()
+                
+                local_torrent_path = app_dir / f"{app_key}_source.torrent"
+                with open(local_torrent_path, 'wb') as f:
+                    f.write(torrent_response.content)
+                
+                self.progress.emit(app_key, "processing", "Đang tải nội dung từ torrent...")
+                
+                # Tạo lệnh aria2c cho torrent, không cần --out
+                command = [
+                    str(ARIA2_EXEC), "--dir", str(app_dir),
+                    "--max-connection-per-server=16", "--split=16", "--min-split-size=1M",
+                    "--show-console-readout=false", "--summary-interval=1",
+                    str(local_torrent_path) # Nguồn là file torrent cục bộ
+                ]
+            except requests.RequestException as e:
+                # Nếu không tải được file torrent, báo lỗi và dừng lại
+                raise Exception(f"Không thể tải tệp .torrent từ {download_url}: {e}")
+        else:
+            # Logic cũ cho các link tải trực tiếp
+            output_filename_str = app_info.get('output_filename', Path(download_url).name)
+            file_name = output_filename_str.split('|', 1)[0] if '|' in output_filename_str else output_filename_str
+            command = [
+                str(ARIA2_EXEC), "--dir", str(app_dir), "--out", file_name,
+                "--max-connection-per-server=16", "--split=16", "--min-split-size=1M",
+                "--show-console-readout=false", "--summary-interval=1",
+                download_url
+            ]
+        
         if 'referer' in app_info:
             command.extend(["--header", f"Referer: {app_info['referer']}"])
-        print(command)
+            
+        print("Lệnh Aria2:", " ".join(f'"{c}"' for c in command))
         return command
 
     def _on_download_finished(self, app_key, success):
@@ -903,6 +931,32 @@ class InstallWorker(QThread):
             except (IOError, json.JSONDecodeError) as e:
                 self.error.emit(f"Lỗi nghiêm trọng khi ghi file config: {e}")
 
+    
+    def _download_icon_if_needed(self, app_key, app_info):
+        icon_url = app_info.get('icon_url')
+        if not isinstance(icon_url, str) or not icon_url:
+            return
+        
+        icon_filename = Path(icon_url).name
+        if not isinstance(icon_filename, str):
+            print(f"Lỗi: icon_filename không phải string ({type(icon_filename)}: {icon_filename}). Set default.")
+            icon_filename = 'default_icon.png'
+
+        if not isinstance(app_key, str):
+            print(f"Lỗi: app_key không phải string ({type(app_key)}: {app_key}). Bỏ qua.")
+            return
+        
+        
+        icon_path = APPS_DIR / app_key / icon_filename
+        if not icon_path.exists():
+            try:
+                icon_response = self.session.get(icon_url, timeout=10)
+                icon_response.raise_for_status()
+                with open(icon_path, 'wb') as f: 
+                    f.write(icon_response.content)
+            except requests.RequestException:
+                pass  # Bỏ qua nếu lỗi
+
 # --- WIDGET TÙY CHỈNH CHO MỖI PHẦN MỀM ---
 class AppItemWidget(QWidget):
     add_requested = Signal(str, dict)
@@ -1031,10 +1085,6 @@ class AppItemWidget(QWidget):
             overlay_width = int(self.width() * (self._current_progress / 100.0))
             self.progress_overlay.setGeometry(0, 0, overlay_width, self.height())
         super().resizeEvent(event)
-        
-    def reset_status_ui(self):
-        """Hàm call-back an toàn để reset trạng thái UI."""
-        self.set_status("")
 
     def set_status(self, status):
         # Dừng mọi animation và movie cũ trước khi bắt đầu cái mới
@@ -1051,9 +1101,6 @@ class AppItemWidget(QWidget):
             self.progress_overlay.setGeometry(0, 0, 0, self.height())
             self.status_label.show()
             timer = QTimer(self)
-            timer.setSingleShot(True)
-            timer.timeout.connect(self.reset_status_ui)
-            timer.start(2000)
         elif status == "failed":
             self.status_label.setPixmap(QPixmap(resource_path('Images/failed.png')).scaled(24, 24, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
             self.name_label.setStyleSheet("color: #F44336; font-weight: bold; font-size: 12pt;")
@@ -2088,31 +2135,6 @@ class TekDT_AIS(QMainWindow):
 
         self.update_counts()
         self.restore_scroll_positions()
-
-    def _download_icon_if_needed(self, app_key, app_info):
-        icon_url = app_info.get('icon_url')
-        if not isinstance(icon_url, str) or not icon_url:
-            return
-        
-        icon_filename = Path(icon_url).name
-        if not isinstance(icon_filename, str):
-            print(f"Lỗi: icon_filename không phải string ({type(icon_filename)}: {icon_filename}). Set default.")
-            icon_filename = 'default_icon.png'
-
-        if not isinstance(app_key, str):
-            print(f"Lỗi: app_key không phải string ({type(app_key)}: {app_key}). Bỏ qua.")
-            return
-        
-        
-        icon_path = APPS_DIR / app_key / icon_filename
-        if not icon_path.exists():
-            try:
-                icon_response = self.session.get(icon_url, timeout=10)
-                icon_response.raise_for_status()
-                with open(icon_path, 'wb') as f: 
-                    f.write(icon_response.content)
-            except requests.RequestException:
-                pass  # Bỏ qua nếu lỗi
     
     def add_app_to_list(self, list_widget, key, info):
         item_widget = AppItemWidget(key, info, embed_mode=self.embed_mode)
