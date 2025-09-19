@@ -442,6 +442,9 @@ class InstallWorker(QThread):
         self._is_stopped = True
         for downloader in self.downloaders:
             downloader.stop()
+        # Nếu luồng đang trong vòng lặp sự kiện, hãy thoát nó ra
+        if self.isRunning():
+            self.quit()
 
     def run(self):
         try:
@@ -747,7 +750,7 @@ class InstallWorker(QThread):
             self.finished.emit()
             return
 
-        successful_tasks = {} #CHANGED: Lưu các tác vụ thành công để xử lý config một lần
+        successful_tasks = {} # Lưu các tác vụ thành công để xử lý config một lần
 
         for app_key, task_def in self.tasks_to_process_after_download.items():
             if self._is_stopped: break
@@ -886,6 +889,11 @@ class InstallWorker(QThread):
         # Sau khi vòng lặp kết thúc, ghi tất cả thay đổi vào config MỘT LẦN
         if successful_tasks:
             self._commit_config_changes(successful_tasks)
+
+        # SAU KHI MỌI THỨ ĐÃ CÀI ĐẶT XONG, GỌI self.quit()
+        # để kết thúc vòng lặp sự kiện self.exec() trong hàm run().
+        if self.isRunning():
+            self.quit()
     
     def _commit_config_changes(self, completed_tasks):
         """
