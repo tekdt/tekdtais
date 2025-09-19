@@ -971,10 +971,6 @@ class AppItemWidget(QWidget):
     add_requested = Signal(str, dict)
     remove_requested = Signal(str, dict)
     auto_install_toggled = Signal(str, bool)
-    # Preload images ở __init__ hoặc class level
-    success_pixmap = QPixmap(resource_path('Images/success.png')).scaled(24, 24, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
-    failed_pixmap = QPixmap(resource_path('Images/failed.png')).scaled(24, 24, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
-    loading_movie = QMovie(resource_path('Images/loading.gif'))
     
     def __init__(self, app_key, app_info, embed_mode=False, parent=None):
         super().__init__(parent)
@@ -985,6 +981,11 @@ class AppItemWidget(QWidget):
         self.setMouseTracking(True)
         self.setMinimumHeight(60)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        
+        # Preload images ở __init__ để đảm bảo sau khi QApplication đã khởi tạo
+        self.success_pixmap = QPixmap(resource_path('Images/success.png')).scaled(24, 24, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+        self.failed_pixmap = QPixmap(resource_path('Images/failed.png')).scaled(24, 24, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+        self.loading_movie = QMovie(resource_path('Images/loading.gif'))
         
         # Layout chính
         self.layout = QHBoxLayout(self)
@@ -1129,7 +1130,7 @@ class AppItemWidget(QWidget):
                 self.action_button.setEnabled(False)
                 self.status_label.show()
                 self.progress_overlay.hide() # Ẩn lớp phủ tiến trình cũ
-            elif status == "downloading_office": # <--- LOGIC MỚI CHO HIỆU ỨNG OFFICE
+            elif status == "downloading_office":
                 self.action_button.setEnabled(False)
                 self.status_label.hide() # Ẩn icon loading gif đi
                 self.progress_overlay.show()
