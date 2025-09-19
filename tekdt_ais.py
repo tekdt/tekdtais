@@ -2761,7 +2761,6 @@ class TekDT_AIS(QMainWindow):
         self.install_worker = InstallWorker(apps_to_process)
         self.install_worker.progress.connect(self.update_install_progress)
         self.install_worker.progress_percentage.connect(self.update_download_progress_anywhere)
-        self.install_worker.finished.connect(self.on_installation_finished)
         self.install_worker.error.connect(lambda e: self.show_styled_message_box(QMessageBox.Icon.Critical, "Lỗi Worker", str(e)))
         self.install_worker.update_widget_status.connect(self.update_widget_status)
         self.install_worker.tasks_batch_completed.connect(self.handle_single_task_completion)
@@ -2827,8 +2826,8 @@ class TekDT_AIS(QMainWindow):
     
     def on_installation_finished(self):
         # Chỉ xử lý nếu có một worker đang chạy hoặc đang trong quá trình dừng
-        if not self.install_worker:
-             return
+        if not self.install_worker and not self._is_stopping:
+            return
 
         # Trường hợp 1: Worker hoàn thành tự nhiên (không bị người dùng dừng)
         if not self._is_stopping:
