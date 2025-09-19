@@ -688,7 +688,7 @@
       "icon_url": "https://www.foxit.com/static/company/images/icons/foxit-pdf-reader-logo-500x500.png"
     },
     "Zoom32": {
-      "display_name": "Zoom",
+      "display_name": "Zoom 32bit",
       "version": "6.5.11.13227",
       "category": "Hội họp trực tuyến",
       "description": "Nền tảng Zoom Workplace cung cấp bộ công cụ năng suất được xây dựng để tối ưu hóa và phát triển giai đoạn kết nối tiếp theo của con người.",
@@ -701,7 +701,7 @@
       "icon_url": "https://st2.zoom.us/static/6.3.41408/image/new/topNav/Resources-ZoomClient.png"
     },
     "Zoom64": {
-      "display_name": "Zoom",
+      "display_name": "Zoom 64bit",
       "version": "6.5.11.13227",
       "category": "Hội họp trực tuyến",
       "description": "Nền tảng Zoom Workplace cung cấp bộ công cụ năng suất được xây dựng để tối ưu hóa và phát triển giai đoạn kết nối tiếp theo của con người.",
@@ -985,6 +985,44 @@
       "output_filename": "epm_portable_trial.zip|StartEPM.exe",
       "install_params": "",
       "icon_url": "https://www.easeus.com/images_2019/product/all_icon/partitionmanager.svg"
+    },
+    "XnConvert32": {
+      "display_name": "XnConvert 32bit",
+      "version": "1.105.0",
+      "category": "Tiện ích",
+      "description": "XnConvert là một công cụ chuyển đổi hình ảnh hàng loạt đa nền tảng nhanh chóng, mạnh mẽ và miễn phí. Nó cho phép tự động chỉnh sửa bộ sưu tập ảnh của bạn: Bạn có thể xoay, chuyển đổi và nén hình ảnh, ảnh và hình ảnh của mình một cách dễ dàng và Áp dụng hơn 80 hành động (như thay đổi kích thước, cắt, điều chỉnh màu sắc, bộ lọc, ...). Tất cả các định dạng hình ảnh và đồ họa phổ biến đều được hỗ trợ (JPEG, TIFF, PNG, GIF, WebP, PSD, JPEG2000, JPEG-XL, OpenEXR, máy ảnh RAW, AVIF, HEIC, HEIF, PDF, DNG, CR2). Bạn có thể lưu và sử dụng lại các cài đặt trước của mình để chuyển đổi hình ảnh hàng loạt khác.",
+      "type": "Installer",
+      "architecture": "32bit",
+      "compatible_os_arch": "both",
+      "download_url": "https://www.xnview.com/download.php?file=XnConvert-win.exe",
+      "output_filename": "XnConvert-win.exe",
+      "install_params": "/verysilent",
+      "icon_url": "https://www.xnview.com/img/app-xnconvert-512.webp"
+    },
+    "XnConvert64": {
+      "display_name": "XnConvert 64bit",
+      "version": "1.105.0",
+      "category": "Tiện ích",
+      "description": "XnConvert là một công cụ chuyển đổi hình ảnh hàng loạt đa nền tảng nhanh chóng, mạnh mẽ và miễn phí. Nó cho phép tự động chỉnh sửa bộ sưu tập ảnh của bạn: Bạn có thể xoay, chuyển đổi và nén hình ảnh, ảnh và hình ảnh của mình một cách dễ dàng và Áp dụng hơn 80 hành động (như thay đổi kích thước, cắt, điều chỉnh màu sắc, bộ lọc, ...). Tất cả các định dạng hình ảnh và đồ họa phổ biến đều được hỗ trợ (JPEG, TIFF, PNG, GIF, WebP, PSD, JPEG2000, JPEG-XL, OpenEXR, máy ảnh RAW, AVIF, HEIC, HEIF, PDF, DNG, CR2). Bạn có thể lưu và sử dụng lại các cài đặt trước của mình để chuyển đổi hình ảnh hàng loạt khác.",
+      "type": "Installer",
+      "architecture": "64bit",
+      "compatible_os_arch": "64bit",
+      "download_url": "https://www.xnview.com/download.php?file=XnConvert-win-x64.exe",
+      "output_filename": "XnConvert-win-x64.exe",
+      "install_params": "/verysilent",
+      "icon_url": "https://www.xnview.com/img/app-xnconvert-512.webp"
+    },
+    "OneClickWinRar": {
+      "display_name": "OneClickWinRar",
+      "version": "0.13.1",
+      "category": "Kích hoạt",
+      "description": "OneClickWinRar là một tập hợp các tập lệnh được sắp xếp hợp lý cài đặt và cấp phép WinRAR chỉ với một cú nhấp chuột. Hoàn hảo cho các thiết lập nhanh chóng, nó loại bỏ các bước thủ công, đảm bảo WinRAR sẵn sàng sử dụng ngay lập tức. Lý tưởng cho cả chuyên gia CNTT và người dùng hàng ngày.",
+      "architecture": "32bit",
+      "compatible_os_arch": "both",
+      "download_url": "https://github.com/neuralpain/oneclickwinrar/archive/refs/heads/master.zip",
+      "output_filename": "master.zip|licenserar.cmd",
+      "install_params": "",
+      "icon_url": "https://github.com/neuralpain/oneclickwinrar/raw/main/assets/images/oneclickwinrar-header.jpg"
     }
   }
 }
