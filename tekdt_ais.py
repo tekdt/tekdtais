@@ -2428,47 +2428,68 @@ class TekDT_AIS(QMainWindow):
         self.update_available_item_state(key, is_selected=True)
         self._update_office_selection_state()
 
+    # def remove_app_from_selection(self, key, info):
+        # for i in range(self.selected_list_widget.count() - 1, -1, -1):  # Duyệt ngược để tránh index shift nếu takeItem
+            # item = self.selected_list_widget.item(i)
+            # if item.data(Qt.ItemDataRole.UserRole) == key:
+                # self.selected_list_widget.takeItem(i)
+                # break
+
+        # self.update_available_item_state(key, is_selected=False)
+        
+        # if key in self.selected_for_install:
+            # self.selected_for_install.remove(key)
+        # self.save_config()
+        # self.update_counts()
+        # widget = self.find_widget_by_key(key)
+        # if widget:
+            # # Đồng bộ lại app_info từ local để icon đúng
+            # latest_info = self.local_apps.get(key, self.remote_apps.get('app_items', {}).get(key, {}))
+            # widget.app_info.update(latest_info)
+            # # Khôi phục nút "Thêm" xanh và reconnect
+            # if current_info.get('type', '').lower() == 'portable':
+                # widget.action_button.setText("Chạy")
+                # widget.action_button.setToolTip(f"Chạy {current_info['display_name']} trực tiếp")
+                # widget.action_button.setStyleSheet("background-color: #3498db; color: white;")
+                # on_run_action = lambda: self.run_portable_app(key, current_info)
+                # if is_update_available:
+                    # widget.action_button.clicked.connect(lambda _, k=key, i=current_info, w=widget, lv=local_ver_str, rv=remote_ver_str, cb=on_run_action: self.confirm_update(k, i, w, lv, rv, on_complete=cb))
+                # else:
+                    # widget.action_button.clicked.connect(on_run_action)
+            # else:
+                # widget.action_button.setText("Thêm")
+                # widget.action_button.setToolTip(f"Thêm {current_info['display_name']} vào danh sách")
+                # widget.action_button.setStyleSheet("background-color: #4CAF50; color: white;")
+                
+                # on_complete_action = lambda: self.move_app_to_selection(key, current_info)
+                # if is_update_available:
+                    # widget.action_button.clicked.connect(lambda _, k=key, i=current_info, w=widget, lv=local_ver_str, rv=remote_ver_str, cb=on_complete_action: self.confirm_update(k, i, w, lv, rv, on_complete=cb))
+                # else:
+                    # widget.action_button.clicked.connect(on_complete_action)
+        # self.update_available_item_state(key, is_selected=False)
+        # self._update_office_selection_state()
+        
     def remove_app_from_selection(self, key, info):
-        for i in range(self.selected_list_widget.count() - 1, -1, -1):  # Duyệt ngược để tránh index shift nếu takeItem
+        # Duyệt ngược để xóa item khỏi danh sách widget bên phải
+        for i in range(self.selected_list_widget.count() - 1, -1, -1):
             item = self.selected_list_widget.item(i)
             if item.data(Qt.ItemDataRole.UserRole) == key:
                 self.selected_list_widget.takeItem(i)
                 break
 
-        self.update_available_item_state(key, is_selected=False)
-        
+        # Xóa app key khỏi danh sách logic và lưu lại cấu hình
         if key in self.selected_for_install:
             self.selected_for_install.remove(key)
         self.save_config()
         self.update_counts()
-        widget = self.find_widget_by_key(key)
-        if widget:
-            # Đồng bộ lại app_info từ local để icon đúng
-            latest_info = self.local_apps.get(key, self.remote_apps.get('app_items', {}).get(key, {}))
-            widget.app_info.update(latest_info)
-            # Khôi phục nút "Thêm" xanh và reconnect
-            if current_info.get('type', '').lower() == 'portable':
-                widget.action_button.setText("Chạy")
-                widget.action_button.setToolTip(f"Chạy {current_info['display_name']} trực tiếp")
-                widget.action_button.setStyleSheet("background-color: #3498db; color: white;")
-                on_run_action = lambda: self.run_portable_app(key, current_info)
-                if is_update_available:
-                    widget.action_button.clicked.connect(lambda _, k=key, i=current_info, w=widget, lv=local_ver_str, rv=remote_ver_str, cb=on_run_action: self.confirm_update(k, i, w, lv, rv, on_complete=cb))
-                else:
-                    widget.action_button.clicked.connect(on_run_action)
-            else:
-                widget.action_button.setText("Thêm")
-                widget.action_button.setToolTip(f"Thêm {current_info['display_name']} vào danh sách")
-                widget.action_button.setStyleSheet("background-color: #4CAF50; color: white;")
-                
-                on_complete_action = lambda: self.move_app_to_selection(key, current_info)
-                if is_update_available:
-                    widget.action_button.clicked.connect(lambda _, k=key, i=current_info, w=widget, lv=local_ver_str, rv=remote_ver_str, cb=on_complete_action: self.confirm_update(k, i, w, lv, rv, on_complete=cb))
-                else:
-                    widget.action_button.clicked.connect(on_complete_action)
+
+        # Gọi hàm helper để khôi phục trạng thái của widget tương ứng ở danh sách bên trái
+        # Hàm này sẽ tự động xử lý việc đổi nút thành "Thêm", "Chạy", hoặc "Tải" và kết nối lại sự kiện
         self.update_available_item_state(key, is_selected=False)
-        self._update_office_selection_state()
         
+        # Cập nhật lại trạng thái của các lựa chọn Office (quan trọng)
+        self._update_office_selection_state()
+    
     def find_widget_by_key(self, app_key, list_widget=None):
         """Tìm widget trong list_widget cụ thể theo app_key"""
         if list_widget is None:
