@@ -994,7 +994,7 @@
       "type": "Installer",
       "architecture": "32bit",
       "compatible_os_arch": "both",
-      "download_url": "https://www.xnview.com/download.php?file=XnConvert-win.exe",
+      "download_url": "https://download.xnview.com/XnConvert-win.exe",
       "output_filename": "XnConvert-win.exe",
       "install_params": "/verysilent",
       "icon_url": "https://www.xnview.com/img/app-xnconvert-512.webp"
@@ -1007,7 +1007,7 @@
       "type": "Installer",
       "architecture": "64bit",
       "compatible_os_arch": "64bit",
-      "download_url": "https://www.xnview.com/download.php?file=XnConvert-win-x64.exe",
+      "download_url": "https://download.xnview.com/XnConvert-win-x64.exe",
       "output_filename": "XnConvert-win-x64.exe",
       "install_params": "/verysilent",
       "icon_url": "https://www.xnview.com/img/app-xnconvert-512.webp"
@@ -1034,7 +1034,7 @@
       "architecture": "32bit",
       "compatible_os_arch": "both",
       "download_url": "https://dl.driverpack.io/DriverPack-LAN.torrent",
-      "output_filename": "DriverPack_Network.zip|DriverPack.exe",
+      "output_filename": "DriverPack_17.10.14-25091_Network.exe|DriverPack.exe",
       "install_params": "/S",
       "icon_url": "https://static.driverpack.io/pic/logo-colored.svg"
     },

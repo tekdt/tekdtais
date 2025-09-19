@@ -2650,7 +2650,7 @@ class TekDT_AIS(QMainWindow):
             return
         
         search_base_dir = APPS_DIR / app_key  # Mặc định thư mục app
-        is_archive = any(archive_name.lower().endswith(ext) for ext in ['.zip', '.7z', '.rar', '.tar', '.iso', '.img'])
+        is_archive = any(archive_name.lower().endswith(ext) for ext in ['.exe','.zip', '.7z', '.rar', '.tar', '.iso', '.img'])
         
         extraction_dir = EXTRACTION_BASE_DIR / app_key
         if is_archive:
