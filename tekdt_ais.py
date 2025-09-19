@@ -1117,6 +1117,7 @@ class AppItemWidget(QWidget):
                 self.progress_overlay.hide()
                 self.progress_overlay.setGeometry(0, 0, 0, self.height())
                 self.status_label.show()
+                QTimer.singleShot(3000, self.status_label.hide)
             elif status == "failed":
                 self.status_label.setPixmap(self.failed_pixmap)
                 self.name_label.setStyleSheet("color: #F44336; font-weight: bold; font-size: 12pt;")
@@ -1124,6 +1125,7 @@ class AppItemWidget(QWidget):
                 self._current_progress = 0
                 self.progress_overlay.hide()
                 self.status_label.show()
+                QTimer.singleShot(3000, self.status_label.hide)
             elif status == "processing" or status == "installing":
                 self.status_label.setMovie(self.loading_movie)
                 self.loading_movie.start()
@@ -2846,6 +2848,10 @@ class TekDT_AIS(QMainWindow):
         if not self.install_worker and not self._is_stopping:
             return
 
+        # Clear queue để tránh lặp process lần nữa
+        if hasattr(self, 'batch_install_queue'):
+            self.batch_install_queue = []
+
         # Trường hợp 1: Worker hoàn thành tự nhiên (không bị người dùng dừng)
         if not self._is_stopping:
             self.status_label.setText("Hoàn tất! Nhấn 'Xong' để tiếp tục.")
@@ -2857,7 +2863,10 @@ class TekDT_AIS(QMainWindow):
         else:
             self.reset_ui_after_completion()
 
-        # Dọn dẹp worker
+        # Dọn dẹp worker an toàn
+        if self.install_worker:
+            self.install_worker.quit()
+            self.install_worker.wait(5000)
         self.install_worker = None
         self._is_stopping = False
 
@@ -2922,13 +2931,24 @@ class TekDT_AIS(QMainWindow):
                 return
             else:
                 # Nếu người dùng vẫn muốn thoát, hãy dừng các worker
-                if self.install_worker and self.install_worker.isRunning():
+                # if self.install_worker and self.install_worker.isRunning():
+                if self.install_worker:
                     self.install_worker.stop()
+                    self.install_worker.quit()
+                    self.install_worker.wait(5000)
                 
                 # Dừng các worker tải/cập nhật riêng lẻ
-                for worker in list(self.active_workers.values()):
-                    if worker and worker.isRunning():
+                # for worker in list(self.active_workers.values()):
+                    # if worker and worker.isRunning():
+                        # worker.stop()
+                # Dừng các worker tải/cập nhật riêng lẻ
+                for key in list(self.active_workers.keys()):
+                    worker = self.active_workers.get(key)
+                    if worker and not sip.isdeleted(worker):
                         worker.stop()
+                        worker.quit()
+                        worker.wait(5000)
+                        del self.active_workers[key]
 
         if hasattr(self, 'tool_manager_thread') and self.tool_manager_thread and self.tool_manager_thread.isRunning():
             self.tool_manager_thread.quit()
