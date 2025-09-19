@@ -971,6 +971,11 @@ class AppItemWidget(QWidget):
     add_requested = Signal(str, dict)
     remove_requested = Signal(str, dict)
     auto_install_toggled = Signal(str, bool)
+    # Preload images ở __init__ hoặc class level
+    success_pixmap = QPixmap(resource_path('Images/success.png')).scaled(24, 24, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+    failed_pixmap = QPixmap(resource_path('Images/failed.png')).scaled(24, 24, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+    loading_movie = QMovie(resource_path('Images/loading.gif'))
+    
     def __init__(self, app_key, app_info, embed_mode=False, parent=None):
         super().__init__(parent)
         self.app_key = app_key
@@ -1101,54 +1106,56 @@ class AppItemWidget(QWidget):
         self.status_label.setMovie(None)
         self.status_label.setPixmap(QPixmap())
 
-        if status == "success":
-            self.status_label.setPixmap(QPixmap(resource_path('Images/success.png')).scaled(24, 24, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
-            self.name_label.setStyleSheet("color: #4CAF50; font-weight: bold; font-size: 12pt;")
-            self.action_button.setEnabled(True)
-            self._current_progress = 0
-            self.progress_overlay.hide()
-            self.progress_overlay.setGeometry(0, 0, 0, self.height())
-            self.status_label.show()
-            timer = QTimer(self)
-        elif status == "failed":
-            self.status_label.setPixmap(QPixmap(resource_path('Images/failed.png')).scaled(24, 24, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
-            self.name_label.setStyleSheet("color: #F44336; font-weight: bold; font-size: 12pt;")
-            self.action_button.setEnabled(True)
-            self._current_progress = 0
-            self.progress_overlay.hide()
-            self.status_label.show()
-        elif status == "processing" or status == "installing":
-            movie = QMovie(resource_path('Images/loading.gif'))
-            self.status_label.setMovie(movie)
-            movie.start()
-            self.action_button.setEnabled(False)
-            self.status_label.show()
-            self.progress_overlay.hide() # Ẩn lớp phủ tiến trình cũ
-        elif status == "downloading_office": # <--- LOGIC MỚI CHO HIỆU ỨNG OFFICE
-            self.action_button.setEnabled(False)
-            self.status_label.hide() # Ẩn icon loading gif đi
-            self.progress_overlay.show()
-            self.progress_overlay.raise_()
+        # Sử dụng QTimer để defer update, giảm khựng UI
+        def deferred_update():
+            if status == "success":
+                self.status_label.setPixmap(self.success_pixmap)
+                self.name_label.setStyleSheet("color: #4CAF50; font-weight: bold; font-size: 12pt;")
+                self.action_button.setEnabled(True)
+                self._current_progress = 0
+                self.progress_overlay.hide()
+                self.progress_overlay.setGeometry(0, 0, 0, self.height())
+                self.status_label.show()
+            elif status == "failed":
+                self.status_label.setPixmap(self.failed_pixmap)
+                self.name_label.setStyleSheet("color: #F44336; font-weight: bold; font-size: 12pt;")
+                self.action_button.setEnabled(True)
+                self._current_progress = 0
+                self.progress_overlay.hide()
+                self.status_label.show()
+            elif status == "processing" or status == "installing":
+                self.status_label.setMovie(self.loading_movie)
+                self.loading_movie.start()
+                self.action_button.setEnabled(False)
+                self.status_label.show()
+                self.progress_overlay.hide() # Ẩn lớp phủ tiến trình cũ
+            elif status == "downloading_office": # <--- LOGIC MỚI CHO HIỆU ỨNG OFFICE
+                self.action_button.setEnabled(False)
+                self.status_label.hide() # Ẩn icon loading gif đi
+                self.progress_overlay.show()
+                self.progress_overlay.raise_()
 
-            # Cấu hình animation chạy lặp vô hạn
-            self._progress_animation.setDuration(1500) # Tốc độ chạy của lớp phủ
-            self._progress_animation.setLoopCount(-1) # Lặp lại vô hạn
-            self._progress_animation.setEasingCurve(QEasingCurve.Type.InOutQuad)
-            
-            # Điểm bắt đầu: lớp phủ rộng 30% và ở ngoài bên trái
-            start_rect = QRect(-int(self.width() * 0.3), 0, int(self.width() * 0.3), self.height())
-            # Điểm kết thúc: lớp phủ ở ngoài bên phải
-            end_rect = QRect(self.width(), 0, int(self.width() * 0.3), self.height())
-            
-            self._progress_animation.setStartValue(start_rect)
-            self._progress_animation.setEndValue(end_rect)
-            self._progress_animation.start()
-        else: # Trạng thái chờ (Idle)
-            self.status_label.hide()
-            self.name_label.setStyleSheet("font-weight: bold; font-size: 12pt;")
-            self.action_button.setEnabled(True)
-            self._current_progress = 0
-            self.progress_overlay.hide()
+                # Cấu hình animation chạy lặp vô hạn
+                self._progress_animation.setDuration(1500) # Tốc độ chạy của lớp phủ
+                self._progress_animation.setLoopCount(-1) # Lặp lại vô hạn
+                self._progress_animation.setEasingCurve(QEasingCurve.Type.InOutQuad)
+                
+                # Điểm bắt đầu: lớp phủ rộng 30% và ở ngoài bên trái
+                start_rect = QRect(-int(self.width() * 0.3), 0, int(self.width() * 0.3), self.height())
+                # Điểm kết thúc: lớp phủ ở ngoài bên phải
+                end_rect = QRect(self.width(), 0, int(self.width() * 0.3), self.height())
+                
+                self._progress_animation.setStartValue(start_rect)
+                self._progress_animation.setEndValue(end_rect)
+                self._progress_animation.start()
+            else: # Trạng thái chờ (Idle)
+                self.status_label.hide()
+                self.name_label.setStyleSheet("font-weight: bold; font-size: 12pt;")
+                self.action_button.setEnabled(True)
+                self._current_progress = 0
+                self.progress_overlay.hide()
+
+        QTimer.singleShot(0, deferred_update)
     
     def update_download_progress(self, app_key, percentage):
         if app_key != self.app_key:
@@ -2772,6 +2779,7 @@ class TekDT_AIS(QMainWindow):
         self.install_worker.error.connect(lambda e: self.show_styled_message_box(QMessageBox.Icon.Critical, "Lỗi Worker", str(e)))
         self.install_worker.update_widget_status.connect(self.update_widget_status)
         self.install_worker.tasks_batch_completed.connect(self.handle_single_task_completion)
+        self.install_worker.finished.connect(self.on_installation_finished)
         self.install_worker.start()
         
     def handle_single_task_completion(self, completed_items):
@@ -2862,6 +2870,8 @@ class TekDT_AIS(QMainWindow):
                     widget.action_button.setText("Thêm")
                     widget.action_button.setStyleSheet("background-color: #4CAF50; color: white;")
                     # Reconnect nếu cần
+        # Sử dụng QTimer để batch update UI, giảm khựng khi cập nhật icon
+        QTimer.singleShot(0, self.reset_ui_after_completion)
 
     def reset_ui_after_completion(self):
         self.is_processing = False
