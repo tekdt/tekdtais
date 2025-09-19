@@ -1023,6 +1023,30 @@
       "output_filename": "master.zip|licenserar.cmd",
       "install_params": "",
       "icon_url": "https://github.com/neuralpain/oneclickwinrar/raw/main/assets/images/oneclickwinrar-header.jpg"
+    },
+    "DriverPackOfflineNetwork": {
+      "display_name": "DriverPack Offline Network",
+      "version": "17.10.14",
+      "category": "Trình điều khiển",
+      "description": "Nó chứa trình điều khiển cho phần cứng mạng (Lan/Wi-Fi) và không yêu cầu kết nối Internet để hoạt động",
+      "architecture": "32bit",
+      "compatible_os_arch": "both",
+      "download_url": "https://dl.driverpack.io/DriverPack-LAN.torrent",
+      "output_filename": "DriverPack_Network.zip|DriverPack.exe",
+      "install_params": "/S",
+      "icon_url": "https://static.driverpack.io/pic/logo-colored.svg"
+    },
+    "DriverPackOfflineFull": {
+      "display_name": "DriverPack Offline Full",
+      "version": "17.10.14",
+      "category": "Trình điều khiển",
+      "description": "Nó chứa tất cả các trình điều khiển, hoạt động mà không cần kết nối internet",
+      "architecture": "32bit",
+      "compatible_os_arch": "both",
+      "download_url": "https://dl.driverpack.io/DriverPack-Offline.torrent",
+      "output_filename": "DriverPack_Full.iso|DriverPack.exe",
+      "install_params": "/S",
+      "icon_url": "https://static.driverpack.io/pic/logo-colored.svg"
     }
   }
 }

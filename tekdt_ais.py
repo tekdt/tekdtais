@@ -646,6 +646,7 @@ class InstallWorker(QThread):
                     str(ARIA2_EXEC), "--dir", str(app_dir),
                     "--max-connection-per-server=16", "--split=16", "--min-split-size=1M",
                     "--show-console-readout=false", "--summary-interval=1",
+                    "--seed-time=0",
                     str(local_torrent_path) # Nguồn là file torrent cục bộ
                 ]
             except requests.RequestException as e:
@@ -1960,7 +1961,7 @@ class TekDT_AIS(QMainWindow):
                 if not enabled:
                     # Ẩn nút "Bỏ" đi thay vì chỉ vô hiệu hóa
                     widget.action_button.hide()
-                    widget.set_status("processing")
+                    # widget.set_status("processing")
                 else:
                     # Hiển thị lại nút "Bỏ"
                     widget.action_button.show()
@@ -2683,6 +2684,7 @@ class TekDT_AIS(QMainWindow):
                 item.setHidden(category_name not in visible_categories and len(text) >= min_chars)
 
     def start_installation(self):
+        self._is_stopping = False
         if self.start_button.text() == "Xong":
             self.reset_ui_after_completion()
             return
@@ -2696,7 +2698,15 @@ class TekDT_AIS(QMainWindow):
                 self.start_button.setDisabled(True)
             return
         
+        # Nếu không có gì được chọn, không làm gì cả
+        if not self.selected_for_install:
+            self.show_styled_message_box(QMessageBox.Icon.Information, "Thông báo", "Vui lòng thêm ít nhất một phần mềm để cài đặt.")
+            return
+        
         self.is_processing = True
+        
+        # TẠO DANH SÁCH CHỜ DỰA TRÊN CÁC MỤC ĐÃ CHỌN
+        self.batch_install_queue = list(self.selected_for_install)
         
         # Nếu nút đang ở trạng thái "Xong"
         if self.start_button.text() == "Xong":
@@ -2704,20 +2714,14 @@ class TekDT_AIS(QMainWindow):
             return
 
         apps_to_process = {}
-        for key in self.selected_for_install:
+        for key in self.batch_install_queue: # Duyệt qua danh sách chờ
             if key in self.remote_apps.get('app_items', {}):
                 remote_info = self.remote_apps['app_items'][key]
                 local_info = self.local_apps.get(key, {})
-                # Mặc định là 'install', nhưng nếu có phiên bản mới thì là 'update'
                 action = 'install'
                 if self.is_app_downloaded(key, remote_info) and parse_version(remote_info.get('version', '0')) > parse_version(local_info.get('version', '0')):
                     action = 'update'
                 apps_to_process[key] = {'info': remote_info, 'action': action}
-
-
-        if not apps_to_process:
-            self.show_styled_message_box(QMessageBox.Icon.Information, "Thông báo", "Vui lòng thêm ít nhất một phần mềm để cài đặt.")
-            return
 
         # Vô hiệu hóa giao diện, ngoại trừ nút "Dừng"
         self.search_box.setEnabled(False)
@@ -2739,9 +2743,35 @@ class TekDT_AIS(QMainWindow):
         self.install_worker.finished.connect(self.on_installation_finished)
         self.install_worker.error.connect(lambda e: self.show_styled_message_box(QMessageBox.Icon.Critical, "Lỗi Worker", str(e)))
         self.install_worker.update_widget_status.connect(self.update_widget_status)
-        self.install_worker.tasks_batch_completed.connect(self.on_tasks_batch_completed)
+        self.install_worker.tasks_batch_completed.connect(self.handle_single_task_completion)
         self.install_worker.start()
         
+    def handle_single_task_completion(self, completed_items):
+        """
+        Xử lý khi một hoặc nhiều tác vụ trong một lô hoàn thành.
+        Hàm này sẽ xóa các mục đã hoàn thành khỏi danh sách chờ và kiểm tra xem lô đã xong chưa.
+        """
+        if not completed_items or not self.is_processing:
+            return
+
+        # Lặp qua TẤT CẢ các app_key mà worker đã xử lý xong và gửi về
+        for app_key in completed_items.keys():
+            # Cập nhật dữ liệu local với thông tin mới nhất từ worker
+            self.local_apps[app_key] = completed_items[app_key]
+
+            # Xóa app đã hoàn thành khỏi danh sách chờ
+            if hasattr(self, 'batch_install_queue') and app_key in self.batch_install_queue:
+                self.batch_install_queue.remove(app_key)
+
+        # Sau khi đã xóa tất cả các mục hoàn thành khỏi hàng đợi,
+        # kiểm tra xem hàng đợi có rỗng không.
+        if hasattr(self, 'batch_install_queue') and not self.batch_install_queue:
+            # Nếu rỗng, có nghĩa là TẤT CẢ các tác vụ đã hoàn thành.
+            # Gọi hàm kết thúc chung.
+            # Dùng QTimer để đảm bảo nó được thực thi sau khi các sự kiện hiện tại đã xử lý xong,
+            # giúp giao diện mượt mà hơn.
+            QTimer.singleShot(100, self.on_installation_finished)
+    
     def update_download_progress_selected(self, app_key, percentage):
         for i in range(self.selected_list_widget.count()):
             item = self.selected_list_widget.item(i)
@@ -2775,19 +2805,24 @@ class TekDT_AIS(QMainWindow):
             target_widget.set_status(status)
     
     def on_installation_finished(self):
-        # self.is_processing = False
-        if self.install_worker and not self.install_worker._is_stopped:
-            status_text = "Hoàn tất! Nhấn 'Xong' để tiếp tục."
-            if not self.embed_mode:
-                self.status_label.setText(status_text)
-                self.start_button.setText("Xong") # Đổi text thành "Xong"
-                self.start_button.setEnabled(True)
-                # Đổi màu nút thành màu xanh lá cây để báo hiệu thành công
-                self.start_button.setStyleSheet("background-color: #4CAF50; color: white;") 
-        elif self.install_worker and self.install_worker._is_stopped and not self.is_cli_mode:
+        # Chỉ xử lý nếu có một worker đang chạy hoặc đang trong quá trình dừng
+        if not self.install_worker:
+             return
+
+        # Trường hợp 1: Worker hoàn thành tự nhiên (không bị người dùng dừng)
+        if not self._is_stopping:
+            self.status_label.setText("Hoàn tất! Nhấn 'Xong' để tiếp tục.")
+            self.start_button.setText("Xong")
+            self.start_button.setEnabled(True)
+            self.start_button.setStyleSheet("background-color: #4CAF50; color: white;")
+        
+        # Trường hợp 2: Worker bị người dùng dừng
+        else:
             self.reset_ui_after_completion()
 
+        # Dọn dẹp worker
         self.install_worker = None
+        self._is_stopping = False
 
         # Force populate và reset trong embed_mode
         if self.embed_mode:
