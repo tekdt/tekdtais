@@ -1050,6 +1050,19 @@
       "output_filename": "DriverPack_Full.iso|DriverPack.exe",
       "install_params": "/S",
       "icon_url": "https://static.driverpack.io/pic/logo-colored.svg"
+    },
+    "BulkFileChanger": {
+      "display_name": "Bulk File Changer",
+      "version": "1.73",
+      "category": "Tiện ích",
+      "description": "BulkFileChanger là một tiện ích nhỏ cho phép bạn tạo danh sách tệp từ nhiều thư mục và sau đó thực hiện một số hành động đối với chúng - Sửa đổi thời gian đã tạo / sửa đổi / truy cập của chúng, thay đổi thuộc tính tệp của chúng (Chỉ đọc, Ẩn, Hệ thống), chạy tệp thực thi với các tệp này làm tham số và sao chép/cắt dán vào Explorer.",
+      "type": "Portable",
+      "architecture": "32bit",
+      "compatible_os_arch": "both",
+      "download_url": "https://www.nirsoft.net/utils/bulkfilechanger.zip",
+      "output_filename": "bulkfilechanger.zip|BulkFileChanger.exe",
+      "install_params": "",
+      "icon_url": "https://www.nirsoft.net/utils/bulkfilechanger_icon.gif"
     }
   }
 }

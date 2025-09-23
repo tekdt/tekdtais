@@ -649,7 +649,7 @@ class InstallWorker(QThread):
                     str(ARIA2_EXEC), "--dir", str(app_dir),
                     "--max-connection-per-server=16", "--split=16", "--min-split-size=1M",
                     "--show-console-readout=false", "--summary-interval=1",
-                    "--seed-time=0",
+                    "--seed-time=0",  "--allow-overwrite=true",
                     str(local_torrent_path) # Nguồn là file torrent cục bộ
                 ]
             except requests.RequestException as e:
@@ -662,7 +662,7 @@ class InstallWorker(QThread):
             command = [
                 str(ARIA2_EXEC), "--dir", str(app_dir), "--out", file_name,
                 "--max-connection-per-server=16", "--split=16", "--min-split-size=1M",
-                "--show-console-readout=false", "--summary-interval=1",
+                "--show-console-readout=false", "--summary-interval=1",  "--allow-overwrite=true",
                 download_url
             ]
         
@@ -680,6 +680,7 @@ class InstallWorker(QThread):
             if success:
                 self.update_widget_status.emit(app_key, "success")
                 self.progress.emit(app_key, "success", f"Đã tải {display_name} thành công!")
+                self.tasks_to_process_after_download[app_key] = task_def
                 self._commit_config_changes({app_key: task_def})
             else:
                 status = "stopped" if self._is_stopped else "failed"
@@ -689,9 +690,9 @@ class InstallWorker(QThread):
             self.active_downloads -= 1
             if self.active_downloads == 0:
                 # Xử lý các tác vụ không cần tải (nếu có)
-                self._process_remaining_tasks() 
+                self._process_remaining_tasks()
                 self.quit()
-                self.finished.emit() # Báo hiệu worker đã xong việc
+                # self.finished.emit() # Báo hiệu worker đã xong việc
 
     def _process_single_task(self, app_key, task_def):
         if self._is_stopped: return
@@ -889,7 +890,9 @@ class InstallWorker(QThread):
         # Sau khi vòng lặp kết thúc, ghi tất cả thay đổi vào config MỘT LẦN
         if successful_tasks:
             self._commit_config_changes(successful_tasks)
-
+        
+        self.finished.emit()
+        
         # SAU KHI MỌI THỨ ĐÃ CÀI ĐẶT XONG, GỌI self.quit()
         # để kết thúc vòng lặp sự kiện self.exec() trong hàm run().
         if self.isRunning():
@@ -986,6 +989,7 @@ class AppItemWidget(QWidget):
         self.success_pixmap = QPixmap(resource_path('Images/success.png')).scaled(24, 24, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
         self.failed_pixmap = QPixmap(resource_path('Images/failed.png')).scaled(24, 24, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
         self.loading_movie = QMovie(resource_path('Images/loading.gif'))
+        self.loading_movie.setScaledSize(QSize(24, 24))
         
         # Layout chính
         self.layout = QHBoxLayout(self)
@@ -1026,8 +1030,6 @@ class AppItemWidget(QWidget):
         else:
             self.icon_label.setText("?")
             self.icon_label.setStyleSheet("color: #ecf0f1; background-color: #34495e; border: 1px solid #3498db;")
-
-        # KẾT THÚC THAY THẾ
 
         self.layout.addWidget(self.icon_label)
         
@@ -1101,7 +1103,7 @@ class AppItemWidget(QWidget):
             self.progress_overlay.setGeometry(0, 0, overlay_width, self.height())
         super().resizeEvent(event)
 
-    def set_status(self, status):
+    def set_status(self, status, is_batch_install=False):
         # Dừng mọi animation và movie cũ trước khi bắt đầu cái mới
         self._progress_animation.stop()
         self.status_label.setMovie(None)
@@ -1109,6 +1111,7 @@ class AppItemWidget(QWidget):
 
         # Sử dụng QTimer để defer update, giảm khựng UI
         def deferred_update():
+            nonlocal is_batch_install
             if status == "success":
                 self.status_label.setPixmap(self.success_pixmap)
                 self.name_label.setStyleSheet("color: #4CAF50; font-weight: bold; font-size: 12pt;")
@@ -1117,7 +1120,8 @@ class AppItemWidget(QWidget):
                 self.progress_overlay.hide()
                 self.progress_overlay.setGeometry(0, 0, 0, self.height())
                 self.status_label.show()
-                QTimer.singleShot(3000, self.status_label.hide)
+                if not is_batch_install:
+                    QTimer.singleShot(3000, self.status_label.hide)
             elif status == "failed":
                 self.status_label.setPixmap(self.failed_pixmap)
                 self.name_label.setStyleSheet("color: #F44336; font-weight: bold; font-size: 12pt;")
@@ -1125,7 +1129,8 @@ class AppItemWidget(QWidget):
                 self._current_progress = 0
                 self.progress_overlay.hide()
                 self.status_label.show()
-                QTimer.singleShot(3000, self.status_label.hide)
+                if not is_batch_install:
+                    QTimer.singleShot(3000, self.status_label.hide)
             elif status == "processing" or status == "installing":
                 self.status_label.setMovie(self.loading_movie)
                 self.loading_movie.start()
@@ -1218,7 +1223,9 @@ class AppListLoader(QObject):
         try:
             # Tải danh sách phần mềm từ xa
             self.progress_update.emit("Đang tải danh sách phần mềm từ máy chủ...")
-            response = self.session.get(REMOTE_APP_LIST_URL, timeout=10)
+            cache_bust = int(time.time())  # Thêm timestamp để tránh cache
+            url_with_bust = f"{REMOTE_APP_LIST_URL}?cache_bust={cache_bust}"
+            response = self.session.get(url_with_bust, timeout=10)
             response.raise_for_status()
             remote_apps = response.json()
 
@@ -1286,10 +1293,11 @@ class TekDT_AIS(QMainWindow):
         self.cli_task_results = {}    
         self.cli_target_apps = []        
         self._scroll_positions = {}
-        self.is_cli_mode = False
+        # self.is_cli_mode = False
         self.is_processing = False
         self.central_widget_ref = None
         self.install_worker = None
+        self.cli_summary_shown = False
 
         if self.embed_mode:
             self.setup_embed_ui()
@@ -1813,10 +1821,16 @@ class TekDT_AIS(QMainWindow):
         self.set_ui_interactive(False) # Vô hiệu hóa tương tác
         self.start_button.hide() # Ẩn nút "Bắt đầu" đi là đúng yêu cầu
         
+        self.is_processing = True
         self.install_worker = InstallWorker(worker_tasks)
 
         # --- BƯỚC 4: Xử lý khi Worker hoàn thành ---
         def on_cli_finished():
+            # Nếu đã show rồi thì bỏ qua (tránh hiện nhiều thông báo)
+            if getattr(self, 'cli_summary_shown', False):
+                return
+            self.cli_summary_shown = True
+            
             # Khởi tạo lại một đối tượng report sạch để đếm lại từ đầu
             final_report = {
                 'update': {'success': 0, 'fail': 0},
@@ -1865,13 +1879,48 @@ class TekDT_AIS(QMainWindow):
             QApplication.quit()
         
         # Kết nối các signals từ worker
-        self.install_worker.progress.connect(self.update_and_record_progress, Qt.ConnectionType.QueuedConnection)
-        self.install_worker.progress_percentage.connect(self.update_download_progress_anywhere, Qt.ConnectionType.QueuedConnection)
-        self.install_worker.finished.connect(on_cli_finished, Qt.ConnectionType.QueuedConnection)
-        self.install_worker.error.connect(lambda e: self.show_styled_message_box(QMessageBox.Icon.Critical, "Lỗi Worker", str(e)), Qt.ConnectionType.QueuedConnection)
-        self.install_worker.update_widget_status.connect(self.update_widget_status, Qt.ConnectionType.QueuedConnection)
-        self.install_worker.tasks_batch_completed.connect(self.on_tasks_batch_completed, Qt.ConnectionType.QueuedConnection)
+        # self.install_worker.progress.connect(self.update_and_record_progress, Qt.ConnectionType.QueuedConnection)
+        # self.install_worker.progress_percentage.connect(self.update_download_progress_anywhere, Qt.ConnectionType.QueuedConnection)
+        # self.install_worker.finished.connect(on_cli_finished, Qt.ConnectionType.QueuedConnection)
+        # self.install_worker.error.connect(lambda e: self.show_styled_message_box(QMessageBox.Icon.Critical, "Lỗi Worker", str(e)), Qt.ConnectionType.QueuedConnection)
+        # self.install_worker.update_widget_status.connect(self.update_widget_status, Qt.ConnectionType.QueuedConnection)
+        # self.install_worker.tasks_batch_completed.connect(self.on_tasks_batch_completed, Qt.ConnectionType.QueuedConnection)
+        # self.install_worker.start()
+        
+        try:
+            self.install_worker.progress.disconnect(self.update_and_record_progress)
+        except Exception:
+            pass
+        try:
+            self.install_worker.progress_percentage.disconnect(self.update_download_progress_anywhere)
+        except Exception:
+            pass
+        try:
+            self.install_worker.finished.disconnect(on_cli_finished)
+        except Exception:
+            pass
+        try:
+            self.install_worker.error.disconnect()
+        except Exception:
+            pass
+        try:
+            self.install_worker.update_widget_status.disconnect(self.update_widget_status)
+        except Exception:
+            pass
+        try:
+            self.install_worker.tasks_batch_completed.disconnect(self.on_tasks_batch_completed)
+        except Exception:
+            pass
+        
+        # Kết nối signals từ worker, đảm bảo chỉ connect duy nhất 1 lần
+        self.install_worker.progress.connect(self.update_and_record_progress, Qt.ConnectionType.QueuedConnection | Qt.ConnectionType.UniqueConnection)
+        self.install_worker.progress_percentage.connect(self.update_download_progress_anywhere, Qt.ConnectionType.QueuedConnection | Qt.ConnectionType.UniqueConnection)
+        self.install_worker.finished.connect(on_cli_finished, Qt.ConnectionType.QueuedConnection | Qt.ConnectionType.UniqueConnection)
+        self.install_worker.error.connect(lambda e: self.show_styled_message_box(QMessageBox.Icon.Critical, "Lỗi Worker", str(e)), Qt.ConnectionType.QueuedConnection | Qt.ConnectionType.UniqueConnection)
+        self.install_worker.update_widget_status.connect(self.update_widget_status, Qt.ConnectionType.QueuedConnection | Qt.ConnectionType.UniqueConnection)
+        self.install_worker.tasks_batch_completed.connect(self.on_tasks_batch_completed, Qt.ConnectionType.QueuedConnection | Qt.ConnectionType.UniqueConnection)
         self.install_worker.start()
+
 
     def update_and_record_progress(self, app_key, status, message):
         """Cập nhật giao diện và ghi lại kết quả cuối cùng cho các tác vụ CLI."""
@@ -1929,11 +1978,45 @@ class TekDT_AIS(QMainWindow):
         left_panel = QWidget()
         left_layout = QVBoxLayout(left_panel)
         self.search_box = QLineEdit()
+        # Tạo layout ngang cho thanh tìm kiếm và nút X
+        search_layout = QHBoxLayout()
+        search_layout.setContentsMargins(0, 0, 0, 0)
+        search_layout.setSpacing(2)
+
+        self.search_box = QLineEdit()
         self.search_box.setPlaceholderText("Gõ để tìm kiếm (tối thiểu 2 ký tự)...")
+        
+        # Tạo nút Xoá
+        self.clear_search_button = QPushButton("X")
+        self.clear_search_button.setFixedSize(30, 30)
+        self.clear_search_button.setStyleSheet("""
+            QPushButton { 
+                font-weight: bold; 
+                font-size: 12pt;
+                color: white;
+                background-color: #e74c3c; 
+                border-radius: 15px;
+                border: none;
+            }
+            QPushButton:hover { background-color: #c0392b; }
+        """)
+        self.clear_search_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.clear_search_button.hide() # Mặc định ẩn
+
+        # Thêm vào layout
+        search_layout.addWidget(self.search_box)
+        search_layout.addWidget(self.clear_search_button)
+
+        # Kết nối sự kiện
         self.search_box.textChanged.connect(self.filter_apps)
+        # Thêm kết nối để hiện/ẩn nút X
+        self.search_box.textChanged.connect(lambda text: self.clear_search_button.setVisible(bool(text)))
+        self.clear_search_button.clicked.connect(self.search_box.clear)
+        
+        # Thêm layout tìm kiếm vào layout chính của khung bên trái
+        left_layout.addLayout(search_layout)
         self.available_count_label = QLabel("Tổng số phần mềm: 0")
         self.available_list_widget = QListWidget()
-        left_layout.addWidget(self.search_box)
         left_layout.addWidget(self.available_count_label)
         left_layout.addWidget(self.available_list_widget)
         
@@ -1979,7 +2062,7 @@ class TekDT_AIS(QMainWindow):
                 if not enabled:
                     # Ẩn nút "Bỏ" đi thay vì chỉ vô hiệu hóa
                     widget.action_button.hide()
-                    # widget.set_status("processing")
+                    widget.set_status("processing")
                 else:
                     # Hiển thị lại nút "Bỏ"
                     widget.action_button.show()
@@ -2281,10 +2364,23 @@ class TekDT_AIS(QMainWindow):
         return None
     
     def update_widget_status(self, app_key, status):
-        """Xử lý signal cập nhật trạng thái widget."""
-        widget = self.find_widget_by_key(app_key)
-        if widget and widget.parent():  # Kiểm tra widget còn tồn tại và có parent
-            widget.set_status(status)
+        """
+        Xử lý signal cập nhật trạng thái widget.
+        Hàm này sẽ tìm widget ở đúng khung (phải khi đang cài đặt hàng loạt, trái cho các tác vụ đơn lẻ)
+        và cập nhật trạng thái trực quan của nó (icon loading, success, v.v.).
+        """
+        target_widget = None
+        
+        # Nếu đang trong quá trình cài đặt hàng loạt (từ nút "Bắt đầu" hoặc CLI), chỉ tìm ở khung bên phải.
+        if self.is_processing and not self.embed_mode:
+            target_widget = self.find_widget_by_key(app_key, list_widget=self.selected_list_widget)
+        else:
+            # Ngược lại (tải/cập nhật đơn lẻ từ khung trái), chỉ tìm ở khung bên trái.
+            target_widget = self.find_widget_by_key(app_key, list_widget=self.available_list_widget)
+
+        if target_widget and target_widget.parent():
+            # Truyền tham số is_batch_install=self.is_processing để widget biết có nên tự động ẩn icon hay không.
+            target_widget.set_status(status, is_batch_install=self.is_processing)
 
     def confirm_download(self, key, info, widget):
         reply = self.show_styled_message_box(
@@ -2509,15 +2605,34 @@ class TekDT_AIS(QMainWindow):
         self._update_office_selection_state()
     
     def find_widget_by_key(self, app_key, list_widget=None):
-        """Tìm widget trong list_widget cụ thể theo app_key"""
-        if list_widget is None:
-            list_widget = self.available_list_widget
-        
-        for i in range(list_widget.count()):
-            item = list_widget.item(i)
-            widget = list_widget.itemWidget(item)
-            if hasattr(widget, 'app_key') and widget.app_key == app_key:
+        """
+        Tìm widget trong một list_widget cụ thể theo app_key.
+        Nếu list_widget không được cung cấp, sẽ tìm ở cả hai, ưu tiên danh sách có sẵn (bên trái).
+        """
+        # Trường hợp 1: Tìm trong một danh sách cụ thể được chỉ định
+        if list_widget:
+            for i in range(list_widget.count()):
+                item = list_widget.item(i)
+                widget = list_widget.itemWidget(item)
+                if widget and hasattr(widget, 'app_key') and widget.app_key == app_key:
+                    return widget
+            return None # Không tìm thấy trong danh sách chỉ định
+
+        # Trường hợp 2: Logic cũ (fallback) - tìm ở cả hai nếu không có list_widget cụ thể
+        # Điều này để đảm bảo không làm ảnh hưởng các chức năng khác nếu có
+        for i in range(self.available_list_widget.count()):
+            item = self.available_list_widget.item(i)
+            widget = self.available_list_widget.itemWidget(item)
+            if widget and hasattr(widget, 'app_key') and widget.app_key == app_key:
                 return widget
+        
+        if not self.embed_mode:
+            for i in range(self.selected_list_widget.count()):
+                item = self.selected_list_widget.item(i)
+                widget = self.selected_list_widget.itemWidget(item)
+                if widget and hasattr(widget, 'app_key') and widget.app_key == app_key:
+                    return widget
+        
         return None
     
     def update_available_item_state(self, key, is_selected):
@@ -2810,38 +2925,72 @@ class TekDT_AIS(QMainWindow):
             # Dùng QTimer để đảm bảo nó được thực thi sau khi các sự kiện hiện tại đã xử lý xong,
             # giúp giao diện mượt mà hơn.
             QTimer.singleShot(100, self.on_installation_finished)
-    
-    def update_download_progress_selected(self, app_key, percentage):
-        for i in range(self.selected_list_widget.count()):
-            item = self.selected_list_widget.item(i)
-            widget = self.selected_list_widget.itemWidget(item)
-            if hasattr(widget, 'app_key') and widget.app_key == app_key and widget.parent():
-                widget.update_download_progress(app_key, percentage)
-                break
 
-    def update_install_progress(self, app_key, status, message):
-        target_widget = None
-        if not self.embed_mode and self.selected_list_widget.count() > 0:
-            for i in range(self.selected_list_widget.count()):
-                widget = self.selected_list_widget.itemWidget(self.selected_list_widget.item(i))
-                if hasattr(widget, 'app_key') and widget.app_key == app_key:
-                    target_widget = widget
-                    break
+    # def update_install_progress(self, app_key, status, message):
+        # # Ưu tiên tìm trong danh sách đang cài đặt (khung phải) nếu quá trình đang chạy
+        # target_widget = None
+        # if not self.embed_mode and self.is_processing:
+            # for i in range(self.selected_list_widget.count()):
+                # item = self.selected_list_widget.item(i)
+                # widget = self.selected_list_widget.itemWidget(item)
+                # if hasattr(widget, 'app_key') and widget.app_key == app_key:
+                    # target_widget = widget
+                    # break
+        # else:
+            # for i in range(self.available_list_widget.count()):
+                # item = self.available_list_widget.item(i)
+                # widget = self.available_list_widget.itemWidget(item)
+                # if hasattr(widget, 'app_key') and widget.app_key == app_key:
+                    # target_widget = widget
+                    # break
         
-        if not target_widget:
-            for i in range(self.available_list_widget.count()):
-                widget = self.available_list_widget.itemWidget(self.available_list_widget.item(i))
-                if hasattr(widget, 'app_key') and widget.app_key == app_key:
-                    target_widget = widget
-                    break
+        # if target_widget and target_widget.parent():
+            # display_name = target_widget.app_info.get('display_name', app_key)
+            # status_text = f"{display_name}: {message}"
+            # if hasattr(self, 'status_label') and self.status_label:
+                # self.status_label.setText(status_text)
 
+            # # để widget biết có nên tự động ẩn icon hay không
+            # is_in_selected_list = False
+            # if not self.embed_mode:
+                 # # Kiểm tra xem widget có nằm trong danh sách bên phải không
+                 # for i in range(self.selected_list_widget.count()):
+                    # item = self.selected_list_widget.item(i)
+                    # if self.selected_list_widget.itemWidget(item) is target_widget:
+                        # is_in_selected_list = True
+                        # break
+            
+            # # is_processing và is_in_selected_list đảm bảo chỉ các widget trong
+            # # quá trình cài đặt hàng loạt mới giữ lại icon
+            # target_widget.set_status(status, is_batch_install=self.is_processing and is_in_selected_list)
+    
+    def update_install_progress(self, app_key, status, message):
+        """
+        Cập nhật thanh trạng thái chung và trạng thái của widget liên quan.
+        Hàm này đảm bảo widget ở đúng khung được cập nhật.
+        """
+        target_widget = None
+
+        # Logic tìm kiếm widget mục tiêu, đồng bộ với update_widget_status:
+        # Nếu đang trong quá trình cài đặt hàng loạt (bao gồm cả chế độ CLI), widget phải ở khung bên phải.
+        if self.is_processing and not self.embed_mode:
+            target_widget = self.find_widget_by_key(app_key, list_widget=self.selected_list_widget)
+        # Ngược lại, widget ở khung bên trái.
+        else:
+            target_widget = self.find_widget_by_key(app_key, list_widget=self.available_list_widget)
+
+        # Cập nhật thanh trạng thái chung (dòng text ở dưới cùng)
         if target_widget and target_widget.parent():
             display_name = target_widget.app_info.get('display_name', app_key)
             status_text = f"{display_name}: {message}"
             if hasattr(self, 'status_label') and self.status_label:
                 self.status_label.setText(status_text)
             
-            target_widget.set_status(status)
+            # Cập nhật trạng thái trực quan của chính widget đó
+            target_widget.set_status(status, is_batch_install=self.is_processing)
+        # Nếu không tìm thấy widget (hiếm gặp), vẫn cập nhật thanh trạng thái chung
+        elif hasattr(self, 'status_label') and self.status_label:
+            self.status_label.setText(f"{app_key}: {message}")
     
     def on_installation_finished(self):
         # Chỉ xử lý nếu có một worker đang chạy hoặc đang trong quá trình dừng
@@ -2880,8 +3029,6 @@ class TekDT_AIS(QMainWindow):
                     widget.action_button.setText("Thêm")
                     widget.action_button.setStyleSheet("background-color: #4CAF50; color: white;")
                     # Reconnect nếu cần
-        # Sử dụng QTimer để batch update UI, giảm khựng khi cập nhật icon
-        QTimer.singleShot(0, self.reset_ui_after_completion)
 
     def reset_ui_after_completion(self):
         self.is_processing = False
@@ -2944,10 +3091,14 @@ class TekDT_AIS(QMainWindow):
                 # Dừng các worker tải/cập nhật riêng lẻ
                 for key in list(self.active_workers.keys()):
                     worker = self.active_workers.get(key)
-                    if worker and not sip.isdeleted(worker):
-                        worker.stop()
-                        worker.quit()
-                        worker.wait(5000)
+                    if worker:
+                        try:
+                            if worker.isRunning():
+                                worker.stop()
+                                worker.quit()
+                                worker.wait(5000)
+                        except RuntimeError:
+                            pass  # Worker đã bị xóa hoặc không tồn tại
                         del self.active_workers[key]
 
         if hasattr(self, 'tool_manager_thread') and self.tool_manager_thread and self.tool_manager_thread.isRunning():
@@ -3030,7 +3181,7 @@ if __name__ == '__main__':
     if Path(icon_path_main).exists():
         app.setWindowIcon(QIcon(icon_path_main))
 
-    # --- THAY ĐỔI CHÍNH BẮT ĐẦU TỪ ĐÂY ---
+    # Xác định xem có phải là lệnh CLI hay không
     is_cli_command = any(arg in ['/install', '/update', '/help'] for arg in cli_command_args)
 
     # Truyền các tham số CLI vào class ngay từ đầu
@@ -3065,26 +3216,29 @@ Lưu ý:
     
     # Các lệnh như /auto_install có thể được xử lý ở đây nếu cần, nhưng hiện tại tập trung vào /install và /update
     
-    is_cli_command = any(arg in ['/install', '/update'] for arg in cli_command_args)
-    main_win.is_cli_mode = is_cli_command
+    # is_cli_command = any(arg in ['/install', '/update'] for arg in cli_command_args)
+    # main_win.is_cli_mode = is_cli_command
     
-    if is_cli_command:
-        # Chế độ CLI: Chờ tool check xong rồi mới chạy handle_cli_args.
-        # handle_cli_args sẽ quyết định mọi thứ, bao gồm hiển thị GUI và thoát.
-        main_win.show()
-        def start_cli_handler(success, msg):
-            if success:
-                QTimer.singleShot(100, lambda: main_win.handle_cli_args(cli_command_args))
-            else:
-                # Nếu tool check thất bại, hiển thị lỗi và thoát
-                main_win.show_styled_message_box(QMessageBox.Icon.Critical, "Lỗi khởi tạo", msg)
-                QApplication.quit()
+    # if is_cli_command:
+        # # Chế độ CLI: Chờ tool check xong rồi mới chạy handle_cli_args.
+        # # handle_cli_args sẽ quyết định mọi thứ, bao gồm hiển thị GUI và thoát.
+        # main_win.show()
+        # def start_cli_handler(success, msg):
+            # if success:
+                # QTimer.singleShot(100, lambda: main_win.handle_cli_args(cli_command_args))
+            # else:
+                # # Nếu tool check thất bại, hiển thị lỗi và thoát
+                # main_win.show_styled_message_box(QMessageBox.Icon.Critical, "Lỗi khởi tạo", msg)
+                # QApplication.quit()
         
-        main_win.tool_manager.finished.connect(start_cli_handler)
-    else:
-        # Chế độ GUI bình thường
-        pass
-    if not is_cli_command:
-        main_win.show()
+        # main_win.tool_manager.finished.connect(start_cli_handler)
+    # else:
+        # # Chế độ GUI bình thường
+        # pass
+    # if not is_cli_command:
+        # main_win.show()
     
+    # sys.exit(app.exec())
+    
+    main_win.show()
     sys.exit(app.exec())
