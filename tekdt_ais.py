@@ -1912,15 +1912,15 @@ class TekDT_AIS(QMainWindow):
         except Exception:
             pass
         
-        # Kết nối signals từ worker, đảm bảo chỉ connect duy nhất 1 lần
-        self.install_worker.progress.connect(self.update_and_record_progress, Qt.ConnectionType.QueuedConnection | Qt.ConnectionType.UniqueConnection)
-        self.install_worker.progress_percentage.connect(self.update_download_progress_anywhere, Qt.ConnectionType.QueuedConnection | Qt.ConnectionType.UniqueConnection)
-        self.install_worker.finished.connect(on_cli_finished, Qt.ConnectionType.QueuedConnection | Qt.ConnectionType.UniqueConnection)
-        self.install_worker.error.connect(lambda e: self.show_styled_message_box(QMessageBox.Icon.Critical, "Lỗi Worker", str(e)), Qt.ConnectionType.QueuedConnection | Qt.ConnectionType.UniqueConnection)
-        self.install_worker.update_widget_status.connect(self.update_widget_status, Qt.ConnectionType.QueuedConnection | Qt.ConnectionType.UniqueConnection)
-        self.install_worker.tasks_batch_completed.connect(self.on_tasks_batch_completed, Qt.ConnectionType.QueuedConnection | Qt.ConnectionType.UniqueConnection)
-        self.install_worker.start()
+        # Kết nối signals từ worker, đảm bảo chỉ connect duy nhất 1 lần     
+        self.install_worker.progress.connect(self.update_and_record_progress, Qt.ConnectionType.QueuedConnection)
+        self.install_worker.progress_percentage.connect(self.update_download_progress_anywhere, Qt.ConnectionType.QueuedConnection)
+        self.install_worker.finished.connect(on_cli_finished, Qt.ConnectionType.QueuedConnection)
+        self.install_worker.error.connect(lambda e: self.show_styled_message_box(QMessageBox.Icon.Critical, "Lỗi Worker", str(e)), Qt.ConnectionType.QueuedConnection)
+        self.install_worker.update_widget_status.connect(self.update_widget_status, Qt.ConnectionType.QueuedConnection)
+        self.install_worker.tasks_batch_completed.connect(self.on_tasks_batch_completed, Qt.ConnectionType.QueuedConnection)
 
+        self.install_worker.start()
 
     def update_and_record_progress(self, app_key, status, message):
         """Cập nhật giao diện và ghi lại kết quả cuối cùng cho các tác vụ CLI."""
