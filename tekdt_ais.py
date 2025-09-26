@@ -2872,6 +2872,7 @@ class TekDT_AIS(QMainWindow):
         self.install_worker.tasks_batch_completed.connect(self.handle_single_task_completion)
         self.install_worker.finished.connect(self.on_installation_finished)
         self.install_worker.finished.connect(self.install_worker.deleteLater)
+        self.install_worker.destroyed.connect(self.on_worker_destroyed)
         self.install_worker.start()
         
     def handle_single_task_completion(self, completed_items):
@@ -2986,11 +2987,7 @@ class TekDT_AIS(QMainWindow):
         else:
             self.reset_ui_after_completion()
 
-        # Dọn dẹp worker an toàn
-        # if self.install_worker:
-            # self.install_worker.quit()
-            # self.install_worker.wait(5000)
-        self.install_worker = None
+        # self.install_worker = None
         self._is_stopping = False
 
         # Force populate và reset trong embed_mode
@@ -3088,6 +3085,14 @@ class TekDT_AIS(QMainWindow):
                 print("Nhận tín hiệu tắt, đang thoát...")
                 os._exit(0)
             time.sleep(1)
+            
+    def on_worker_destroyed(self):
+        """
+        Slot này được gọi khi đối tượng worker đã được phá hủy an toàn.
+        Đây là nơi an toàn để xóa bỏ tham chiếu đến nó.
+        """
+        print("Worker has been safely destroyed. Cleaning up reference.")
+        self.install_worker = None
 
 def handle_auto_install_cli(args):
     """Xử lý riêng cho tham số dòng lệnh /auto_install."""

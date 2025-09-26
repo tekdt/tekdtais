@@ -6,3 +6,5 @@ app_config.json
 exe.json
 build.bat
 build
+tekdt_ais.exe
+nuitka-crash-report.xml
