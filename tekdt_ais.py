@@ -3003,6 +3003,10 @@ class TekDT_AIS(QMainWindow):
                     widget.action_button.setStyleSheet("background-color: #4CAF50; color: white;")
                     # Reconnect nếu cần
 
+        shutdown_file = Path("shutdown_signal.txt")
+        if shutdown_file.exists():
+            shutdown_file.unlink()
+
     def reset_ui_after_completion(self):
         self.is_processing = False
         if not self.embed_mode:
