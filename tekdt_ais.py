@@ -590,7 +590,7 @@ class InstallWorker(QThread):
 <Configuration>
   <Add OfficeClientEdition="{app_info['architecture'][1:]}" Channel="{app_info['channel']}">
     <Product ID="{app_info['product_id']}">
-      <Language ID="vi-vn" />
+      <Language ID="en-us" />
     </Product>
   </Add>
   <Property Name="FORCEAPPSHUTDOWN" Value="FALSE" />
@@ -775,7 +775,7 @@ class InstallWorker(QThread):
 <Configuration>
   <Add OfficeClientEdition="{app_info['architecture'][1:]}" Channel="{app_info['channel']}" SourcePath="{app_dir}">
     <Product ID="{app_info['product_id']}">
-      <Language ID="vi-vn" />
+      <Language ID="en-us" />
     </Product>
   </Add>
   <Display Level="None" AcceptEULA="TRUE" />
@@ -791,7 +791,7 @@ class InstallWorker(QThread):
                     install_process = subprocess.Popen(command, creationflags=subprocess.CREATE_NO_WINDOW)
                     install_process.wait(timeout=1800) # Chờ 30 phút
 
-                    if install_process.returncode == 0:
+                    if install_process.returncode in [0, 3010]:
                         self.update_widget_status.emit(app_key, "success")
                         task_successful = True
                     else:
@@ -869,7 +869,7 @@ class InstallWorker(QThread):
                     install_process = subprocess.Popen(install_command, cwd=cwd, creationflags=creation_flags)
                     install_process.wait(timeout=600)
 
-                    if install_process.returncode == 0:
+                    if install_process.returncode in [0, 3010]:
                         self.update_widget_status.emit(app_key, "success")
                         self.progress.emit(app_key, "success", f"Đã xử lý {display_name} thành công!")
                         task_successful = True
@@ -1891,15 +1891,6 @@ class TekDT_AIS(QMainWindow):
             final_message = "\n\n".join(summary_lines) if summary_lines else "Không có tác vụ nào được thực hiện."
             self.show_styled_message_box(QMessageBox.Icon.Information, "Hoàn tất tác vụ dòng lệnh", final_message)
             QApplication.quit()
-        
-        # Kết nối các signals từ worker
-        # self.install_worker.progress.connect(self.update_and_record_progress, Qt.ConnectionType.QueuedConnection)
-        # self.install_worker.progress_percentage.connect(self.update_download_progress_anywhere, Qt.ConnectionType.QueuedConnection)
-        # self.install_worker.finished.connect(on_cli_finished, Qt.ConnectionType.QueuedConnection)
-        # self.install_worker.error.connect(lambda e: self.show_styled_message_box(QMessageBox.Icon.Critical, "Lỗi Worker", str(e)), Qt.ConnectionType.QueuedConnection)
-        # self.install_worker.update_widget_status.connect(self.update_widget_status, Qt.ConnectionType.QueuedConnection)
-        # self.install_worker.tasks_batch_completed.connect(self.on_tasks_batch_completed, Qt.ConnectionType.QueuedConnection)
-        # self.install_worker.start()
         
         try:
             self.install_worker.progress.disconnect(self.update_and_record_progress)
@@ -2996,9 +2987,9 @@ class TekDT_AIS(QMainWindow):
             self.reset_ui_after_completion()
 
         # Dọn dẹp worker an toàn
-        if self.install_worker:
-            self.install_worker.quit()
-            self.install_worker.wait(5000)
+        # if self.install_worker:
+            # self.install_worker.quit()
+            # self.install_worker.wait(5000)
         self.install_worker = None
         self._is_stopping = False
 
