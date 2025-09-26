@@ -2989,6 +2989,13 @@ class TekDT_AIS(QMainWindow):
         else:
             self.reset_ui_after_completion()
 
+        # Đảm bảo worker đã kết thúc trước khi xóa
+        if self.install_worker:
+            self.install_worker.quit()
+            self.install_worker.wait()
+            self.install_worker.deleteLater()
+            self.install_worker = None
+        
         # self.install_worker = None
         self._is_stopping = False
 
