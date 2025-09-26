@@ -1570,7 +1570,21 @@ class TekDT_AIS(QMainWindow):
             "ProfessionalRetail": {"display_name": "Office Professional (Retail)", "channel": "Retail"},
             "Professional2019Retail": {"display_name": "Office Professional 2019", "channel": "Retail"},
             "Personal2019Retail": {"display_name": "Office Personal 2019", "channel": "Retail"},
-
+            
+            # Visio và Project Retail (Click-to-Run)
+            "VisioPro2019Retail": {"display_name": "Visio Professional 2019 (Retail)", "channel": "Retail"},
+            "VisioStd2019Retail": {"display_name": "Visio Standard 2019 (Retail)", "channel": "Retail"},
+            "ProjectPro2019Retail": {"display_name": "Project Professional 2019 (Retail)", "channel": "Retail"},
+            "ProjectStd2019Retail": {"display_name": "Project Standard 2019 (Retail)", "channel": "Retail"},
+            "VisioPro2021Retail": {"display_name": "Visio Professional 2021 (Retail)", "channel": "Retail"},
+            "VisioStd2021Retail": {"display_name": "Visio Standard 2021 (Retail)", "channel": "Retail"},
+            "ProjectPro2021Retail": {"display_name": "Project Professional 2021 (Retail)", "channel": "Retail"},
+            "ProjectStd2021Retail": {"display_name": "Project Standard 2021 (Retail)", "channel": "Retail"},
+            "VisioPro2024Retail": {"display_name": "Visio Professional 2024 (Retail)", "channel": "Retail"},
+            "VisioStd2024Retail": {"display_name": "Visio Standard 2024 (Retail)", "channel": "Retail"},
+            "ProjectPro2024Retail": {"display_name": "Project Professional 2024 (Retail)", "channel": "Retail"},
+            "ProjectStd2024Retail": {"display_name": "Project Standard 2024 (Retail)", "channel": "Retail"},
+            
             # Component Apps Retail
             "AccessRetail": {"display_name": "Access (Retail)", "channel": "Retail"},
             "Access2019Retail": {"display_name": "Access 2019", "channel": "Retail"},
@@ -1988,17 +2002,26 @@ class TekDT_AIS(QMainWindow):
         
         # Tạo nút Xoá
         self.clear_search_button = QPushButton("X")
-        self.clear_search_button.setFixedSize(30, 30)
+        # Lấy chiều cao gợi ý của ô search_box để đảm bảo nút luôn cao bằng
+        button_height = self.search_box.sizeHint().height()
+        self.clear_search_button.setFixedSize(button_height, button_height)
+        self.clear_search_button.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         self.clear_search_button.setStyleSheet("""
             QPushButton { 
                 font-weight: bold; 
-                font-size: 12pt;
+                font-size: 10pt;
                 color: white;
-                background-color: #e74c3c; 
-                border-radius: 15px;
-                border: none;
+                background-color: #34495e;
+                border: 1px solid #2c3e50;
+                border-left: 1px solid #4a627a;
+                /* Bo tròn góc phải để khớp với ô search */
+                border-top-left-radius: 0px;
+                border-bottom-left-radius: 0px;
+                border-top-right-radius: 4px;
+                border-bottom-right-radius: 4px;
             }
             QPushButton:hover { background-color: #c0392b; }
+            QPushButton:pressed { background-color: #e74c3c; }
         """)
         self.clear_search_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.clear_search_button.hide() # Mặc định ẩn
@@ -2541,47 +2564,6 @@ class TekDT_AIS(QMainWindow):
         self.update_counts()
         self.update_available_item_state(key, is_selected=True)
         self._update_office_selection_state()
-
-    # def remove_app_from_selection(self, key, info):
-        # for i in range(self.selected_list_widget.count() - 1, -1, -1):  # Duyệt ngược để tránh index shift nếu takeItem
-            # item = self.selected_list_widget.item(i)
-            # if item.data(Qt.ItemDataRole.UserRole) == key:
-                # self.selected_list_widget.takeItem(i)
-                # break
-
-        # self.update_available_item_state(key, is_selected=False)
-        
-        # if key in self.selected_for_install:
-            # self.selected_for_install.remove(key)
-        # self.save_config()
-        # self.update_counts()
-        # widget = self.find_widget_by_key(key)
-        # if widget:
-            # # Đồng bộ lại app_info từ local để icon đúng
-            # latest_info = self.local_apps.get(key, self.remote_apps.get('app_items', {}).get(key, {}))
-            # widget.app_info.update(latest_info)
-            # # Khôi phục nút "Thêm" xanh và reconnect
-            # if current_info.get('type', '').lower() == 'portable':
-                # widget.action_button.setText("Chạy")
-                # widget.action_button.setToolTip(f"Chạy {current_info['display_name']} trực tiếp")
-                # widget.action_button.setStyleSheet("background-color: #3498db; color: white;")
-                # on_run_action = lambda: self.run_portable_app(key, current_info)
-                # if is_update_available:
-                    # widget.action_button.clicked.connect(lambda _, k=key, i=current_info, w=widget, lv=local_ver_str, rv=remote_ver_str, cb=on_run_action: self.confirm_update(k, i, w, lv, rv, on_complete=cb))
-                # else:
-                    # widget.action_button.clicked.connect(on_run_action)
-            # else:
-                # widget.action_button.setText("Thêm")
-                # widget.action_button.setToolTip(f"Thêm {current_info['display_name']} vào danh sách")
-                # widget.action_button.setStyleSheet("background-color: #4CAF50; color: white;")
-                
-                # on_complete_action = lambda: self.move_app_to_selection(key, current_info)
-                # if is_update_available:
-                    # widget.action_button.clicked.connect(lambda _, k=key, i=current_info, w=widget, lv=local_ver_str, rv=remote_ver_str, cb=on_complete_action: self.confirm_update(k, i, w, lv, rv, on_complete=cb))
-                # else:
-                    # widget.action_button.clicked.connect(on_complete_action)
-        # self.update_available_item_state(key, is_selected=False)
-        # self._update_office_selection_state()
         
     def remove_app_from_selection(self, key, info):
         # Duyệt ngược để xóa item khỏi danh sách widget bên phải
