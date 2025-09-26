@@ -1998,7 +1998,9 @@ class TekDT_AIS(QMainWindow):
         self.clear_search_button.setFixedSize(button_height, button_height)
         self.clear_search_button.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         self.clear_search_button.setStyleSheet("""
-            QPushButton { 
+            QPushButton {
+                padding: 0px;
+                margin: 0px;
                 font-weight: bold; 
                 font-size: 10pt;
                 color: white;
