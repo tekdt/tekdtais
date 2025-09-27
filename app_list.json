@@ -1250,14 +1250,14 @@
       "display_name": "Zalo",
       "version": "1.0.0",
       "category": "Mạng xã hội",
-      "description": "WeChat trò chuyện điện thoại di động trò chuyện miễn phí gửi tin nhắn gửi ảnh thoại.",
+      "description": "Zalo cho phép người dùng nhắn tin, gọi thoại, gọi video, chia sẻ hình ảnh, video, tệp tin và nhiều nội dung khác trên các thiết bị di động và máy tính, chỉ cần có kết nối internet.",
       "type": "Installer",
       "architecture": "32bit",
       "compatible_os_arch": "both",
       "download_url": "https://zalo.me/download/zalo-pc?utm=90000",
       "output_filename": "ZaloSetup.exe",
       "install_params": "/S",
-      "icon_url": "https://res.wx.qq.com/a/wx_fed/assets/res/NTI4MWU5.ico"
+      "icon_url": "https://stc-zaloprofile.zdn.vn/favicon.ico"
     }
   }
 }
