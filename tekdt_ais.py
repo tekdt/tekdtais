@@ -15,6 +15,7 @@ import signal
 import threading
 import queue
 import time
+import unicodedata
 from packaging.version import parse as parse_version
 
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
@@ -638,7 +639,10 @@ class InstallWorker(QThread):
                 torrent_response = self.session.get(download_url, timeout=30)
                 torrent_response.raise_for_status()
                 
-                local_torrent_path = app_dir / f"{app_key}_source.torrent"
+                # Đảm bảo tên file torrent chỉ chứa ký tự ASCII
+                def safe_ascii_filename(s):
+                    return ''.join(c if ord(c) < 128 else '_' for c in unicodedata.normalize('NFKD', s))
+                local_torrent_path = app_dir / f"{safe_ascii_filename(app_key)}_source.torrent"
                 with open(local_torrent_path, 'wb') as f:
                     f.write(torrent_response.content)
                 
