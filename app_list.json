@@ -388,6 +388,45 @@
       "install_params": "/S /user=all",
       "icon_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/01/FileZilla_logo.svg/800px-FileZilla_logo.svg.png"
     },
+    "WinSCP": {
+      "display_name": "WinSCP",
+      "version": "6.5.3",
+      "category": "Quản lý tập tin từ xa",
+      "description": "WinSCP là một SFTP và ứng dụng FTP phổ biến cho Microsoft Windows! Sao chép tệp giữa máy tính cục bộ và máy chủ từ xa bằng cách sử dụng Giao thức truyền tệp FTP, FTPS, SCP, SFTP, WebDAV hoặc S3.",
+      "type": "installer",
+      "architecture": "32bit",
+      "compatible_os_arch": "both",
+      "download_url": "https://winscp.net/download/WinSCP-6.5.3-Setup.exe/download",
+      "output_filename": "WinSCP-Setup.exe",
+      "install_params": "/VERYSILENT /ALLUSERS /NORESTART",
+      "icon_url": "https://winscp-static-746341.c.cdn77.org/assets/images/logos/logo.png"
+    },
+    "Core_FTP_LE64": {
+      "display_name": "Core FTP LE",
+      "version": "2.2",
+      "category": "Quản lý tập tin từ xa",
+      "description": "Core FTP LE - phần mềm Windows miễn phí bao gồm các tính năng FTP của máy khách mà bạn cần. Các tính năng như SFTP (SSH), SSL, TLS, FTPS, IDN, tích hợp trình duyệt, chuyển trang này sang trang khác, Tiếp tục truyền FTP, hỗ trợ kéo và thả, xem và chỉnh sửa tệp, hỗ trợ tường lửa, lệnh tùy chỉnh, Phân tích cú pháp URL FTP, chuyển dòng lệnh, bộ lọc và nhiều hơn nữa!",
+      "type": "installer",
+      "architecture": "64bit",
+      "compatible_os_arch": "64bit",
+      "download_url": "https://www.coreftp.com/download/coreftplite64.exe",
+      "output_filename": "coreftplite64.exe",
+      "install_params": "/S",
+      "icon_url": "https://www.coreftp.com/images/coreftp2.gif"
+    },
+    "Core_FTP_LE32": {
+      "display_name": "Core FTP LE",
+      "version": "2.2",
+      "category": "Quản lý tập tin từ xa",
+      "description": "Core FTP LE - phần mềm Windows miễn phí bao gồm các tính năng FTP của máy khách mà bạn cần. Các tính năng như SFTP (SSH), SSL, TLS, FTPS, IDN, tích hợp trình duyệt, chuyển trang này sang trang khác, Tiếp tục truyền FTP, hỗ trợ kéo và thả, xem và chỉnh sửa tệp, hỗ trợ tường lửa, lệnh tùy chỉnh, Phân tích cú pháp URL FTP, chuyển dòng lệnh, bộ lọc và nhiều hơn nữa!",
+      "type": "installer",
+      "architecture": "32bit",
+      "compatible_os_arch": "32bit",
+      "download_url": "https://www.coreftp.com/download/coreftplite.exe",
+      "output_filename": "coreftplite.exe",
+      "install_params": "/S",
+      "icon_url": "https://www.coreftp.com/images/coreftp2.gif"
+    },
     "OfficeTabFree": {
       "display_name": "Office Tab",
       "version": "1.0.0",
