@@ -1064,31 +1064,31 @@
       "install_params": "",
       "icon_url": "https://github.com/neuralpain/oneclickwinrar/raw/main/assets/images/oneclickwinrar-header.jpg"
     },
-    "DriverPackOfflineNetwork": {
-      "display_name": "DriverPack Offline Network",
-      "version": "17.10.14",
+    "SamDriversOfflineNetwork": {
+      "display_name": "SamDrivers Offline Network",
+      "version": "25.8",
       "category": "Trình điều khiển",
       "description": "Nó chứa trình điều khiển cho phần cứng mạng (Lan/Wi-Fi) và không yêu cầu kết nối Internet để hoạt động",
       "type": "Portable",
       "architecture": "32bit",
       "compatible_os_arch": "both",
-      "download_url": "https://dl.driverpack.io/DriverPack-LAN.torrent",
-      "output_filename": "DriverPack_17.10.14-25091_Network.exe|DriverPack.exe",
-      "install_params": "/S",
-      "icon_url": "https://static.driverpack.io/pic/logo-colored.svg"
+      "download_url": "https://driveroff.net/SamDrivers_25.8_LAN.torrent",
+      "output_filename": "SamDrivers_25.8_LAN.exe|DriverPack.exe",
+      "install_params": "-nogui -license -autoinstall -autoclose",
+      "icon_url": "https://driveroff.net/favicon.ico"
     },
-    "DriverPackOfflineFull": {
-      "display_name": "DriverPack Offline Full",
-      "version": "17.10.14",
+    "SDIOOfflineFull": {
+      "display_name": "Snappy Driver Installer Origin Offline Full (>40GB)",
+      "version": "25.08.3",
       "category": "Trình điều khiển",
       "description": "Nó chứa tất cả các trình điều khiển, hoạt động mà không cần kết nối internet",
       "type": "Portable",
       "architecture": "32bit",
       "compatible_os_arch": "both",
-      "download_url": "https://dl.driverpack.io/DriverPack-Offline.torrent",
-      "output_filename": "DriverPack_Full.iso|DriverPack.exe",
-      "install_params": "/S",
-      "icon_url": "https://static.driverpack.io/pic/logo-colored.svg"
+      "download_url": "https://sdi-tool.org/SDI_Update.torrent",
+      "output_filename": "SDI_R2503.exe",
+      "install_params": "-nogui -license -autoinstall -autoclose",
+      "icon_url": "https://sdi-tool.org/html/images/logo2m.png"
     },
     "BulkFileChanger": {
       "display_name": "Bulk File Changer",
