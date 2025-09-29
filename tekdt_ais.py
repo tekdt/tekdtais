@@ -1492,13 +1492,13 @@ class TekDT_AIS(QMainWindow):
                 QApplication.quit()
                 return
         
-        # --- LOGIC MỚI: BẮT ĐẦU TẢI DANH SÁCH APP TRÊN LUỒNG MỚI ---
+        # --- BẮT ĐẦU TẢI DANH SÁCH APP TRÊN LUỒNG MỚI ---
         # 1. Tải config local trước để có dữ liệu icon cache
         self.load_config_and_apps(populate=False)
 
         # 2. Khởi tạo worker tải app list
         self.app_loader_thread = QThread()
-        self.app_loader = AppListLoader(self.session, self.local_apps)
+        self.app_loader = AppListLoader(self.session, self.local_apps, CONFIG_FILE)
         self.app_loader.moveToThread(self.app_loader_thread)
 
         # 3. Kết nối tín hiệu
