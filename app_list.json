@@ -1297,6 +1297,19 @@
       "output_filename": "ZaloSetup.exe",
       "install_params": "/S",
       "icon_url": "https://stc-zaloprofile.zdn.vn/favicon.ico"
+    },
+    "GSplit": {
+      "display_name": "GSplit",
+      "version": "3.0.1",
+      "category": "Tiện ích",
+      "description": "Phần mềm này là trình chia tệp nhanh và miễn phí cho phép bạn chia các tệp lớn, chẳng hạn như tệp nén, tệp văn bản và nhật ký, bản sao lưu, hình ảnh đĩa, tệp video và tài liệu…, thành một tập hợp các tệp nhỏ hơn được gọi là phần.",
+      "type": "Portable",
+      "architecture": "32bit",
+      "compatible_os_arch": "both",
+      "download_url": "https://download.gdgsoft.com/gsppsfx.exe",
+      "output_filename": "gsppsfx.exe",
+      "install_params": "",
+      "icon_url": "https://www.gdgsoft.com/wp-content/uploads/GSplitLogo2019.png.webp"
     }
   }
 }
