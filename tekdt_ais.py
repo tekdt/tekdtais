@@ -26,6 +26,24 @@ from PySide6.QtGui import QIcon, QPixmap, QColor, QPalette, QFont, QMovie
 from PySide6.QtCore import (Qt, QSize, QThread, Signal, QObject, QPropertyAnimation,
                           QEasingCurve, QTimer, QRect, QCoreApplication)
 
+# Lý do: Khi đóng gói thành EXE ở chế độ console, stdout và stderr mặc định
+# của Windows sử dụng mã hóa 'charmap', không hỗ trợ ký tự Unicode (tiếng Việt).
+# Đoạn mã này sẽ "ép" Python sử dụng mã hóa UTF-8 cho tất cả các output,
+# giải quyết triệt để lỗi UnicodeEncodeError khi in hoặc hiển thị lỗi.
+# Nó cần được đặt ở ngay đầu chương trình để có hiệu lực sớm nhất.
+if sys.stdout.encoding != 'utf-8':
+    try:
+        # Ghi đè stdout và stderr để sử dụng UTF-8
+        sys.stdout.reconfigure(encoding='utf-8')
+        sys.stderr.reconfigure(encoding='utf-8')
+        print("Đã cấu hình thành công stdout và stderr sang UTF-8.")
+    except TypeError:
+        # Cung cấp một phương pháp thay thế cho các phiên bản Python cũ hơn
+        import io
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
+        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8")
+        print("Đã cấu hình thành công stdout và stderr sang UTF-8 (phương pháp thay thế).")
+
 # --- CÁC HẰNG SỐ VÀ CẤU HÌNH ---
 APP_NAME = "TekDT AIS"
 APP_VERSION = "1.0.4"

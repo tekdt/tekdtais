@@ -1073,9 +1073,9 @@
       "architecture": "32bit",
       "compatible_os_arch": "both",
       "download_url": "https://driveroff.net/SamDrivers_25.8_LAN.torrent",
-      "output_filename": "SamDrivers_25.8_LAN.exe|DriverPack.exe",
+      "output_filename": "SamDrivers_25.8_LAN.exe|SDI-drv.exe",
       "install_params": "-nogui -license -autoinstall -autoclose",
-      "icon_url": "https://driveroff.net/favicon.ico"
+      "icon_url": "https://samlab.ws/img/_logo1.gif"
     },
     "SDIOOfflineFull": {
       "display_name": "Snappy Driver Installer Origin Offline Full (>40GB)",
