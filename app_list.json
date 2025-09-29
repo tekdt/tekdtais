@@ -1231,13 +1231,13 @@
       "download_url": "https://go.microsoft.com/fwlink/p/?LinkID=2182910&clcid=0x42a",
       "output_filename": "OneDriveSetup.exe",
       "install_params": "/silent /allusers",
-      "icon_url": "https://ssl.gstatic.com/docs/doclist/images/drive_2022q3_32dp.png"
+      "icon_url": "https://onedrive.live.com/_layouts/15/images/odbfavicon.ico"
     },
     "MEGAsync64": {
       "display_name": "MEGAsync 64bit",
       "version": "1.0.0",
       "category": "Ổ đĩa đám mây",
-      "description": "OneDrive là dịch vụ lưu trữ đám mây của Microsoft, cho phép bạn lưu trữ, đồng bộ hóa và chia sẻ tệp từ bất kỳ thiết bị nào có kết nối Internet.",
+      "description": "Mega Sync (MEGAsync) là ứng dụng giúp bạn đồng bộ hóa các thư mục và tệp trên máy tính với tài khoản lưu trữ đám mây của bạn trên MEGA.",
       "type": "Installer",
       "architecture": "64bit",
       "compatible_os_arch": "64bit",
