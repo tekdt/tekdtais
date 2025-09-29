@@ -2758,7 +2758,6 @@ class TekDT_AIS(QMainWindow):
             self.remote_apps['app_items'][app_key].update(new_app_info)
 
         # BƯỚC 3: Gọi hàm cập nhật widget ở khung bên trái (danh sách có sẵn).
-        # Đây là bước quan trọng nhất, nó sẽ gọi đến hàm đã được sửa lỗi bên dưới
         # để đảm bảo nút "Tải" chuyển thành nút "Thêm" với hành động được kết nối đúng.
         self.update_single_app_widget(app_key)
 
