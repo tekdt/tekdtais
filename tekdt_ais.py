@@ -1217,10 +1217,11 @@ class AppListLoader(QObject):
     # Tín hiệu hoàn thành: trả về (dict_danh_sách_app, thành_công_hay_không)
     finished = Signal(dict, bool)
 
-    def __init__(self, session, local_apps_data):
+    def __init__(self, session, local_apps_data, config_file_path):
         super().__init__()
         self.session = session
         self.local_apps = local_apps_data
+        self.config_file_path = config_file_path
 
     def run(self):
         """Hàm chính thực thi các tác vụ mạng."""
@@ -1237,8 +1238,7 @@ class AppListLoader(QObject):
             generated_office_apps = TekDT_AIS._generate_office_suites_info(None) # Gọi phương thức tĩnh
             remote_apps.get("app_items", {}).update(generated_office_apps)
             
-            # Tải các icon cần thiết
-            self.progress_update.emit("Đang tải và kiểm tra icon phần mềm...")
+            self.progress_update.emit("Đang kiểm tra và cập nhật icon phần mềm...")
             all_apps = remote_apps.get("app_items", {})
             config_needs_saving = False
 
@@ -1250,22 +1250,60 @@ class AppListLoader(QObject):
                 icon_filename = Path(icon_url).name
                 app_dir = APPS_DIR / key
                 icon_path = app_dir / icon_filename
+                # Lấy thông tin cục bộ của app (nếu có) từ config đã tải
+                local_info = self.local_apps.get(key, {})
 
-                # Kiểm tra xem icon đã có trong config local và file đã tồn tại chưa
-                local_icon_file = self.local_apps.get(key, {}).get('icon_file')
-                if not local_icon_file or not icon_path.exists():
+                # Điều kiện kiểm tra mới: Icon sẽ được tải lại NẾU:
+                # 1. File icon vật lý không tồn tại trên đĩa.
+                # 2. Hoặc tên file icon trong config không khớp với tên file từ URL mới (phòng trường hợp icon được cập nhật trên server).
+                needs_download = not icon_path.exists() or local_info.get('icon_file') != icon_filename
+
+                if needs_download:
                     try:
                         app_dir.mkdir(exist_ok=True)
                         icon_response = self.session.get(icon_url, timeout=5)
                         icon_response.raise_for_status()
+                        
+                        # Ghi file icon ra đĩa
                         with open(icon_path, 'wb') as f:
                             f.write(icon_response.content)
-                        # Đánh dấu để lưu lại thông tin icon file vào config
+                        
+                        # Cập nhật thông tin icon vào self.local_apps (dữ liệu trong bộ nhớ)
+                        # Dùng setdefault để tự động tạo key cho app nếu nó chưa tồn tại trong config.
+                        self.local_apps.setdefault(key, {})['icon_file'] = icon_filename
+                        # Đánh dấu rằng file config cần được lưu lại vào đĩa
+                        config_needs_saving = True
+                        
+                        # Đồng bộ thông tin icon_file vào app_info để giao diện hiển thị ngay lập tức
                         app_info['icon_file'] = icon_filename
 
                     except requests.RequestException:
+                        # Nếu tải lỗi, dùng icon mặc định
                         app_info['icon_file'] = 'default_icon.png'
+                else:
+                    # Nếu không cần tải, vẫn phải đảm bảo app_info có thông tin icon_file
+                    # để giao diện chính có thể hiển thị icon đã có sẵn.
+                    app_info['icon_file'] = local_info.get('icon_file')
 
+            # Sau khi duyệt qua tất cả các app, lưu lại file config MỘT LẦN nếu có sự thay đổi
+            if config_needs_saving:
+                self.progress_update.emit("Đang lưu lại thông tin icon mới...")
+                try:
+                    # Tải lại toàn bộ cấu trúc config hiện tại để không làm mất mục 'settings'
+                    full_config = {}
+                    if self.config_file_path.exists():
+                        with open(self.config_file_path, 'r', encoding='utf-8') as f:
+                            content = f.read()
+                            if content: full_config = json.loads(content)
+                    
+                    # Cập nhật mục 'app_items' với dữ liệu mới (đã bao gồm các icon mới)
+                    full_config['app_items'] = self.local_apps
+                    
+                    # Ghi đè toàn bộ file config với dữ liệu đã được cập nhật
+                    with open(self.config_file_path, 'w', encoding='utf-8') as f:
+                        json.dump(full_config, f, indent=2, ensure_ascii=False)
+                except (IOError, json.JSONDecodeError) as e:
+                    print(f"Lỗi nghiêm trọng khi lưu file config icon: {e}")
             self.finished.emit(remote_apps, True)
 
         except requests.RequestException as e:
@@ -2216,11 +2254,15 @@ class TekDT_AIS(QMainWindow):
         
         # Lọc ứng dụng dựa trên cấu trúc hệ thống
         compatible_apps = {}
-        for key, app_info in all_apps.items():
-            compatible_os_arch = app_info.get('compatible_os_arch', 'both')
-            if (self.system_arch == '64bit' and compatible_os_arch in ['64bit', 'both']) or \
-               (self.system_arch == '32bit' and compatible_os_arch in ['32bit', 'both']):
-                compatible_apps[key] = app_info.copy()
+        if self.system_arch == '64bit':
+            # Nếu là HĐH 64-bit, lấy tất cả các ứng dụng mà không cần lọc
+            compatible_apps = all_apps.copy()
+        else:
+            # Nếu là HĐH 32-bit, chỉ lấy các ứng dụng tương thích (32-bit hoặc 'both')
+            for key, app_info in all_apps.items():
+                compatible_os_arch = app_info.get('compatible_os_arch', 'both')
+                if compatible_os_arch in ['32bit', 'both']:
+                    compatible_apps[key] = app_info.copy()
         
         for key, local_info in self.local_apps.items():
             if key in compatible_apps:
