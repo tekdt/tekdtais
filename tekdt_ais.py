@@ -195,7 +195,7 @@ class ToolManager(QObject):
             extract_dir.mkdir(parents=True, exist_ok=True)
             
             command = ['msiexec', '/a', str(msi_path), '/qb', f'TARGETDIR={str(extract_dir)}']
-            process = subprocess.run(command, capture_output=True, text=True, timeout=300, check=False, creationflags=subprocess.CREATE_NO_WINDOW)
+            process = subprocess.run(command, capture_output=True, text=True, encoding='utf-8', errors='ignore', timeout=300, check=False, creationflags=subprocess.CREATE_NO_WINDOW)
             
             if process.returncode != 0:
                 error_message = process.stderr or process.stdout
@@ -296,7 +296,7 @@ class ToolManager(QObject):
             # /quiet: chạy ẩn, /extract: giải nén, /log: ghi log (tùy chọn)
             command = [str(temp_odt_installer), f'/extract:{str(ODT_DIR)}', '/quiet']
             print(command)
-            process = subprocess.run(command, capture_output=True, text=True, timeout=60, check=False)
+            process = subprocess.run(command, capture_output=True, text=True, encoding='utf-8', errors='ignore', timeout=60, check=False)
             
             print("returncode:", process.returncode)
             print("stdout:", process.stdout)
@@ -544,7 +544,7 @@ class InstallWorker(QThread):
                 f'-o{str(destination_dir)}',
                 '-y'
             ]
-            process = subprocess.run(command, capture_output=True, text=True, timeout=300, check=False, creationflags=subprocess.CREATE_NO_WINDOW)
+            process = subprocess.run(command, capture_output=True, text=True, encoding='utf-8', errors='ignore', timeout=300, check=False, creationflags=subprocess.CREATE_NO_WINDOW)
 
             if process.returncode != 0:
                 error_message = process.stderr or process.stdout
@@ -2801,7 +2801,7 @@ class TekDT_AIS(QMainWindow):
                 f'-o{str(extraction_dir)}',
                 '-y'
             ]
-            process = subprocess.run(command, capture_output=True, text=True, timeout=300, check=False, creationflags=subprocess.CREATE_NO_WINDOW)
+            process = subprocess.run(command, capture_output=True, text=True, encoding='utf-8', errors='ignore', timeout=300, check=False, creationflags=subprocess.CREATE_NO_WINDOW)
             if process.returncode != 0:
                 error_message = process.stderr or process.stdout
                 self.show_styled_message_box(QMessageBox.Icon.Critical, "Lỗi giải nén", f"Giải nén '{archive_name}' thất bại: {error_message}")
