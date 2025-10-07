@@ -193,6 +193,19 @@
       "install_params": "/skipdlgs",
       "icon_url": "https://www.internetdownloadmanager.com/register/IDMlib/images/idman_logos.png"
     },
+    "ndm": {
+      "display_name": "Neat Download Manager (NDM)",
+      "version": "1.4",
+      "category": "Quản lý tải xuống",
+      "description": "Trình quản lý tải xuống gọn gàng là một Trình quản lý tải xuống Internet miễn phí cho macOS (OS X 10.10 trở lên) và Windows (Windows 7 trở lên)",
+      "type": "installer",
+      "architecture": "32bit",
+      "compatible_os_arch": "both",
+      "download_url": "https://neatdownloadmanager.com/file/NeatDM_setup.exe",
+      "output_filename": "NeatDM_setup.exe",
+      "install_params": "/VERYSILENT",
+      "icon_url": "https://neatdownloadmanager.com/templates/neat/images/icon.png"
+    },
     "AvastAVfree": {
       "display_name": "Avast Antivirus Free",
       "version": "1.0.0",
