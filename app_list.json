@@ -8,7 +8,7 @@
       "type": "installer",
       "architecture": "64bit",
       "compatible_os_arch": "64bit",
-      "download_url": "https://chromeenterprise.google/download/thank-you/?platform=WIN64_MSI&channel=stable&usagestats=0#",
+      "download_url": "https://dl.google.com/dl/chrome/install/googlechromestandaloneenterprise64.msi",
       "install_params": "/silent /install",
       "output_filename": "googlechromestandaloneenterprise64.msi",
       "icon_url": "https://www.google.com/chrome/static/images/chrome-logo-m100.svg"
@@ -21,7 +21,7 @@
       "type": "installer",
       "architecture": "32bit",
       "compatible_os_arch": "both",
-      "download_url": "https://chromeenterprise.google/download/thank-you/?platform=WIN_MSI&channel=stable&usagestats=0#",
+      "download_url": "https://dl.google.com/dl/chrome/install/googlechromestandaloneenterprise.msi",
       "install_params": "/silent /install",
       "output_filename": "googlechromestandaloneenterprise.msi",
       "icon_url": "https://www.google.com/chrome/static/images/chrome-logo-m100.svg"
