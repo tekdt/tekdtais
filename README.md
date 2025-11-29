@@ -7,9 +7,9 @@ TekDT AIS là công cụ cài đặt các phần mềm khác hàng loạt một 
 - Phiên bản: 1.0.5
 
 # Tải xuống
-Phiên bản mới nhất tại [https://github.com/tekdt/tekdtais/releases/download/v1.0.5/TekDT.AIS_v1.0.5.zip]
-Mã hash SHA256 của chữ ký của TekDT là: 4ef06065990138ab401948b95f536272. Nếu đúng mã hash thì mới chính xác từ TekDT.
-MD5 cho phiên bản v1.0.5: 49bba6beb7d4ddab683580887eb63bf9
+- Phiên bản mới nhất tại [https://github.com/tekdt/tekdtais/releases/download/v1.0.5/TekDT.AIS_v1.0.5.zip]
+- Mã hash SHA256 của chữ ký của TekDT là: 4ef06065990138ab401948b95f536272. Nếu đúng mã hash thì mới chính xác từ TekDT.
+- MD5 cho phiên bản v1.0.5: 49bba6beb7d4ddab683580887eb63bf9
 
 # Hướng dẫn sử dụng
 Chỉ cần chọn phần mềm bạn muốn tải thì nhấn nút Tải hoặc muốn đưa vào danh sách để cài hàng loạt thì nhấn nút Thêm, sau đó nhấn nút Bắt đầu để cài đặt hàng loạt. Nếu muốn sử dụng chế độ dòng lệnh thì gõ "TekDT_AIS.exe /help" để tham khảo thêm các câu lệnh và hướng dẫn ở chế độ dòng lệnh.
