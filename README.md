@@ -3,21 +3,22 @@ TekDT AIS là công cụ cài đặt các phần mềm khác hàng loạt một 
 - Tên phần mềm: TekDT AIS
 - Tác giả: TekDT
 - Mô tả: TekDT AIS là công cụ cài đặt các phần mềm khác hàng loạt một cách tự động, hỗ trợ chế độ dòng lệnh.
-- Ngày phát hành: 26-09-2025
-- Phiên bản: 1.0.4
+- Ngày phát hành: 29-11-2025
+- Phiên bản: 1.0.5
 
 # Tải xuống
-Phiên bản mới nhất tại [https://github.com/tekdt/tekdtais/releases/download/v1.0.4/TekDT.AIS_v1.0.4.zip]
-
+Phiên bản mới nhất tại [https://github.com/tekdt/tekdtais/releases/download/v1.0.5/TekDT.AIS_v1.0.5.zip]
+Mã hash SHA256 của chữ ký của TekDT là: 4ef06065990138ab401948b95f536272. Nếu đúng mã hash thì mới chính xác từ TekDT.
+MD5 cho phiên bản v1.0.5: 49bba6beb7d4ddab683580887eb63bf9
 
 # Hướng dẫn sử dụng
-Chỉ cần chọn phần mềm bạn muốn tải thì nhấn nút Tải hoặc muốn cài thì nhấn nút Thêm, sau đó nhấn nút Bắt đầu để cài đặt hàng loạt. Nếu muốn sử dụng chế độ dòng lệnh thì gõ "TekDT_AIS.exe /help" để tham khảo thêm các câu lệnh và hướng dẫn ở chế độ dòng lệnh.
-Phần mềm này cũng là một phần (được nhúng vào trong) của phần mềm TekDT BMC[https://github.com/tekdt/tekdtbmc] để cho quá trình cài đặt Windows và các phần mềm đồng bộ.
+Chỉ cần chọn phần mềm bạn muốn tải thì nhấn nút Tải hoặc muốn đưa vào danh sách để cài hàng loạt thì nhấn nút Thêm, sau đó nhấn nút Bắt đầu để cài đặt hàng loạt. Nếu muốn sử dụng chế độ dòng lệnh thì gõ "TekDT_AIS.exe /help" để tham khảo thêm các câu lệnh và hướng dẫn ở chế độ dòng lệnh.
+Phần mềm này cũng là một phần (được nhúng vào trong) của phần mềm TekDT BMC[https://github.com/tekdt/tekdtbmc] để cho quá trình cài đặt Windows và các phần mềm đồng bộ. Phần mềm này sẽ được TekDT BMC tự động thêm vào trong quá trình tạo USB Boot, bạn không cần làm gì thêm, ngoại trừ chọn các phần mềm cần thêm ở bước cuối của TekDT BMC.
 
 #Lưu ý: Chương trình này cần kết nối internet để hoạt động lần đầu tiên, do cần tải các công cụ cần thiết khác trong thư mục Tools như: 7z, aria2. Nếu bạn muốn tải phần mềm mới thì cần có kết nối internet để tải, còn nếu trước đó đã tải một vài (hoặc toàn bộ) phần mềm đã đủ dùng thì không cần kết nối internet nữa.
 
 # Trách nhiệm
-TekDT không chịu trách nhiệm khi bạn sử dụng phần mềm/script này hoặc tải ở các nguồn khác được tuỳ biến, sửa đổi dựa trên script này. Bạn có thể sử dụng chương phần mềm/script miễn phí thì hãy tin nó. TekDT sẽ không thu thập thông tin hay làm hại đến máy tính của bạn.
+TekDT không chịu trách nhiệm khi bạn sử dụng phần mềm/script này hoặc tải ở các nguồn khác được tuỳ biến, sửa đổi dựa trên phần mềm/script này. Bạn có thể sử dụng chương phần mềm/script miễn phí thì hãy tin nó. TekDT sẽ không thu thập thông tin hay làm hại đến máy tính của bạn.
 Nếu bạn không tin tưởng phần mềm/script này, hãy xoá phần mềm/script đã tải.
 
 # Hỗ trợ:
