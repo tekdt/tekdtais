@@ -21,10 +21,46 @@ from packaging.version import parse as parse_version
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
                              QListWidget, QListWidgetItem, QLabel, QPushButton, QLineEdit,
                              QFrame, QScrollArea, QGraphicsOpacityEffect, QToolTip,
-                             QMessageBox, QSizePolicy, QTextEdit, QGridLayout)
-from PySide6.QtGui import QIcon, QPixmap, QColor, QPalette, QFont, QMovie
+                             QMessageBox, QSizePolicy, QTextEdit, QGridLayout, QComboBox, QStyledItemDelegate)
+from PySide6.QtGui import QIcon, QPixmap, QColor, QPalette, QFont, QMovie, QStandardItem, QStandardItemModel
 from PySide6.QtCore import (Qt, QSize, QThread, Signal, QObject, QPropertyAnimation,
                           QEasingCurve, QTimer, QRect, QCoreApplication)
+
+class CheckableComboBox(QComboBox):
+    # Signal gửi đi khi trạng thái check thay đổi
+    checkedItemsChanged = Signal()
+
+    def __init__(self, parent=None):
+        super(CheckableComboBox, self).__init__(parent)
+        self.view().pressed.connect(self.handleItemPressed)
+        self.setModel(QStandardItemModel(self))
+        self.view().setTextElideMode(Qt.TextElideMode.ElideRight) 
+        self.setPlaceholderText("Tất cả danh mục")
+
+    def handleItemPressed(self, index):
+        item = self.model().itemFromIndex(index)
+        if item.checkState() == Qt.CheckState.Checked:
+            item.setCheckState(Qt.CheckState.Unchecked)
+        else:
+            item.setCheckState(Qt.CheckState.Checked)
+        self.checkedItemsChanged.emit()
+
+    def get_checked_items(self):
+        checkedItems = []
+        for i in range(self.model().rowCount()):
+            item = self.model().item(i)
+            if item.checkState() == Qt.CheckState.Checked:
+                checkedItems.append(item.text())
+        return checkedItems
+
+    def add_item(self, text):
+        item = QStandardItem(text)
+        item.setCheckState(Qt.CheckState.Unchecked)
+        item.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled)
+        self.model().appendRow(item)
+    
+    def clear_items(self):
+        self.model().clear()
 
 # Lý do: Khi đóng gói thành EXE ở chế độ console, stdout và stderr mặc định
 # của Windows sử dụng mã hóa 'charmap', không hỗ trợ ký tự Unicode (tiếng Việt).
@@ -46,7 +82,7 @@ if sys.stdout.encoding != 'utf-8':
 
 # --- CÁC HẰNG SỐ VÀ CẤU HÌNH ---
 APP_NAME = "TekDT AIS"
-APP_VERSION = "1.0.4"
+APP_VERSION = "1.0.5"
 GITHUB_REPO_URL = "https://github.com/tekdt/tekdtais"
 REMOTE_APP_LIST_URL = "https://raw.githubusercontent.com/tekdt/tekdtais/refs/heads/main/app_list.json"
     
@@ -1889,7 +1925,7 @@ class TekDT_AIS(QMainWindow):
 
         # --- BƯỚC 3: Hiển thị giao diện và khởi chạy Worker ---
         self.show()
-        # QUAN TRỌNG: Gọi populate_lists SAU KHI đã xác định self.cli_target_apps
+        # Gọi populate_lists SAU KHI đã xác định self.cli_target_apps
         self.populate_lists() 
         
         self.set_ui_interactive(False) # Vô hiệu hóa tương tác
@@ -1949,41 +1985,56 @@ class TekDT_AIS(QMainWindow):
                 summary_lines.append(f"--- Cài đặt ---\nThành công: {s} | Thất bại: {f} | Bỏ qua: {skip}")
 
             final_message = "\n\n".join(summary_lines) if summary_lines else "Không có tác vụ nào được thực hiện."
+            
+            # Reset trạng thái processing để tránh bị chặn bởi closeEvent
+            self.is_processing = False
+            self.install_worker = None # Xóa tham chiếu worker
+            
             self.show_styled_message_box(QMessageBox.Icon.Information, "Hoàn tất tác vụ dòng lệnh", final_message)
             QApplication.quit()
         
+        # Ngắt kết nối các signal cũ có thể gây xung đột
         try:
-            self.install_worker.progress.disconnect(self.update_and_record_progress)
-        except Exception:
-            pass
-        try:
-            self.install_worker.progress_percentage.disconnect(self.update_download_progress_anywhere)
-        except Exception:
-            pass
-        try:
-            self.install_worker.finished.disconnect(on_cli_finished)
-        except Exception:
-            pass
-        try:
-            self.install_worker.error.disconnect()
-        except Exception:
-            pass
-        try:
-            self.install_worker.update_widget_status.disconnect(self.update_widget_status)
-        except Exception:
-            pass
-        try:
-            self.install_worker.tasks_batch_completed.disconnect(self.on_tasks_batch_completed)
+            self.install_worker.tasks_batch_completed.disconnect() # Ngắt kết nối logic GUI batch update
+            self.install_worker.finished.disconnect() # Ngắt kết nối logic GUI finished
         except Exception:
             pass
         
-        # Kết nối signals từ worker, đảm bảo chỉ connect duy nhất 1 lần     
+        # try:
+            # self.install_worker.progress.disconnect(self.update_and_record_progress)
+        # except Exception:
+            # pass
+        # try:
+            # self.install_worker.progress_percentage.disconnect(self.update_download_progress_anywhere)
+        # except Exception:
+            # pass
+        # try:
+            # self.install_worker.finished.disconnect(on_cli_finished)
+        # except Exception:
+            # pass
+        # try:
+            # self.install_worker.error.disconnect()
+        # except Exception:
+            # pass
+        # try:
+            # self.install_worker.update_widget_status.disconnect(self.update_widget_status)
+        # except Exception:
+            # pass
+        # try:
+            # self.install_worker.tasks_batch_completed.disconnect(self.on_tasks_batch_completed)
+        # except Exception:
+            # pass
+        
+        # Kết nối signals dành riêng cho CLI
         self.install_worker.progress.connect(self.update_and_record_progress, Qt.ConnectionType.QueuedConnection)
         self.install_worker.progress_percentage.connect(self.update_download_progress_anywhere, Qt.ConnectionType.QueuedConnection)
+        
+        # Kết nối tasks_batch_completed để cập nhật config, NHƯNG KHÔNG gọi handle_single_task_completion (cái này gây loop)
+        self.install_worker.tasks_batch_completed.connect(self.on_tasks_batch_completed, Qt.ConnectionType.QueuedConnection)
+        
         self.install_worker.finished.connect(on_cli_finished, Qt.ConnectionType.QueuedConnection)
         self.install_worker.error.connect(lambda e: self.show_styled_message_box(QMessageBox.Icon.Critical, "Lỗi Worker", str(e)), Qt.ConnectionType.QueuedConnection)
         self.install_worker.update_widget_status.connect(self.update_widget_status, Qt.ConnectionType.QueuedConnection)
-        self.install_worker.tasks_batch_completed.connect(self.on_tasks_batch_completed, Qt.ConnectionType.QueuedConnection)
 
         self.install_worker.start()
 
@@ -2029,6 +2080,9 @@ class TekDT_AIS(QMainWindow):
             QPushButton:hover { background-color: #2980b9; }
             QPushButton:disabled { background-color: #95a5a6; }
             QLineEdit { background-color: #34495e; border: 1px solid #2c3e50; padding: 8px; border-radius: 4px; color: white; }
+            QComboBox { background-color: #34495e; border: 1px solid #2c3e50; padding: 5px; border-radius: 4px; color: white; min-width: 150px; }
+            QComboBox::drop-down { border: none; }
+            QComboBox QAbstractItemView { background-color: #34495e; color: white; selection-background-color: #4a627a; }
             QToolTip { background-color: #34495e; color: white; border: 1px solid #3498db; }
         """)
 
@@ -2042,21 +2096,23 @@ class TekDT_AIS(QMainWindow):
         # --- Left Panel (Available Apps) ---
         left_panel = QWidget()
         left_layout = QVBoxLayout(left_panel)
-        self.search_box = QLineEdit()
-        # Tạo layout ngang cho thanh tìm kiếm và nút X
+        
+        # Tạo layout ngang cho thanh tìm kiếm, bộ lọc và nút X
         search_layout = QHBoxLayout()
         search_layout.setContentsMargins(0, 0, 0, 0)
-        search_layout.setSpacing(2)
+        search_layout.setSpacing(5)
 
         self.search_box = QLineEdit()
-        self.search_box.setPlaceholderText("Gõ để tìm kiếm (tối thiểu 2 ký tự)...")
+        self.search_box.setPlaceholderText("Tìm kiếm (Tên, Mô tả)...")
+        
+        # [NEW] Thêm Widget lọc danh mục
+        self.category_filter = CheckableComboBox()
+        self.category_filter.setToolTip("Chọn danh mục để lọc")
         
         # Tạo nút Xoá
         self.clear_search_button = QPushButton("X")
-        # Lấy chiều cao gợi ý của ô search_box để đảm bảo nút luôn cao bằng
         button_height = self.search_box.sizeHint().height()
-        self.clear_search_button.setFixedSize(button_height, button_height)
-        self.clear_search_button.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        self.clear_search_button.setFixedSize(button_height, button_height) # Chiều cao tự động theo ô search thì tốt hơn fixed
         self.clear_search_button.setStyleSheet("""
             QPushButton {
                 padding: 0px;
@@ -2076,18 +2132,19 @@ class TekDT_AIS(QMainWindow):
             QPushButton:hover { background-color: #c0392b; }
             QPushButton:pressed { background-color: #e74c3c; }
         """)
-        self.clear_search_button.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.clear_search_button.hide() # Mặc định ẩn
+        self.clear_search_button.hide()
 
-        # Thêm vào layout
-        search_layout.addWidget(self.search_box)
+        # Thêm vào layout: Search Box | Category Filter | Clear Button
+        search_layout.addWidget(self.search_box, 1) # Search box giãn tối đa
+        search_layout.addWidget(self.category_filter)
         search_layout.addWidget(self.clear_search_button)
 
         # Kết nối sự kiện
         self.search_box.textChanged.connect(self.filter_apps)
-        # Thêm kết nối để hiện/ẩn nút X
         self.search_box.textChanged.connect(lambda text: self.clear_search_button.setVisible(bool(text)))
         self.clear_search_button.clicked.connect(self.search_box.clear)
+        # [NEW] Kết nối sự kiện khi tick vào danh mục
+        self.category_filter.checkedItemsChanged.connect(lambda: self.filter_apps(self.search_box.text()))
         
         # Thêm layout tìm kiếm vào layout chính của khung bên trái
         left_layout.addLayout(search_layout)
@@ -2268,6 +2325,10 @@ class TekDT_AIS(QMainWindow):
         if not self.embed_mode:
             self.selected_list_widget.clear()
         
+        # Xóa danh sách category cũ
+        if hasattr(self, 'category_filter'):
+            self.category_filter.clear_items()
+        
         all_apps = self.remote_apps.get("app_items", {})
         
         # Lọc ứng dụng dựa trên cấu trúc hệ thống
@@ -2287,6 +2348,11 @@ class TekDT_AIS(QMainWindow):
                 compatible_apps[key].update(local_info)
 
         categories = sorted(list(set(app.get('category', 'Chưa phân loại') for app in compatible_apps.values())))
+        
+        # Thêm category vào bộ lọc
+        if hasattr(self, 'category_filter'):
+            for category in categories:
+                self.category_filter.add_item(category)
         
         for category in categories:
             cat_item = QListWidgetItem(category.upper())
@@ -2322,6 +2388,8 @@ class TekDT_AIS(QMainWindow):
 
         self.update_counts()
         self.restore_scroll_positions()
+        # Gọi lại filter một lần để đảm bảo nếu đang gõ dở thì vẫn lọc đúng
+        self.filter_apps(self.search_box.text())
     
     def add_app_to_list(self, list_widget, key, info):
         item_widget = AppItemWidget(key, info, embed_mode=self.embed_mode)
@@ -2855,17 +2923,33 @@ class TekDT_AIS(QMainWindow):
         text = text.lower().strip()
         min_chars = 1 if self.embed_mode else 2
         
+        # Lấy danh sách các category đang được tick chọn
+        selected_categories = []
+        if hasattr(self, 'category_filter'):
+            selected_categories = self.category_filter.get_checked_items()
+
         visible_categories = set()
         for i in range(self.available_list_widget.count()):
             item = self.available_list_widget.item(i)
             widget = self.available_list_widget.itemWidget(item)
             if hasattr(widget, 'app_key'):
                 app_info = widget.app_info
+                
+                # Logic tìm kiếm Text: Tên hoặc Mô tả
                 display_name = app_info.get('display_name', '').lower()
-                is_match = text in display_name or len(text) < min_chars
-                item.setHidden(not is_match)
-                if is_match:
-                    visible_categories.add(app_info.get('category', 'Chưa phân loại'))
+                description = app_info.get('description', '').lower()
+                is_text_match = (text in display_name or text in description) or len(text) < min_chars
+                
+                # Logic lọc Category: Nếu không chọn gì (list rỗng) thì coi như chọn tất cả
+                category = app_info.get('category', 'Chưa phân loại')
+                is_cat_match = not selected_categories or category in selected_categories
+                
+                # Kết hợp điều kiện AND
+                is_visible = is_text_match and is_cat_match
+                
+                item.setHidden(not is_visible)
+                if is_visible:
+                    visible_categories.add(category)
             
         # Ẩn/hiện category header
         for i in range(self.available_list_widget.count()):
@@ -2873,7 +2957,9 @@ class TekDT_AIS(QMainWindow):
             widget = self.available_list_widget.itemWidget(item)
             if not hasattr(widget, 'app_key'): # Đây là category header
                 category_name = item.text().title() # Chuyển về dạng 'Chưa Phân Loại'
-                item.setHidden(category_name not in visible_categories and len(text) >= min_chars)
+                # item.setHidden(category_name not in visible_categories and len(text) >= min_chars)
+                should_show = category_name in visible_categories
+                item.setHidden(not should_show)
 
     def start_installation(self):
         self._is_stopping = False
