@@ -1066,13 +1066,13 @@
     },
     "Python3": {
       "display_name": "Python 3",
-      "version": "3.13.7",
+      "version": "3.14.2",
       "category": "Ngôn ngữ lập trình",
       "description": "Python là một ngôn ngữ lập trình cho phép bạn làm việc nhanh hơn và tích hợp hệ thống của mình hiệu quả hơn.",
       "type": "Installer",
       "architecture": "64bit",
       "compatible_os_arch": "64bit",
-      "download_url": "https://www.python.org/ftp/python/3.13.7/python-3.13.7-amd64.exe",
+      "download_url": "https://www.python.org/ftp/python/3.14.2/python-3.14.2-amd64.exe",
       "output_filename": "python-amd64.exe",
       "install_params": "/verysilent /PrependPath=1 /InstallAllUsers=1",
       "icon_url": "https://www.python.org/static/img/python-logo.png"
@@ -1166,7 +1166,7 @@
       "download_url": "https://go.microsoft.com/fwlink/p/?LinkID=2182910&clcid=0x42a",
       "output_filename": "OneDriveSetup.exe",
       "install_params": "/silent /allusers",
-      "icon_url": "https://onedrive.live.com/_layouts/15/images/odbfavicon.ico"
+      "icon_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e7/Microsoft_OneDrive_Icon_%282025_-_present%29.svg/2560px-Microsoft_OneDrive_Icon_%282025_-_present%29.svg.png"
     },
     "MEGAsync64": {
       "display_name": "MEGAsync 64bit",

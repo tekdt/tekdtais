@@ -1,4 +1,5 @@
 import sys
+import random
 import os
 import json
 import requests
@@ -82,7 +83,7 @@ if sys.stdout.encoding != 'utf-8':
 
 # --- CÁC HẰNG SỐ VÀ CẤU HÌNH ---
 APP_NAME = "TekDT AIS"
-APP_VERSION = "1.0.5"
+APP_VERSION = "1.0.6"
 GITHUB_REPO_URL = "https://github.com/tekdt/tekdtais"
 REMOTE_APP_LIST_URL = "https://raw.githubusercontent.com/tekdt/tekdtais/refs/heads/main/app_list.json"
     
@@ -580,12 +581,12 @@ class InstallWorker(QThread):
                 self.quit()
             self.finished.emit()
 
-    def _extract_archive(self, archive_path, destination_dir):
+    def _extract_archive(self, app_key, archive_path, destination_dir):
         """
         Sử dụng 7za.exe để giải nén file.
         Hỗ trợ ghi đè (-y) và trích xuất với đầy đủ đường dẫn (x).
         """
-        self.progress.emit(self.app_key, "installing", f"Đang giải nén file...")
+        self.progress.emit(app_key, "installing", f"Đang giải nén file...")
         try:
             # Lệnh: 7za x <archive_path> -o<destination_dir> -y
             # x: giải nén với đường dẫn đầy đủ
@@ -605,7 +606,7 @@ class InstallWorker(QThread):
                 raise Exception(f"Giải nén thất bại: {error_message}")
             return True
         except Exception as e:
-            self.progress.emit(self.app_key, "failed", f"Lỗi giải nén: {e}")
+            self.progress.emit(app_key, "failed", f"Lỗi giải nén: {e}")
             return False
 
     def _find_executable(self, search_dir, pattern):
@@ -685,6 +686,31 @@ class InstallWorker(QThread):
         
     def _build_aria_command(self, app_key, app_info, app_dir):
         download_url = app_info['download_url']
+        USER_AGENTS_LIST = [
+            # Chrome Windows
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+
+            # Edge Windows
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36 Edg/122.0.0.0",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36 Edg/121.0.0.0",
+
+            # Firefox Windows
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:123.0) Gecko/20100101 Firefox/123.0",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:122.0) Gecko/20100101 Firefox/122.0",
+
+            # Chrome macOS
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+
+            # Safari macOS
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_3) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.3 Safari/605.1.15",
+
+            # Chrome Linux
+            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+
+            # Firefox Linux
+            "Mozilla/5.0 (X11; Linux x86_64; rv:123.0) Gecko/20100101 Firefox/123.0",
+        ]
         
         # Logic xử lý file .torrent
         if download_url.lower().endswith('.torrent'):
@@ -708,6 +734,7 @@ class InstallWorker(QThread):
                     "--max-connection-per-server=16", "--split=16", "--min-split-size=1M",
                     "--show-console-readout=false", "--summary-interval=1",
                     "--seed-time=0",  "--allow-overwrite=true",
+                    f'--user-agent="{random.choice(USER_AGENTS_LIST)}"',
                     str(local_torrent_path) # Nguồn là file torrent cục bộ
                 ]
             except requests.RequestException as e:
@@ -721,6 +748,7 @@ class InstallWorker(QThread):
                 str(ARIA2_EXEC), "--dir", str(app_dir), "--out", file_name,
                 "--max-connection-per-server=16", "--split=16", "--min-split-size=1M",
                 "--show-console-readout=false", "--summary-interval=1",  "--allow-overwrite=true",
+                f'--user-agent="{random.choice(USER_AGENTS_LIST)}"',
                 download_url
             ]
         
@@ -750,58 +778,6 @@ class InstallWorker(QThread):
                 # Xử lý các tác vụ không cần tải (nếu có)
                 self._process_remaining_tasks()
                 self.quit()
-                # self.finished.emit() # Báo hiệu worker đã xong việc
-
-    def _process_single_task(self, app_key, task_def):
-        if self._is_stopped: return
-
-        app_info = task_def['info']
-        action = task_def['action'] # 'install' hoặc 'update'
-        display_name = app_info.get('display_name', app_key)
-        task_successful = False
-
-        self._download_icon_if_needed(app_key, app_info)
-
-        # Logic xử lý chính: Dù là 'install' hay 'update', cuối cùng cũng sẽ chạy trình cài đặt
-        # nếu đó là loại 'installer'.
-        if app_info.get('type', '').lower() == 'installer':
-            output_filename_str = app_info.get('output_filename', Path(app_info['download_url']).name)
-            archive_name = output_filename_str.split('|', 1)[0] if '|' in output_filename_str else output_filename_str
-            download_path = APPS_DIR / key / archive_name
-            if not download_path.exists():
-                self.update_widget_status.emit(app_key, "failed")
-                self.progress.emit(app_key, "failed", f"Lỗi: Không tìm thấy file đã tải của {display_name}.")
-                return
-
-            self.update_widget_status.emit(app_key, "installing")
-            self.progress.emit(app_key, "installing", f"Đang cài đặt {display_name}...")
-
-            install_params = app_info.get('install_params', '')
-            install_command = [str(download_path)] + shlex.split(install_params)
-            try:
-                # Chạy tiến trình cài đặt
-                install_process = subprocess.Popen(install_command, creationflags=subprocess.CREATE_NO_WINDOW)
-                install_process.wait(timeout=600) # Chờ tối đa 10 phút
-
-                if install_process.returncode == 0:
-                    self.update_widget_status.emit(app_key, "success")
-                    self.progress.emit(app_key, "success", f"Đã xử lý {display_name} thành công!")
-                    task_successful = True
-                else:
-                    self.update_widget_status.emit(app_key, "failed")
-                    self.progress.emit(app_key, "failed", f"Cài đặt thất bại (mã lỗi: {install_process.returncode}).")
-            except subprocess.TimeoutExpired:
-                self.update_widget_status.emit(app_key, "failed")
-                self.progress.emit(app_key, "failed", f"Cài đặt quá thời gian cho phép.")
-            except Exception as e:
-                self.update_widget_status.emit(app_key, "failed")
-                self.progress.emit(app_key, "failed", f"Lỗi khi chạy cài đặt: {e}")
-                
-        elif app_info.get('type').lower() == 'Portable' or action == 'download':
-            # Đối với portable hoặc chỉ download, tải xong là thành công
-            self.update_widget_status.emit(app_key, "success")
-            self.progress.emit(app_key, "success", f"Đã xử lý {display_name} thành công!")
-            task_successful = True
     
     def _process_remaining_tasks(self):
         """Xử lý các tác vụ còn lại như cài đặt, cập nhật icon..."""
@@ -890,7 +866,7 @@ class InstallWorker(QThread):
                     extraction_dir = EXTRACTION_BASE_DIR / app_key
                     extraction_dir.mkdir(parents=True, exist_ok=True)
                     
-                    if not self._extract_archive(download_path, extraction_dir):
+                    if not self._extract_archive(app_key, download_path, extraction_dir):
                         # Hàm _extract_archive đã tự gửi tín hiệu lỗi, nên chỉ cần continue
                         continue
                     
@@ -913,7 +889,7 @@ class InstallWorker(QThread):
                 install_command = [str(executable_path)] + shlex.split(install_params)
                 
                 # Xử lý đặc biệt cho file .bat
-                if executable_path.suffix.lower() == '.bat':
+                if executable_path.suffix.lower() == '.bat' or executable_path.suffix.lower() == '.cmd':
                     install_command = ['cmd.exe', '/c'] + install_command
                     # Loại bỏ CREATE_NO_WINDOW cho .bat
                     creation_flags = 0
