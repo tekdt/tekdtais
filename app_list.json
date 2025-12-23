@@ -450,7 +450,7 @@
       "compatible_os_arch": "both",
       "download_url": "https://download.extendoffice.com/downloads/SetupOfficeTab.msi",
       "output_filename": "SetupOfficeTab.msi",
-      "install_params": "/quiet /norestart",
+      "install_params": "/quiet /qn /norestart",
       "icon_url": "https://i-cdn.apsgo.com/cdn/HHsdsvy5NrMo67Ng5Xtq8e5X3yCsUFXdwIyWuUW7.webp"
     },
     "FurMarkROG": {
@@ -1256,7 +1256,7 @@
       "compatible_os_arch": "64bit",
       "download_url": "https://the.earth.li/~sgtatham/putty/latest/w64/putty-64bit-0.83-installer.msi",
       "output_filename": "putty-64bit-installer.msi",
-      "install_params": "/qn /norestart",
+      "install_params": "/quiet /qn /norestart",
       "icon_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e7/PuTTY_Icon.svg/2048px-PuTTY_Icon.svg.png"
     },
     "PuTTY_32": {
@@ -1269,7 +1269,7 @@
       "compatible_os_arch": "32bit",
       "download_url": "https://the.earth.li/~sgtatham/putty/latest/w32/putty-0.83-installer.msi",
       "output_filename": "putty-installer.msi",
-      "install_params": "/qn /norestart",
+      "install_params": "/quiet /qn /norestart",
       "icon_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e7/PuTTY_Icon.svg/2048px-PuTTY_Icon.svg.png"
     }
   }
