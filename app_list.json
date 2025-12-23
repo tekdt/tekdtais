@@ -1025,19 +1025,6 @@
       "install_params": "/verysilent",
       "icon_url": "https://www.xnview.com/img/app-xnconvert-512.webp"
     },
-    "OneClickWinRar": {
-      "display_name": "OneClickWinRar",
-      "version": "0.13.1",
-      "category": "Kích hoạt",
-      "description": "OneClickWinRar là một tập hợp các tập lệnh được sắp xếp hợp lý cài đặt và cấp phép WinRAR chỉ với một cú nhấp chuột. Hoàn hảo cho các thiết lập nhanh chóng, nó loại bỏ các bước thủ công, đảm bảo WinRAR sẵn sàng sử dụng ngay lập tức. Lý tưởng cho cả chuyên gia CNTT và người dùng hàng ngày.",
-      "type": "Portable",
-      "architecture": "32bit",
-      "compatible_os_arch": "both",
-      "download_url": "https://github.com/neuralpain/oneclickwinrar/archive/refs/heads/master.zip",
-      "output_filename": "master.zip|licenserar.cmd",
-      "install_params": "",
-      "icon_url": "https://github.com/neuralpain/oneclickwinrar/raw/main/assets/images/oneclickwinrar-header.jpg"
-    },
     "SamDriversOfflineNetwork": {
       "display_name": "SamDrivers Offline Network",
       "version": "25.8",
