@@ -68,18 +68,33 @@ class CheckableComboBox(QComboBox):
 # Đoạn mã này sẽ "ép" Python sử dụng mã hóa UTF-8 cho tất cả các output,
 # giải quyết triệt để lỗi UnicodeEncodeError khi in hoặc hiển thị lỗi.
 # Nó cần được đặt ở ngay đầu chương trình để có hiệu lực sớm nhất.
-if sys.stdout.encoding != 'utf-8':
-    try:
-        # Ghi đè stdout và stderr để sử dụng UTF-8
-        sys.stdout.reconfigure(encoding='utf-8')
-        sys.stderr.reconfigure(encoding='utf-8')
-        print("Đã cấu hình thành công stdout và stderr sang UTF-8.")
-    except TypeError:
-        # Cung cấp một phương pháp thay thế cho các phiên bản Python cũ hơn
-        import io
-        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
-        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8")
-        print("Đã cấu hình thành công stdout và stderr sang UTF-8 (phương pháp thay thế).")
+# if sys.stdout.encoding != 'utf-8':
+    # try:
+        # # Ghi đè stdout và stderr để sử dụng UTF-8
+        # sys.stdout.reconfigure(encoding='utf-8')
+        # sys.stderr.reconfigure(encoding='utf-8')
+        # print("Đã cấu hình thành công stdout và stderr sang UTF-8.")
+    # except TypeError:
+        # # Cung cấp một phương pháp thay thế cho các phiên bản Python cũ hơn
+        # import io
+        # sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
+        # sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8")
+        # print("Đã cấu hình thành công stdout và stderr sang UTF-8 (phương pháp thay thế).")
+# Kiểm tra nếu stdout tồn tại (không ở chế độ window-only)
+if sys.stdout is not None:
+    if sys.stdout.encoding != 'utf-8':
+        try:
+            sys.stdout.reconfigure(encoding='utf-8')
+            sys.stderr.reconfigure(encoding='utf-8')
+        except (TypeError, AttributeError):
+            import io
+            sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
+            sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8")
+else:
+    # Nếu chạy ở chế độ disable console, chuyển hướng output vào hư không (devnull)
+    # để các lệnh print() trong code không gây crash ứng dụng.
+    sys.stdout = open(os.devnull, 'w', encoding='utf-8')
+    sys.stderr = open(os.devnull, 'w', encoding='utf-8')
 
 # --- CÁC HẰNG SỐ VÀ CẤU HÌNH ---
 APP_NAME = "TekDT AIS"
@@ -3310,7 +3325,7 @@ if __name__ == '__main__':
     )
 
     # Xử lý /help riêng biệt vì nó không cần chờ
-    if '/help' in cli_command_args:
+    if '/help' in cli_command_args or '--help' in cli_command_args or '/?' in cli_command_args:
         help_text = """Sử dụng TekDT AIS qua dòng lệnh:
   /help                       Hiển thị trợ giúp này.
   /install                  Cài đặt các phần mềm có auto_install=true đã được tải về.
