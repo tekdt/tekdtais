@@ -9,7 +9,7 @@
       "architecture": "64bit",
       "compatible_os_arch": "64bit",
       "download_url": "https://dl.google.com/dl/chrome/install/googlechromestandaloneenterprise64.msi",
-      "install_params": "/quiet /norestart",
+      "install_params": "/quiet /qn /norestart",
       "output_filename": "googlechromestandaloneenterprise64.msi",
       "icon_url": "https://www.google.com/chrome/static/images/chrome-logo-m100.svg"
     },
@@ -22,7 +22,7 @@
       "architecture": "32bit",
       "compatible_os_arch": "both",
       "download_url": "https://dl.google.com/dl/chrome/install/googlechromestandaloneenterprise.msi",
-      "install_params": "/quiet /norestart",
+      "install_params": "/quiet /qn /norestart",
       "output_filename": "googlechromestandaloneenterprise.msi",
       "icon_url": "https://www.google.com/chrome/static/images/chrome-logo-m100.svg"
     },

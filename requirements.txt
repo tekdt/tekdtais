@@ -1,1 +1,3 @@
-requests packaging PySide6
+requests
+packaging
+PySide6
