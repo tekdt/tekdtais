@@ -765,45 +765,6 @@
       "install_params": "/quiet /qn /norestart",
       "icon_url": "https://st2.zoom.us/static/6.3.41408/image/new/topNav/Resources-ZoomClient.png"
     },
-    "mas_aio": {
-      "display_name": "Microsoft Activation Scripts",
-      "version": "3.5",
-      "category": "Kích hoạt",
-      "description": "Kích hoạt Windows và Office.",
-      "type": "Portable",
-      "architecture": "32bit",
-      "compatible_os_arch": "both",
-      "download_url": "https://github.com/massgravel/Microsoft-Activation-Scripts/archive/refs/heads/master.zip",
-      "output_filename": "MAS.zip|MAS_AIO*.cmd",
-      "install_params": "",
-      "icon_url": "https://massgrave.dev/img/logo.png"
-    },
-    "idm_as": {
-      "display_name": "IDM Activation Script (Activator + Registry Cleaner)",
-      "version": "6.42",
-      "category": "Kích hoạt",
-      "description": "IDM Activation Script là công cụ được thiết kế để kích hoạt Internet Download Manager (IDM) miễn phí, cho phép người dùng bỏ qua các hạn chế trong thời gian dùng thử và tận hưởng phiên bản đầy đủ mà không cần mua giấy phép.",
-      "type": "Portable",
-      "architecture": "32bit",
-      "compatible_os_arch": "both",
-      "download_url": "https://github.com/Coporton/IDM-Activation-Script/archive/refs/heads/master.zip",
-      "output_filename": "IDM_AS.zip|IASL.cmd",
-      "install_params": "",
-      "icon_url": "https://cdn.coporton.com/data/CWS-Logo-Full-White.svg"
-    },
-    "ias": {
-      "display_name": "IDM Activation Script (IAS)",
-      "version": "3.7",
-      "category": "Kích hoạt",
-      "description": "Một công cụ mã nguồn mở để kích hoạt, đóng băng, đặt lại và chặn tường lửa Internet Download Manager (IDM).",
-      "type": "Portable",
-      "architecture": "32bit",
-      "compatible_os_arch": "both",
-      "download_url": "https://github.com/Blindsinner/IDM-ACTIVATION-SCRIPT/archive/refs/heads/master.zip",
-      "output_filename": "IAS.zip|IAS.cmd",
-      "install_params": "",
-      "icon_url": "https://cdn-icons-png.flaticon.com/512/6112/6112200.png"
-    },
     "Defender_Remover": {
       "display_name": "Defender Remover",
       "version": "12.8.4",
