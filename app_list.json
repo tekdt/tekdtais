@@ -1025,32 +1025,6 @@
       "install_params": "/verysilent",
       "icon_url": "https://www.xnview.com/img/app-xnconvert-512.webp"
     },
-    "SamDriversOfflineNetwork": {
-      "display_name": "SamDrivers Offline Network",
-      "version": "25.8",
-      "category": "Trình điều khiển",
-      "description": "Nó chứa trình điều khiển cho phần cứng mạng (Lan/Wi-Fi) và không yêu cầu kết nối Internet để hoạt động",
-      "type": "Portable",
-      "architecture": "32bit",
-      "compatible_os_arch": "both",
-      "download_url": "https://driveroff.net/SamDrivers_25.8_LAN.torrent",
-      "output_filename": "SamDrivers_25.8_LAN.exe|SDI-drv.exe",
-      "install_params": "-nogui -license -autoinstall -autoclose",
-      "icon_url": "https://samlab.ws/img/_logo1.gif"
-    },
-    "SDIOOfflineFull": {
-      "display_name": "Snappy Driver Installer Origin Offline Full (>40GB)",
-      "version": "25.08.3",
-      "category": "Trình điều khiển",
-      "description": "Nó chứa tất cả các trình điều khiển, hoạt động mà không cần kết nối internet",
-      "type": "Portable",
-      "architecture": "32bit",
-      "compatible_os_arch": "both",
-      "download_url": "https://sdi-tool.org/SDI_Update.torrent",
-      "output_filename": "SDI_R2503.exe",
-      "install_params": "-nogui -license -autoinstall -autoclose",
-      "icon_url": "https://sdi-tool.org/html/images/logo2m.png"
-    },
     "BulkFileChanger": {
       "display_name": "Bulk File Changer",
       "version": "1.73",
