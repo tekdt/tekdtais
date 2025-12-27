@@ -5,6 +5,7 @@ logo.svg
 app_config.json
 exe.json
 build.bat
-build
+output
 tekdt_ais.exe
 nuitka-crash-report.xml
+sign.bat

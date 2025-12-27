@@ -701,31 +701,7 @@ class InstallWorker(QThread):
         
     def _build_aria_command(self, app_key, app_info, app_dir):
         download_url = app_info['download_url']
-        USER_AGENTS_LIST = [
-            # Chrome Windows
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
-
-            # Edge Windows
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36 Edg/122.0.0.0",
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36 Edg/121.0.0.0",
-
-            # Firefox Windows
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:123.0) Gecko/20100101 Firefox/123.0",
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:122.0) Gecko/20100101 Firefox/122.0",
-
-            # Chrome macOS
-            "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-
-            # Safari macOS
-            "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_3) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.3 Safari/605.1.15",
-
-            # Chrome Linux
-            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-
-            # Firefox Linux
-            "Mozilla/5.0 (X11; Linux x86_64; rv:123.0) Gecko/20100101 Firefox/123.0",
-        ]
+        USER_AGENT = f"TekDT-AIS/{APP_VERSION} (Windows NT 10.0; Win64; x64)"
         
         # Logic xử lý file .torrent
         if download_url.lower().endswith('.torrent'):
@@ -749,7 +725,7 @@ class InstallWorker(QThread):
                     "--max-connection-per-server=16", "--split=16", "--min-split-size=1M",
                     "--show-console-readout=false", "--summary-interval=1",
                     "--seed-time=0",  "--allow-overwrite=true",
-                    f'--user-agent="{random.choice(USER_AGENTS_LIST)}"',
+                    f'--user-agent="{USER_AGENT}"',
                     str(local_torrent_path) # Nguồn là file torrent cục bộ
                 ]
             except requests.RequestException as e:
@@ -763,7 +739,7 @@ class InstallWorker(QThread):
                 str(ARIA2_EXEC), "--dir", str(app_dir), "--out", file_name,
                 "--max-connection-per-server=16", "--split=16", "--min-split-size=1M",
                 "--show-console-readout=false", "--summary-interval=1",  "--allow-overwrite=true",
-                f'--user-agent="{random.choice(USER_AGENTS_LIST)}"',
+                f'--user-agent="{USER_AGENT}"',
                 download_url
             ]
         
