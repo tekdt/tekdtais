@@ -1,3 +1,5 @@
 requests
 packaging
 PySide6
+PyInstaller
+auto-py-to-exe
