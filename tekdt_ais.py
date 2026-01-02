@@ -264,7 +264,7 @@ class ToolManager(QObject):
                 shutil.rmtree(extract_dir)
             extract_dir.mkdir(parents=True, exist_ok=True)
             
-            command = ['msiexec', '/a', str(msi_path), '/qb', f'TARGETDIR={str(extract_dir)}']
+            command = ['msiexec', '/a', str(msi_path), '/qn', f'TARGETDIR={str(extract_dir)}']
             process = subprocess.run(command, capture_output=True, text=True, encoding='utf-8', errors='ignore', timeout=300, check=False, creationflags=subprocess.CREATE_NO_WINDOW)
             
             if process.returncode != 0:
