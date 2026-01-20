@@ -17,6 +17,7 @@ import threading
 import queue
 import time
 import unicodedata
+import certifi
 from packaging.version import parse as parse_version
 
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
@@ -184,6 +185,7 @@ class ToolManager(QObject):
         self.session = requests.Session()
         # GitHub API cần User-Agent
         self.session.headers.update({'User-Agent': 'TekDT-AIS-App'})
+        self.session.verify = certifi.where()
 
     def run_checks(self):
         tools_present = ARIA2_EXEC.exists() and SEVENZ_EXEC.exists() and ODT_EXEC.exists()
