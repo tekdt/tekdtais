@@ -18,6 +18,7 @@ import queue
 import time
 import unicodedata
 import certifi
+
 from packaging.version import parse as parse_version
 
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
@@ -126,7 +127,7 @@ ARIA2_EXEC = ARIA2_DIR / "aria2c.exe"
 SEVENZ_EXEC = SEVENZ_DIR / "7z.exe"
 ARIA2_API_URL = "https://api.github.com/repos/aria2/aria2/releases/latest"
 SEVENZIP_API_URL = "https://api.github.com/repos/ip7z/7zip/releases/latest"
-ODT_SETUP_URL = "https://download.microsoft.com/download/6c1eeb25-cf8b-41d9-8d0d-cc1dbc032140/officedeploymenttool_19029-20136.exe"
+ODT_SETUP_URL = "https://download.microsoft.com/download/6c1eeb25-cf8b-41d9-8d0d-cc1dbc032140/officedeploymenttool_19628-20046.exe"
 ODT_DIR = TOOLS_DIR / "ODT"
 ODT_EXEC = ODT_DIR / "setup.exe"
 EXTRACTION_BASE_DIR = Path("C:/TEKDT_AIS")
@@ -305,7 +306,7 @@ class ToolManager(QObject):
         version_file = tool_dir / ".version"
         local_version = version_file.read_text().strip() if version_file.exists() else "0"
 
-        response = self.session.get(api_url)
+        response = self.session.get(api_url, verify=False)
         response.raise_for_status()
         latest_release = response.json()
         remote_version = latest_release['tag_name']
@@ -323,7 +324,7 @@ class ToolManager(QObject):
                 raise Exception(f"Không tìm thấy file tải về phù hợp cho {tool_name}")
                 
             # Tải file
-            file_response = self.session.get(download_url)
+            file_response = self.session.get(download_url, verify=False)
             file_response.raise_for_status()
             file_content = file_response.content
             file_name = Path(download_url).name
@@ -353,7 +354,7 @@ class ToolManager(QObject):
         self.progress_update.emit("Đang tải Office Deployment Tool...")
         try:
             # Tải file .exe chứa ODT
-            response = self.session.get(ODT_SETUP_URL, stream=True)
+            response = self.session.get(ODT_SETUP_URL, stream=True, verify=False)
             response.raise_for_status()
 
             # ODT là một self-extracting archive, cần chạy nó để giải nén
