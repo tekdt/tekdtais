@@ -38,7 +38,7 @@ class CheckableComboBox(QComboBox):
         self.view().pressed.connect(self.handleItemPressed)
         self.setModel(QStandardItemModel(self))
         self.view().setTextElideMode(Qt.TextElideMode.ElideRight) 
-        self.setPlaceholderText("All categories")
+        self.setPlaceholderText("Tất cả danh mục")
 
     def handleItemPressed(self, index):
         item = self.model().itemFromIndex(index)
@@ -162,7 +162,7 @@ initialize_directories_and_tools()
 class CliProgressWindow(QWidget):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Installing Process - TekDT AIS")
+        self.setWindowTitle("Tiến trình cài đặt - TekDT AIS")
         self.setGeometry(150, 150, 700, 400)
         layout = QVBoxLayout(self)
         self.log_output = QTextEdit()
@@ -194,12 +194,12 @@ class ToolManager(QObject):
 
         # 1. Kiểm tra kết nối mạng một cách an toàn
         try:
-            self.progress_update.emit("Checking internet connection...")
+            self.progress_update.emit("Kiểm tra kết nối internet...")
             self.session.get("https://www.google.com", timeout=5)
             is_online = True
-            self.progress_update.emit("Connected internet. Check the update for tools...")
+            self.progress_update.emit("Đã kết nối internet. Kiểm tra cập nhật công cụ...")
         except requests.ConnectionError:
-            self.progress_update.emit("No internet connection. Use the tools are available (if ready).")
+            self.progress_update.emit("Không có internet. Sử dụng công cụ có sẵn (nếu có).")
             is_online = False
 
         # 2. Xử lý logic dựa trên trạng thái online và sự tồn tại của công cụ
@@ -209,20 +209,20 @@ class ToolManager(QObject):
                 self._check_7zip()
                 self._check_aria2()
                 self._check_odt()
-                self.finished.emit(True, "Check the tool completion.")
+                self.finished.emit(True, "Kiểm tra công cụ hoàn tất.")
             except Exception as e:
                 # Nếu cập nhật thất bại nhưng công cụ đã có sẵn, vẫn có thể tiếp tục
                 if tools_present:
-                    self.finished.emit(True, f"Error when updating the tool: {e}. Use the available version..")
+                    self.finished.emit(True, f"Lỗi khi cập nhật công cụ: {e}. Sử dụng phiên bản có sẵn.")
                 else: # Nếu cập nhật thất bại và cũng không có sẵn công cụ -> Lỗi nghiêm trọng
-                    self.finished.emit(False, f"Error loading required tools: {e}. Please check your network and try again..")
+                    self.finished.emit(False, f"Lỗi tải công cụ cần thiết: {e}. Vui lòng kiểm tra mạng và thử lại.")
         else: # Nếu offline
             if tools_present:
                 # Offline nhưng có công cụ -> OK để tiếp tục
-                self.finished.emit(True, "Use the tools available in offline mode..")
+                self.finished.emit(True, "Sử dụng công cụ có sẵn ở chế độ offline.")
             else:
                 # Offline và thiếu công cụ -> Lỗi nghiêm trọng
-                self.finished.emit(False, "Missing tools and no internet connection to download. Please connect to the network and restart..")
+                self.finished.emit(False, "Thiếu công cụ và không có internet để tải. Vui lòng kết nối mạng và khởi động lại.")
 
     def _check_7zip(self):
         tool_dir = SEVENZ_DIR
@@ -238,7 +238,7 @@ class ToolManager(QObject):
         remote_version = latest_release['tag_name']
 
         if remote_version != local_version or not exec_file.exists():
-            self.progress_update.emit(f"Looking for {tool_name} version {remote_version}...")
+            self.progress_update.emit(f"Đang tìm {tool_name} phiên bản {remote_version}...")
 
             asset_name = f"7z{remote_version.replace('.', '')}.msi"
             download_url = ""
@@ -248,9 +248,9 @@ class ToolManager(QObject):
                     break
 
             if not download_url:
-                raise Exception(f"No download file '{asset_name}' for {tool_name}")
+                raise Exception(f"Không tìm thấy file tải về '{asset_name}' cho {tool_name}")
 
-            self.progress_update.emit(f"Downloading {tool_name} ({asset_name})...")
+            self.progress_update.emit(f"Đang tải {tool_name} ({asset_name})...")
 
             # Tải file .msi vào TOOLS_DIR
             file_response = self.session.get(download_url)
@@ -261,7 +261,7 @@ class ToolManager(QObject):
                 f.write(file_content)
 
             # Giải nén .msi bằng msiexec (administrative install)
-            self.progress_update.emit(f"Extracting {tool_name}...")
+            self.progress_update.emit(f"Đang giải nén {tool_name}...")
             extract_dir = TOOLS_DIR / "7z_extract_temp"
             if extract_dir.exists():
                 shutil.rmtree(extract_dir)
@@ -272,12 +272,12 @@ class ToolManager(QObject):
             
             if process.returncode != 0:
                 error_message = process.stderr or process.stdout
-                raise Exception(f"Extracting .msi failed: {error_message}")
+                raise Exception(f"Giải nén .msi thất bại: {error_message}")
 
             # Kiểm tra cấu trúc sau giải nén
             source_dir = extract_dir / "Files" / "7-Zip"
             if not source_dir.exists():
-                raise Exception(f"The 'Files/7-Zip' folder was not found after extraction.")
+                raise Exception(f"Không tìm thấy thư mục 'Files/7-Zip' sau khi giải nén.")
 
             # Xóa tool_dir cũ nếu tồn tại để cập nhật mới
             if tool_dir.exists():
@@ -292,9 +292,9 @@ class ToolManager(QObject):
 
             # Lưu phiên bản mới vào .version
             version_file.write_text(remote_version)
-            self.progress_update.emit(f"{tool_name} has been successfully updated!")
+            self.progress_update.emit(f"Đã cập nhật {tool_name} thành công!")
         else:
-            self.progress_update.emit(f"{tool_name} is the latest version.")
+            self.progress_update.emit(f"{tool_name} đã là phiên bản mới nhất.")
 
     def _check_aria2(self):
         tool_dir = ARIA2_DIR
@@ -312,7 +312,7 @@ class ToolManager(QObject):
         remote_version = latest_release['tag_name']
 
         if remote_version != local_version or not exec_file.exists():
-            self.progress_update.emit(f"Downloading {tool_name} version {remote_version}...")
+            self.progress_update.emit(f"Đang tải {tool_name} phiên bản {remote_version}...")
             
             download_url = ""
             for asset in latest_release['assets']:
@@ -321,7 +321,7 @@ class ToolManager(QObject):
                     break
             
             if not download_url:
-                raise Exception(f"No suitable download file found for {tool_name}")
+                raise Exception(f"Không tìm thấy file tải về phù hợp cho {tool_name}")
                 
             # Tải file
             file_response = self.session.get(download_url, verify=False)
@@ -330,7 +330,7 @@ class ToolManager(QObject):
             file_name = Path(download_url).name
 
             # Giải nén
-            self.progress_update.emit(f"Extracting {tool_name}...")
+            self.progress_update.emit(f"Đang giải nén {tool_name}...")
             if tool_dir.exists():
                 shutil.rmtree(tool_dir)
             
@@ -341,17 +341,17 @@ class ToolManager(QObject):
                 (TOOLS_DIR / extracted_folder_name).rename(tool_dir)
 
             version_file.write_text(remote_version)
-            self.progress_update.emit(f"{tool_name} has been successfully updated!")
+            self.progress_update.emit(f"Đã cập nhật {tool_name} thành công!")
         else:
-            self.progress_update.emit(f"{tool_name} is the latest version.")
+            self.progress_update.emit(f"{tool_name} đã là phiên bản mới nhất.")
             
     def _check_odt(self):
         """Kiểm tra và tải Office Deployment Tool nếu cần."""
         if ODT_EXEC.exists():
-            self.progress_update.emit("The Office Deployment Tool is now available.")
+            self.progress_update.emit("Office Deployment Tool đã có sẵn.")
             return
 
-        self.progress_update.emit("Downloading Office Deployment Tool...")
+        self.progress_update.emit("Đang tải Office Deployment Tool...")
         try:
             # Tải file .exe chứa ODT
             response = self.session.get(ODT_SETUP_URL, stream=True, verify=False)
@@ -362,7 +362,7 @@ class ToolManager(QObject):
             with open(temp_odt_installer, 'wb') as f:
                 shutil.copyfileobj(response.raw, f)
 
-            self.progress_update.emit("Extracting Office Deployment Tool...")
+            self.progress_update.emit("Đang giải nén Office Deployment Tool...")
             ODT_DIR.mkdir(exist_ok=True)
             
             # Lệnh giải nén tự động vào thư mục ODT_DIR
@@ -377,14 +377,14 @@ class ToolManager(QObject):
 
             # subprocess.run sẽ đợi tiến trình con hoàn thành
             if process.returncode != 0:
-                raise Exception(f"ODT decompression failed: {process.stderr}")
+                raise Exception(f"Giải nén ODT thất bại: {process.stderr}")
 
             # Dọn dẹp file cài đặt tạm SAU KHI đã chắc chắn giải nén xong
             temp_odt_installer.unlink()
-            self.progress_update.emit("The Office Deployment Tool is ready..")
+            self.progress_update.emit("Office Deployment Tool đã sẵn sàng.")
 
         except Exception as e:
-            raise Exception(f"Error when processing ODT: {e}")    
+            raise Exception(f"Lỗi khi xử lý ODT: {e}")    
 
 class AriaDownloader(QThread):
     # Tín hiệu trả về app_key để biết tiến trình của app nào
@@ -561,7 +561,7 @@ class InstallWorker(QThread):
                 for app_key, task_def in download_tasks.items():
                     if self._is_stopped: break
                     
-                    self.progress.emit(app_key, "processing", f"Prepare for download...")
+                    self.progress.emit(app_key, "processing", f"Chuẩn bị tải...")
                     app_info = task_def['info']
                     app_dir = APPS_DIR / app_key
                     app_dir.mkdir(exist_ok=True)
@@ -604,7 +604,7 @@ class InstallWorker(QThread):
         Sử dụng 7za.exe để giải nén file.
         Hỗ trợ ghi đè (-y) và trích xuất với đầy đủ đường dẫn (x).
         """
-        self.progress.emit(app_key, "installing", f"Extracting the file...")
+        self.progress.emit(app_key, "installing", f"Đang giải nén file...")
         try:
             # Lệnh: 7za x <archive_path> -o<destination_dir> -y
             # x: giải nén với đường dẫn đầy đủ
@@ -621,10 +621,10 @@ class InstallWorker(QThread):
 
             if process.returncode != 0:
                 error_message = process.stderr or process.stdout
-                raise Exception(f"Extract failed: {error_message}")
+                raise Exception(f"Giải nén thất bại: {error_message}")
             return True
         except Exception as e:
-            self.progress.emit(app_key, "failed", f"Extraction error: {e}")
+            self.progress.emit(app_key, "failed", f"Lỗi giải nén: {e}")
             return False
 
     def _find_executable(self, search_dir, pattern):
@@ -649,7 +649,7 @@ class InstallWorker(QThread):
     def _handle_office_download(self, app_key, app_info):
         """Thực hiện tải bộ cài Office bằng ODT."""
         # self.update_widget_status.emit(app_key, "processing")
-        self.progress.emit(app_key, "processing", "Creating configuration file...")
+        self.progress.emit(app_key, "processing", "Đang tạo file cấu hình...")
         
         app_dir = APPS_DIR / app_key
         app_dir.mkdir(exist_ok=True)
@@ -674,7 +674,7 @@ class InstallWorker(QThread):
         with open(config_path, 'w', encoding='utf-8') as f:
             f.write(xml_content.strip())
 
-        self.progress.emit(app_key, "processing", "Starting to download Office (this may take a few minutes)...")
+        self.progress.emit(app_key, "processing", "Bắt đầu tải Office (có thể mất vài phút)...")
         self.update_widget_status.emit(app_key, "downloading_office")
         command = [str(ODT_EXEC), '/download', str(config_path)]
         
@@ -692,7 +692,7 @@ class InstallWorker(QThread):
                 with open(marker_file, 'w') as f:
                     f.write('done')
                 self.update_widget_status.emit(app_key, "success")
-                self.progress.emit(app_key, "success", "Office download successful!")
+                self.progress.emit(app_key, "success", "Tải Office thành công!")
                 # Ghi config
                 self._commit_config_changes({app_key: {'info': app_info, 'action': 'download'}})
             else:
@@ -700,7 +700,7 @@ class InstallWorker(QThread):
 
         except Exception as e:
             self.update_widget_status.emit(app_key, "failed")
-            self.progress.emit(app_key, "failed", f"Office download error: {e}")
+            self.progress.emit(app_key, "failed", f"Lỗi tải Office: {e}")
         
     def _build_aria_command(self, app_key, app_info, app_dir):
         download_url = app_info['download_url']
@@ -709,7 +709,7 @@ class InstallWorker(QThread):
         # Logic xử lý file .torrent
         if download_url.lower().endswith('.torrent'):
             try:
-                self.progress.emit(app_key, "processing", "Downloading .torrent file...")
+                self.progress.emit(app_key, "processing", "Đang tải tệp .torrent...")
                 torrent_response = self.session.get(download_url, timeout=30)
                 torrent_response.raise_for_status()
                 
@@ -720,7 +720,7 @@ class InstallWorker(QThread):
                 with open(local_torrent_path, 'wb') as f:
                     f.write(torrent_response.content)
                 
-                self.progress.emit(app_key, "processing", "Downloading content from torrent...")
+                self.progress.emit(app_key, "processing", "Đang tải nội dung từ torrent...")
                 
                 # Tạo lệnh aria2c cho torrent, không cần --out
                 command = [
@@ -733,7 +733,7 @@ class InstallWorker(QThread):
                 ]
             except requests.RequestException as e:
                 # Nếu không tải được file torrent, báo lỗi và dừng lại
-                raise Exception(f"Unable to load .torrent file from {download_url}: {e}")
+                raise Exception(f"Không thể tải tệp .torrent từ {download_url}: {e}")
         else:
             # Logic cũ cho các link tải trực tiếp
             output_filename_str = app_info.get('output_filename', Path(download_url).name)
@@ -759,13 +759,13 @@ class InstallWorker(QThread):
             
             if success:
                 self.update_widget_status.emit(app_key, "success")
-                self.progress.emit(app_key, "success", f"{display_name} was downloaded successfully!")
+                self.progress.emit(app_key, "success", f"Đã tải {display_name} thành công!")
                 self.tasks_to_process_after_download[app_key] = task_def
                 self._commit_config_changes({app_key: task_def})
             else:
                 status = "stopped" if self._is_stopped else "failed"
                 self.update_widget_status.emit(app_key, status) # Cập nhật UI thất bại
-                self.progress.emit(app_key, status, f"Downloaded failed.")
+                self.progress.emit(app_key, status, f"Tải thất bại.")
 
             self.active_downloads -= 1
             if self.active_downloads == 0:
@@ -795,7 +795,7 @@ class InstallWorker(QThread):
             if app_info.get('type', '').lower() == 'office_suite' and action in ["install", "update"]:
                 # --- LOGIC CÀI ĐẶT OFFICE ---
                 self.update_widget_status.emit(app_key, "installing")
-                self.progress.emit(app_key, "installing", f"Installing {display_name}...")
+                self.progress.emit(app_key, "installing", f"Đang cài đặt {display_name}...")
                 
                 app_dir = APPS_DIR / app_key
                 # Tạo file XML để install
@@ -831,7 +831,7 @@ class InstallWorker(QThread):
             if action == "download" or app_info.get('type', '').lower() == 'portable':
                 # Với 'download' hoặc portable, chỉ cần tải xong là thành công
                 self.update_widget_status.emit(app_key, "success")
-                self.progress.emit(app_key, "success", f"{display_name} has been processed successfully!")
+                self.progress.emit(app_key, "success", f"Đã xử lý {display_name} thành công!")
                 task_successful = True
 
             elif (action == "install" or action == "update") and app_info.get('type', '').lower() == 'installer':
@@ -849,7 +849,7 @@ class InstallWorker(QThread):
                 
                 if not download_path.exists():
                     self.update_widget_status.emit(app_key, "failed")
-                    self.progress.emit(app_key, "failed", f"Error: Downloaded file not found'{archive_name}'.")
+                    self.progress.emit(app_key, "failed", f"Lỗi: Không tìm thấy file đã tải '{archive_name}'.")
                     continue
 
                 search_base_dir = APPS_DIR / app_key # Mặc định tìm trong thư mục app
@@ -867,17 +867,17 @@ class InstallWorker(QThread):
                     search_base_dir = extraction_dir # Cập nhật lại đường dẫn tìm kiếm
 
                 # 3. Tìm file thực thi dựa trên pattern (hỗ trợ wildcard *)
-                self.progress.emit(app_key, "installing", f"Looking for the executable file '{executable_pattern}'...")
+                self.progress.emit(app_key, "installing", f"Đang tìm file thực thi '{executable_pattern}'...")
                 executable_path = self._find_executable(search_base_dir, executable_pattern)
 
                 if not executable_path:
                     self.update_widget_status.emit(app_key, "failed")
-                    self.progress.emit(app_key, "failed", f"Executable file not found '{executable_pattern}'.")
+                    self.progress.emit(app_key, "failed", f"Không tìm thấy file thực thi '{executable_pattern}'.")
                     continue
 
                 # 4. Chạy file thực thi đã tìm được với các tham số
                 self.update_widget_status.emit(app_key, "installing")
-                self.progress.emit(app_key, "installing", f"Installing {display_name}...")
+                self.progress.emit(app_key, "installing", f"Đang cài đặt {display_name}...")
                 
                 install_params = app_info.get('install_params', '')
                 install_command = [str(executable_path)] + shlex.split(install_params)
@@ -899,17 +899,17 @@ class InstallWorker(QThread):
 
                     if install_process.returncode in [0, 3010]:
                         self.update_widget_status.emit(app_key, "success")
-                        self.progress.emit(app_key, "success", f"{display_name} has been processed successfully!")
+                        self.progress.emit(app_key, "success", f"Đã xử lý {display_name} thành công!")
                         task_successful = True
                     else:
                         self.update_widget_status.emit(app_key, "failed")
-                        self.progress.emit(app_key, "failed", f"Installation failed (error code: {install_process.returncode}).")
+                        self.progress.emit(app_key, "failed", f"Cài đặt thất bại (mã lỗi: {install_process.returncode}).")
                 except subprocess.TimeoutExpired:
                     self.update_widget_status.emit(app_key, "failed")
-                    self.progress.emit(app_key, "failed", f"The installation time has expired")
+                    self.progress.emit(app_key, "failed", f"Cài đặt quá thời gian cho phép.")
                 except Exception as e:
                     self.update_widget_status.emit(app_key, "failed")
-                    self.progress.emit(app_key, "failed", f"Error during installation: {e}")
+                    self.progress.emit(app_key, "failed", f"Lỗi khi chạy cài đặt: {e}")
 
             # Nếu tác vụ thành công, thêm vào danh sách để cập nhật config
             if task_successful:
@@ -969,7 +969,7 @@ class InstallWorker(QThread):
                     self.tasks_batch_completed.emit(updated_items_for_signal)
 
             except (IOError, json.JSONDecodeError) as e:
-                self.error.emit(f"Serious error when writing configuration file: {e}")
+                self.error.emit(f"Lỗi nghiêm trọng khi ghi file config: {e}")
 
     
     def _download_icon_if_needed(self, app_key, app_info):
@@ -1070,7 +1070,7 @@ class AppItemWidget(QWidget):
         
         self.name_label = QLabel(f"{app_info.get('display_name', 'N/A')}")
         self.name_label.setStyleSheet("font-weight: bold; font-size: 12pt;")
-        self.version_label = QLabel(f"Version: {app_info.get('version', 'N/A')}")
+        self.version_label = QLabel(f"Phiên bản: {app_info.get('version', 'N/A')}")
         self.version_label.setStyleSheet("color: #bdc3c7; font-size: 10pt;")
         
         self.info_layout.addWidget(self.name_label)
@@ -1098,28 +1098,28 @@ class AppItemWidget(QWidget):
         self._progress_animation.setDuration(500) # Thời gian chuyển động ngắn để tạo cảm giác real-time
         self._progress_animation.setEasingCurve(QEasingCurve.Type.Linear)
         
-        self.setToolTip(app_info.get('description', 'No description.'))
+        self.setToolTip(app_info.get('description', 'Không có mô tả.'))
 
     def _on_action_button_clicked(self):
         if self.embed_mode:
-            is_currently_set_for_auto_install = self.action_button.text() == "Remove"
+            is_currently_set_for_auto_install = self.action_button.text() == "Xoá"
             new_state = not is_currently_set_for_auto_install
             self.auto_install_toggled.emit(self.app_key, new_state)
             self.set_auto_install_button_state(new_state)
         else:
-            if self.action_button.text() == "Add":
+            if self.action_button.text() == "Thêm":
                 self.add_requested.emit(self.app_key, self.app_info)
 
     def set_auto_install_button_state(self, is_auto_install):
         if is_auto_install:
-            self.action_button.setText("Remove")
-            self.action_button.setToolTip(f"Cancel automatic installation of {self.app_info['display_name']}")
+            self.action_button.setText("Xoá")
+            self.action_button.setToolTip(f"Huỷ tự động cài đặt {self.app_info['display_name']}")
             self.action_button.setStyleSheet(
                 "background-color: #e74c3c; color: white; border: none; padding: 8px 16px; border-radius: 4px; font-weight: bold;"
             ) # Màu đỏ
         else:
-            self.action_button.setText("Add")
-            self.action_button.setToolTip(f"Enable automatic installation of {self.app_info['display_name']}")
+            self.action_button.setText("Thêm")
+            self.action_button.setToolTip(f"Bật tự động cài đặt {self.app_info['display_name']}")
             self.action_button.setStyleSheet(
                 "background-color: #4CAF50; color: white; border: none; padding: 8px 16px; border-radius: 4px; font-weight: bold;"
             ) # Màu xanh
@@ -1251,7 +1251,7 @@ class AppListLoader(QObject):
         """Hàm chính thực thi các tác vụ mạng."""
         try:
             # Tải danh sách phần mềm từ xa
-            self.progress_update.emit("Loading the list of software from the server....")
+            self.progress_update.emit("Đang tải danh sách phần mềm từ máy chủ...")
             cache_bust = int(time.time())  # Thêm timestamp để tránh cache
             url_with_bust = f"{REMOTE_APP_LIST_URL}?cache_bust={cache_bust}"
             response = self.session.get(url_with_bust, timeout=10)
@@ -1262,7 +1262,7 @@ class AppListLoader(QObject):
             generated_office_apps = TekDT_AIS._generate_office_suites_info(None) # Gọi phương thức tĩnh
             remote_apps.get("app_items", {}).update(generated_office_apps)
             
-            self.progress_update.emit("Checking and updating the software icon....")
+            self.progress_update.emit("Đang kiểm tra và cập nhật icon phần mềm...")
             all_apps = remote_apps.get("app_items", {})
             config_needs_saving = False
 
@@ -1311,7 +1311,7 @@ class AppListLoader(QObject):
 
             # Sau khi duyệt qua tất cả các app, lưu lại file config MỘT LẦN nếu có sự thay đổi
             if config_needs_saving:
-                self.progress_update.emit("Saving new icon information...")
+                self.progress_update.emit("Đang lưu lại thông tin icon mới...")
                 try:
                     # Tải lại toàn bộ cấu trúc config hiện tại để không làm mất mục 'settings'
                     full_config = {}
@@ -1373,7 +1373,7 @@ class TekDT_AIS(QMainWindow):
         # Vô hiệu hóa UI và hiển thị trạng thái khởi động
         self.central_widget_ref = self.centralWidget()
         self.central_widget_ref.setEnabled(False)
-        self.show_startup_status("Initializing...")
+        self.show_startup_status("Đang khởi tạo...")
         
         QTimer.singleShot(50, self.start_tool_check)
         
@@ -1511,7 +1511,7 @@ class TekDT_AIS(QMainWindow):
         if not success:
             if hasattr(self, 'startup_overlay'):
                 self.startup_overlay.hide()
-            self.show_styled_message_box(QMessageBox.Icon.Warning, "Tool error", message)
+            self.show_styled_message_box(QMessageBox.Icon.Warning, "Lỗi công cụ", message)
             if not (ARIA2_EXEC.exists() and SEVENZ_EXEC.exists()):
                 QApplication.quit()
                 return
@@ -1545,9 +1545,9 @@ class TekDT_AIS(QMainWindow):
         # Nếu đang ở chế độ offline, lọc danh sách để chỉ giữ lại các app đã được tải về.
         if not is_online:
             if not self.is_cli_mode:
-                self.show_styled_message_box(QMessageBox.Icon.Warning, "Network error", f"Unable to load the list of software from the server. The program will only display software for which information is available locally")
+                self.show_styled_message_box(QMessageBox.Icon.Warning, "Lỗi mạng", f"Không thể tải danh sách phần mềm từ máy chủ.\nChương trình sẽ chỉ hiển thị các phần mềm đã có thông tin cục bộ.")
             else:
-                print(f"Note: The list of software cannot be loaded from the server. Continue with the local data.")
+                print(f"Lưu ý: Không thể tải danh sách phần mềm từ máy chủ. Tiếp tục với dữ liệu cục bộ.")
 
             all_local_apps = self.remote_apps.get("app_items", {})
             downloaded_apps_only = {
@@ -1556,9 +1556,9 @@ class TekDT_AIS(QMainWindow):
             }
             self.remote_apps["app_items"] = downloaded_apps_only
             if hasattr(self, 'status_label') and self.status_label:
-                self.status_label.setText("Offline mode. Displays downloaded software.")
+                self.status_label.setText("Chế độ Offline. Hiển thị các phần mềm đã tải.")
         else:
-            status_text = "List downloaded successfully. Ready."
+            status_text = "Tải danh sách thành công. Sẵn sàng."
             if hasattr(self, 'status_label') and self.status_label: self.status_label.setText(status_text)
 
         # Ẩn overlay khởi động
@@ -1600,7 +1600,7 @@ class TekDT_AIS(QMainWindow):
         
         # Chỉ giữ lại khung tìm kiếm và danh sách phần mềm
         self.search_box = QLineEdit()
-        self.search_box.setPlaceholderText("Type to search...")
+        self.search_box.setPlaceholderText("Gõ để tìm kiếm...")
         self.search_box.textChanged.connect(self.filter_apps)
         
         self.available_list_widget = QListWidget()
@@ -1727,8 +1727,8 @@ class TekDT_AIS(QMainWindow):
                 office_apps[app_key] = {
                     "display_name": display_name_with_arch,
                     "version": "1.0.0.0", # Office tự quản lý phiên bản
-                    "description": f"Installer {display_name_with_arch} via Office Deployment Tool.",
-                    "category": "Office",
+                    "description": f"Bộ cài đặt {display_name_with_arch} qua Office Deployment Tool.",
+                    "category": "Văn phòng",
                     "type": "office_suite",  # Key đặc biệt để nhận diện
                     "icon_url": "https://img.icons8.com/color/96/microsoft-office-2019.png", # Icon chung
                     "product_id": product_id,
@@ -1812,7 +1812,7 @@ class TekDT_AIS(QMainWindow):
         # Tải dữ liệu remote và local mà không vẽ lại giao diện
         self.load_config_and_apps(populate=False) 
         if not self.remote_apps.get('app_items'):
-            self.show_styled_message_box(QMessageBox.Icon.Critical, "Error", "Unable to load the list of software. Cannot continue..")
+            self.show_styled_message_box(QMessageBox.Icon.Critical, "Lỗi", "Không thể tải danh sách phần mềm. Không thể tiếp tục.")
             QApplication.quit()
             return
 
@@ -1889,7 +1889,7 @@ class TekDT_AIS(QMainWindow):
                 worker_tasks[key] = {'info': remote_info, 'action': 'install'}
 
         if not worker_tasks:
-            self.show_styled_message_box(QMessageBox.Icon.Information, "Notification", "No tasks need to be performed (the software does not exist, has not been downloaded, or is already the latest version).")
+            self.show_styled_message_box(QMessageBox.Icon.Information, "Thông báo", "Không có tác vụ nào cần thực hiện (phần mềm không tồn tại, chưa được tải về, hoặc đã là phiên bản mới nhất).")
             QApplication.quit()
             return
 
@@ -1945,22 +1945,22 @@ class TekDT_AIS(QMainWindow):
                 f = final_report['update']['fail']
                 # Lấy số lượng app bị bỏ qua từ report ban đầu
                 skip = len(report['update'].get('skipped', []))
-                summary_lines.append(f"--- Update ---\nSuccess: {s} | Failed: {f} | Skipped: {skip}")
+                summary_lines.append(f"--- Cập nhật ---\nThành công: {s} | Thất bại: {f} | Bỏ qua: {skip}")
             
             if is_install_action:
                 s = final_report['install']['success']
                 f = final_report['install']['fail']
                 # Lấy số lượng app bị bỏ qua từ report ban đầu
                 skip = len(report['install'].get('skipped', []))
-                summary_lines.append(f"--- Install ---\nSuccess: {s} | Failed: {f} | Skipped: {skip}")
+                summary_lines.append(f"--- Cài đặt ---\nThành công: {s} | Thất bại: {f} | Bỏ qua: {skip}")
 
-            final_message = "\n\n".join(summary_lines) if summary_lines else "No tasks were performed."
+            final_message = "\n\n".join(summary_lines) if summary_lines else "Không có tác vụ nào được thực hiện."
             
             # Reset trạng thái processing để tránh bị chặn bởi closeEvent
             self.is_processing = False
             self.install_worker = None # Xóa tham chiếu worker
             
-            self.show_styled_message_box(QMessageBox.Icon.Information, "Complete the command-line task", final_message)
+            self.show_styled_message_box(QMessageBox.Icon.Information, "Hoàn tất tác vụ dòng lệnh", final_message)
             QApplication.quit()
         
         # Ngắt kết nối các signal cũ có thể gây xung đột
@@ -2003,7 +2003,7 @@ class TekDT_AIS(QMainWindow):
         self.install_worker.tasks_batch_completed.connect(self.on_tasks_batch_completed, Qt.ConnectionType.QueuedConnection)
         
         self.install_worker.finished.connect(on_cli_finished, Qt.ConnectionType.QueuedConnection)
-        self.install_worker.error.connect(lambda e: self.show_styled_message_box(QMessageBox.Icon.Critical, "Error Worker", str(e)), Qt.ConnectionType.QueuedConnection)
+        self.install_worker.error.connect(lambda e: self.show_styled_message_box(QMessageBox.Icon.Critical, "Lỗi Worker", str(e)), Qt.ConnectionType.QueuedConnection)
         self.install_worker.update_widget_status.connect(self.update_widget_status, Qt.ConnectionType.QueuedConnection)
 
         self.install_worker.start()
@@ -2020,7 +2020,7 @@ class TekDT_AIS(QMainWindow):
                 # Nếu hành động gốc là 'update'
                 if original_action == 'update':
                     # Nếu tải về thất bại, thì cả update và install đều thất bại
-                    if status == 'failed' and message == "Downloaded failed":
+                    if status == 'failed' and message == "Tải thất bại.":
                         self.cli_task_results[app_key] = {'status': 'failed', 'action': 'update'}
                     # Nếu cài đặt thất bại sau khi update
                     elif status == 'failed':
@@ -2073,11 +2073,11 @@ class TekDT_AIS(QMainWindow):
         search_layout.setSpacing(5)
 
         self.search_box = QLineEdit()
-        self.search_box.setPlaceholderText("Search (Name, Description)...")
+        self.search_box.setPlaceholderText("Tìm kiếm (Tên, Mô tả)...")
         
         # [NEW] Thêm Widget lọc danh mục
         self.category_filter = CheckableComboBox()
-        self.category_filter.setToolTip("Select categories to filter by")
+        self.category_filter.setToolTip("Chọn danh mục để lọc")
         
         # Tạo nút Xoá
         self.clear_search_button = QPushButton("X")
@@ -2118,7 +2118,7 @@ class TekDT_AIS(QMainWindow):
         
         # Thêm layout tìm kiếm vào layout chính của khung bên trái
         left_layout.addLayout(search_layout)
-        self.available_count_label = QLabel("Total number of software programs: 0")
+        self.available_count_label = QLabel("Tổng số phần mềm: 0")
         self.available_list_widget = QListWidget()
         left_layout.addWidget(self.available_count_label)
         left_layout.addWidget(self.available_list_widget)
@@ -2126,7 +2126,7 @@ class TekDT_AIS(QMainWindow):
         # --- Right Panel (Selected Apps) ---
         right_panel = QWidget()
         right_layout = QVBoxLayout(right_panel)
-        self.selected_count_label = QLabel("Selected: 0")
+        self.selected_count_label = QLabel("Đã chọn: 0")
         self.selected_list_widget = QListWidget()
         right_layout.addWidget(self.selected_count_label)
         right_layout.addWidget(self.selected_list_widget)
@@ -2139,11 +2139,11 @@ class TekDT_AIS(QMainWindow):
         bottom_layout = QHBoxLayout(bottom_panel)
         bottom_panel.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
         
-        self.start_button = QPushButton("START INSTALLATION")
+        self.start_button = QPushButton("BẮT ĐẦU CÀI ĐẶT")
         self.start_button.clicked.connect(self.start_installation)
         self.start_button.setMinimumHeight(40)
 
-        self.status_label = QLabel("Status: Ready")
+        self.status_label = QLabel("Trạng thái: Sẵn sàng.")
         
         bottom_layout.addWidget(self.status_label, 1)
         bottom_layout.addWidget(self.start_button)
@@ -2173,11 +2173,11 @@ class TekDT_AIS(QMainWindow):
         
         # Giữ nút "Bắt đầu cài đặt" luôn hiển thị, nhưng đổi text nếu không enabled
         if not enabled:
-            self.start_button.setText("STOP")
+            self.start_button.setText("DỪNG")
             self.start_button.setEnabled(True)  # Cho phép click để dừng
             self.start_button.setStyleSheet("background-color: #e74c3c; color: white;")
         else:
-            self.start_button.setText("START INSTALLATION")
+            self.start_button.setText("BẮT ĐẦU CÀI ĐẶT")
             self.start_button.setStyleSheet("background-color: #3498db; color: white;")
     
     def load_config_and_apps(self, populate=True):
@@ -2227,10 +2227,10 @@ class TekDT_AIS(QMainWindow):
         remote_ver_str = self.remote_apps.get('app_items', {}).get(app_key, {}).get('version', '0')
         is_update_available = is_downloaded and parse_version(remote_ver_str) > parse_version(local_ver_str)
 
-        widget.version_label.setText(f"Version: {app_info.get('version', 'N/A')}")
+        widget.version_label.setText(f"Phiên bản: {app_info.get('version', 'N/A')}")
         widget.version_label.setStyleSheet("color: #bdc3c7; font-size: 10pt;")
         if is_update_available:
-            widget.version_label.setText(f"Update: {local_ver_str} -> {remote_ver_str}")
+            widget.version_label.setText(f"Cập nhật: {local_ver_str} -> {remote_ver_str}")
             widget.version_label.setStyleSheet("color: #2ecc71; font-weight: bold;")
 
         # Luôn ngắt kết nối cũ trước khi kết nối hành động mới để tránh lỗi gọi nhiều lần
@@ -2243,14 +2243,14 @@ class TekDT_AIS(QMainWindow):
             is_auto = self.local_apps.get(app_key, {}).get('auto_install', False)
 
             if is_auto:
-                # TRƯỜNG HỢP 1: Phần mềm ĐÃ được chọn -> Nút phải là "Remove".
-                widget.set_auto_install_button_state(True) # Đặt giao diện nút là "Remove" (màu đỏ)
+                # TRƯỜNG HỢP 1: Phần mềm ĐÃ được chọn -> Nút phải là "Xoá".
+                widget.set_auto_install_button_state(True) # Đặt giao diện nút là "Xoá" (màu đỏ)
                 # Hành động khi nhấn là tắt auto_install.
-                # Hàm on_auto_install_toggled sau đó sẽ tự gọi lại chính hàm này để cập nhật nút thành "Add".
+                # Hàm on_auto_install_toggled sau đó sẽ tự gọi lại chính hàm này để cập nhật nút thành "Thêm".
                 widget.action_button.clicked.connect(lambda: self.on_auto_install_toggled(app_key, False))
             else:
-                # TRƯỜNG HỢP 2: Phần mềm CHƯA được chọn -> Nút phải là "Add".
-                widget.set_auto_install_button_state(False) # Đặt giao diện nút là "Add" (màu xanh)
+                # TRƯỜNG HỢP 2: Phần mềm CHƯA được chọn -> Nút phải là "Thêm".
+                widget.set_auto_install_button_state(False) # Đặt giao diện nút là "Thêm" (màu xanh)
                 
                 # Hành động khi nhấn là bật auto_install.
                 on_add_action = lambda: self.on_auto_install_toggled(app_key, True)
@@ -2266,8 +2266,8 @@ class TekDT_AIS(QMainWindow):
         
         else: 
             if app_info.get('type', '').lower() == 'portable':
-                widget.action_button.setText("Run")
-                widget.action_button.setToolTip(f"Run {app_info['display_name']} direct")
+                widget.action_button.setText("Chạy")
+                widget.action_button.setToolTip(f"Chạy {app_info['display_name']} trực tiếp")
                 widget.action_button.setStyleSheet("background-color: #3498db; color: white;")
                 on_run_action = lambda: self.run_portable_app(app_key, app_info)
                 if is_update_available:
@@ -2275,8 +2275,8 @@ class TekDT_AIS(QMainWindow):
                 else:
                     widget.action_button.clicked.connect(on_run_action)
             else:
-                widget.action_button.setText("Add")
-                widget.action_button.setToolTip(f"Add {app_info['display_name']} to the list")
+                widget.action_button.setText("Thêm")
+                widget.action_button.setToolTip(f"Thêm {app_info['display_name']} vào danh sách")
                 widget.action_button.setStyleSheet("background-color: #4CAF50; color: white;")
                 
                 on_complete_action = lambda: self.move_app_to_selection(app_key, app_info)
@@ -2317,7 +2317,7 @@ class TekDT_AIS(QMainWindow):
             if key in compatible_apps:
                 compatible_apps[key].update(local_info)
 
-        categories = sorted(list(set(app.get('category', 'Uncategorized') for app in compatible_apps.values())))
+        categories = sorted(list(set(app.get('category', 'Chưa phân loại') for app in compatible_apps.values())))
         
         # Thêm category vào bộ lọc
         if hasattr(self, 'category_filter'):
@@ -2334,7 +2334,7 @@ class TekDT_AIS(QMainWindow):
             self.available_list_widget.addItem(cat_item)
 
             for key, info in sorted(compatible_apps.items(), key=lambda item: item[1].get('display_name', '')):
-                if info.get('category', 'Uncategorized') == category:
+                if info.get('category', 'Chưa phân loại') == category:
                     self.add_app_to_list(self.available_list_widget, key, info)
 
         if not self.embed_mode:
@@ -2374,7 +2374,7 @@ class TekDT_AIS(QMainWindow):
 
         # Luôn hiển thị thông báo nếu có cập nhật
         if is_update_available:
-            item_widget.version_label.setText(f"Update: {local_ver_str} -> {remote_ver_str}")
+            item_widget.version_label.setText(f"Cập nhật: {local_ver_str} -> {remote_ver_str}")
             item_widget.version_label.setStyleSheet("color: #2ecc71; font-weight: bold;") # Màu xanh lá
 
         # Ngắt kết nối mặc định để thiết lập lại cho từng trường hợp
@@ -2382,8 +2382,8 @@ class TekDT_AIS(QMainWindow):
 
         if not is_downloaded:
             # --- TRƯỜNG HỢP 1: CHƯA TẢI VỀ ---
-            item_widget.action_button.setText("Download")
-            item_widget.action_button.setToolTip(f"Download {info['display_name']}")
+            item_widget.action_button.setText("Tải")
+            item_widget.action_button.setToolTip(f"Tải về {info['display_name']}")
             item_widget.action_button.setStyleSheet("background-color: #f39c12; color: white;") # Màu cam
             # Hành động tải không thay đổi giữa các chế độ
             item_widget.action_button.clicked.connect(lambda _, k=key, i=info, w=item_widget: self.confirm_download(k, i, w))
@@ -2392,13 +2392,13 @@ class TekDT_AIS(QMainWindow):
             # --- TRƯỜNG HỢP 2: ĐÃ TẢI VỀ (CHẾ ĐỘ EMBED) ---
             is_auto = self.local_apps.get(key, {}).get('auto_install', False)
             if is_auto:
-                item_widget.set_auto_install_button_state(True) # Nút "Remove"
+                item_widget.set_auto_install_button_state(True) # Nút "Xoá"
                 # Hành động Xoá: chỉ cần bật/tắt auto_install
                 item_widget.action_button.clicked.connect(
                     lambda _, w=item_widget, k=key: (w.auto_install_toggled.emit(k, False), w.set_auto_install_button_state(False))
                 )
             else:
-                item_widget.set_auto_install_button_state(False) # Nút "Add"
+                item_widget.set_auto_install_button_state(False) # Nút "Thêm"
                 # Hành động Thêm:
                 # 1. Kiểm tra cập nhật (nếu có)
                 # 2. Sau đó bật auto_install = true
@@ -2416,8 +2416,8 @@ class TekDT_AIS(QMainWindow):
 
         else:  # Chế độ thông thường
             if info.get('type', '').lower() == 'portable':
-                item_widget.action_button.setText("Run")
-                item_widget.action_button.setToolTip(f"Run {info['display_name']} direct")
+                item_widget.action_button.setText("Chạy")
+                item_widget.action_button.setToolTip(f"Chạy {info['display_name']} trực tiếp")
                 item_widget.action_button.setStyleSheet("background-color: #3498db; color: white;")
                 on_run_action = lambda: self.run_portable_app(key, info)
                 if is_update_available:
@@ -2425,8 +2425,8 @@ class TekDT_AIS(QMainWindow):
                 else:
                     item_widget.action_button.clicked.connect(on_run_action)
             else:
-                item_widget.action_button.setText("Add")
-                item_widget.action_button.setToolTip(f"Add {info['display_name']} to the list")
+                item_widget.action_button.setText("Thêm")
+                item_widget.action_button.setToolTip(f"Thêm {info['display_name']} vào danh sách")
                 item_widget.action_button.setStyleSheet("background-color: #4CAF50; color: white;")
                 
                 on_complete_action = lambda: self.move_app_to_selection(key, info)
@@ -2503,8 +2503,8 @@ class TekDT_AIS(QMainWindow):
     def confirm_download(self, key, info, widget):
         reply = self.show_styled_message_box(
             QMessageBox.Icon.Question,
-            "Download the software",
-            f"Do you want to download {info['display_name']}?",
+            "Tải phần mềm",
+            f"Bạn có muốn tải về {info['display_name']} không?",
             buttons=QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         )
         if reply == QMessageBox.StandardButton.Yes:
@@ -2518,7 +2518,7 @@ class TekDT_AIS(QMainWindow):
             # 2. Kết nối các tín hiệu phụ (tiến trình, lỗi, trạng thái)
             worker.progress.connect(self.update_install_progress)
             worker.progress_percentage.connect(self.update_download_progress_anywhere)
-            worker.error.connect(lambda e: self.show_styled_message_box(QMessageBox.Icon.Critical, "Error Worker", str(e)))
+            worker.error.connect(lambda e: self.show_styled_message_box(QMessageBox.Icon.Critical, "Lỗi Worker", str(e)))
             worker.update_widget_status.connect(self.update_widget_status)
 
             # 3. Kết nối tín hiệu finished CHỈ để tự động xóa worker
@@ -2532,9 +2532,9 @@ class TekDT_AIS(QMainWindow):
     def confirm_update(self, key, info, widget, local_ver, remote_ver, on_complete):
         reply = self.show_styled_message_box(
             QMessageBox.Icon.Question,
-            "Update the software",
-            f"A newer version of {info['display_name']} ({remote_ver}) is now available "
-            f"Current version: {local_ver}.\n\nDo you want to update?",
+            "Cập nhật phần mềm",
+            f"Phiên bản mới hơn của {info['display_name']} ({remote_ver}) đã có. "
+            f"Phiên bản hiện tại: {local_ver}.\n\nBạn có muốn cập nhật không?",
             buttons=QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         )
 
@@ -2555,7 +2555,7 @@ class TekDT_AIS(QMainWindow):
 
             worker.progress.connect(self.update_install_progress)
             worker.progress_percentage.connect(self.update_download_progress_anywhere)
-            worker.error.connect(lambda e: self.show_styled_message_box(QMessageBox.Icon.Critical, "Error Worker", str(e)))
+            worker.error.connect(lambda e: self.show_styled_message_box(QMessageBox.Icon.Critical, "Lỗi Worker", str(e)))
             worker.update_widget_status.connect(self.update_widget_status)
             
             # Kết nối đến hàm callback lồng nhau ở trên
@@ -2582,19 +2582,19 @@ class TekDT_AIS(QMainWindow):
                 # Nếu đã có Office được chọn VÀ widget này không phải là cái đã được chọn
                 if is_office_selected and widget.app_key not in self.selected_for_install:
                     widget.action_button.setDisabled(True)
-                    widget.action_button.setToolTip("Only one version of Office can be selected for installation")
+                    widget.action_button.setToolTip("Chỉ có thể chọn một phiên bản Office để cài đặt.")
                 # Nếu không có Office nào được chọn, KHÔI PHỤC HOÀN TOÀN TRẠNG THÁI NÚT
                 elif not is_office_selected:
                     widget.action_button.setDisabled(False)
                     # Logic khôi phục nút (quan trọng nhất)
                     is_downloaded = self.is_app_downloaded(widget.app_key, widget.app_info)
                     if is_downloaded:
-                        widget.action_button.setText("Add")
-                        widget.action_button.setToolTip(f"Add {widget.app_info['display_name']} to the list")
+                        widget.action_button.setText("Thêm")
+                        widget.action_button.setToolTip(f"Thêm {widget.app_info['display_name']} vào danh sách")
                         widget.action_button.setStyleSheet("background-color: #4CAF50; color: white;")
                     else:
-                        widget.action_button.setText("Download")
-                        widget.action_button.setToolTip(f"Download {widget.app_info['display_name']}")
+                        widget.action_button.setText("Tải")
+                        widget.action_button.setToolTip(f"Tải về {widget.app_info['display_name']}")
                         widget.action_button.setStyleSheet("background-color: #f39c12; color: white;")
     
     def move_app_to_selection(self, key, info):
@@ -2630,8 +2630,8 @@ class TekDT_AIS(QMainWindow):
         item_widget = AppItemWidget(key, app_info_latest)
 
         # Thiết lập nút "Bỏ" và kết nối sự kiện
-        item_widget.action_button.setText("Remove")
-        item_widget.action_button.setToolTip(f"Remove {app_info_latest.get('display_name', key)} from the list")
+        item_widget.action_button.setText("Bỏ")
+        item_widget.action_button.setToolTip(f"Bỏ {app_info_latest.get('display_name', key)} khỏi danh sách")
         item_widget.action_button.setStyleSheet(
             "background-color: #e74c3c; color: white; border: none; padding: 8px 16px; border-radius: 4px; font-weight: bold;"
         )
@@ -2675,7 +2675,7 @@ class TekDT_AIS(QMainWindow):
         self.update_counts()
 
         # Gọi hàm helper để khôi phục trạng thái của widget tương ứng ở danh sách bên trái
-        # Hàm này sẽ tự động xử lý việc đổi nút thành "Add", "Chạy", hoặc "Tải" và kết nối lại sự kiện
+        # Hàm này sẽ tự động xử lý việc đổi nút thành "Thêm", "Chạy", hoặc "Tải" và kết nối lại sự kiện
         self.update_available_item_state(key, is_selected=False)
         
         # Cập nhật lại trạng thái của các lựa chọn Office (quan trọng)
@@ -2723,7 +2723,7 @@ class TekDT_AIS(QMainWindow):
                         widget.action_button.setStyleSheet(
                             "background-color: #95a5a6; color: white; border: none; padding: 8px 16px; border-radius: 4px; font-weight: bold;"
                         )
-                        widget.action_button.setText("Selected")
+                        widget.action_button.setText("Đã chọn")
                     else:
                         # Khi một item được bỏ chọn, tái tạo lại nút của nó ở danh sách bên trái
                         widget.action_button.setEnabled(True)
@@ -2742,14 +2742,14 @@ class TekDT_AIS(QMainWindow):
                             pass
 
                         if not is_downloaded:
-                            widget.action_button.setText("Download")
-                            widget.action_button.setToolTip(f"Download {current_info['display_name']}")
+                            widget.action_button.setText("Tải")
+                            widget.action_button.setToolTip(f"Tải về {current_info['display_name']}")
                             widget.action_button.setStyleSheet("background-color: #f39c12; color: white;")
                             widget.action_button.clicked.connect(lambda _, k=key, i=current_info, w=widget: self.confirm_download(k, i, w))
                         else:  # Đã tải về
                             if current_info.get('type') == 'Portable':
-                                widget.action_button.setText("Run")
-                                widget.action_button.setToolTip(f"Run {current_info['display_name']} direct")
+                                widget.action_button.setText("Chạy")
+                                widget.action_button.setToolTip(f"Chạy {current_info['display_name']} trực tiếp")
                                 widget.action_button.setStyleSheet("background-color: #3498db; color: white;")
                                 on_run_action = lambda: self.run_portable_app(key, current_info)
                                 if is_update_available:
@@ -2757,8 +2757,8 @@ class TekDT_AIS(QMainWindow):
                                 else:
                                     widget.action_button.clicked.connect(on_run_action)
                             else:
-                                widget.action_button.setText("Add")
-                                widget.action_button.setToolTip(f"Add {current_info['display_name']} to the list")
+                                widget.action_button.setText("Thêm")
+                                widget.action_button.setToolTip(f"Thêm {current_info['display_name']} vào danh sách")
                                 widget.action_button.setStyleSheet("background-color: #4CAF50; color: white;")
                                 
                                 on_complete_action = lambda: self.move_app_to_selection(key, current_info)
@@ -2814,7 +2814,7 @@ class TekDT_AIS(QMainWindow):
             self.remote_apps['app_items'][app_key].update(new_app_info)
 
         # BƯỚC 3: Gọi hàm cập nhật widget ở khung bên trái (danh sách có sẵn).
-        # để đảm bảo nút "Tải" chuyển thành nút "Add" với hành động được kết nối đúng.
+        # để đảm bảo nút "Tải" chuyển thành nút "Thêm" với hành động được kết nối đúng.
         self.update_single_app_widget(app_key)
 
         # BƯỚC 4: Nếu phần mềm này đang nằm trong danh sách "Đã chọn" (trường hợp update),
@@ -2839,7 +2839,7 @@ class TekDT_AIS(QMainWindow):
         
         download_path = APPS_DIR / app_key / archive_name
         if not download_path.exists():
-            self.show_styled_message_box(QMessageBox.Icon.Warning, "Running error", f"The downloaded file '{archive_name}' does not exist.")
+            self.show_styled_message_box(QMessageBox.Icon.Warning, "Lỗi chạy", f"File tải về '{archive_name}' không tồn tại.")
             return
         
         search_base_dir = APPS_DIR / app_key  # Mặc định thư mục app
@@ -2859,14 +2859,14 @@ class TekDT_AIS(QMainWindow):
             process = subprocess.run(command, capture_output=True, text=True, encoding='utf-8', errors='ignore', timeout=300, check=False, creationflags=subprocess.CREATE_NO_WINDOW)
             if process.returncode != 0:
                 error_message = process.stderr or process.stdout
-                self.show_styled_message_box(QMessageBox.Icon.Critical, "Extraction error", f"Extraction of '{archive_name}' failed: {error_message}")
+                self.show_styled_message_box(QMessageBox.Icon.Critical, "Lỗi giải nén", f"Giải nén '{archive_name}' thất bại: {error_message}")
                 return
             search_base_dir = extraction_dir  # Cập nhật đường dẫn tìm kiếm sau giải nén
         
         # Tìm và chạy executable
         executable_path = self._find_executable(search_base_dir, executable_pattern)
         if not executable_path:
-            self.show_styled_message_box(QMessageBox.Icon.Warning, "Running error", f"Executable file not found '{executable_pattern}'.")
+            self.show_styled_message_box(QMessageBox.Icon.Warning, "Lỗi chạy", f"Không tìm thấy file thực thi '{executable_pattern}'.")
             return
         
         install_params = app_info.get('install_params', '')
@@ -2887,7 +2887,7 @@ class TekDT_AIS(QMainWindow):
         try:
             subprocess.Popen(install_command, cwd=cwd, creationflags=creation_flags)
         except Exception as e:
-            self.show_styled_message_box(QMessageBox.Icon.Critical, "Running error", f"Error when running '{executable_pattern}': {e}")
+            self.show_styled_message_box(QMessageBox.Icon.Critical, "Lỗi chạy", f"Lỗi khi chạy '{executable_pattern}': {e}")
     
     def filter_apps(self, text):
         text = text.lower().strip()
@@ -2911,7 +2911,7 @@ class TekDT_AIS(QMainWindow):
                 is_text_match = (text in display_name or text in description) or len(text) < min_chars
                 
                 # Logic lọc Category: Nếu không chọn gì (list rỗng) thì coi như chọn tất cả
-                category = app_info.get('category', 'Uncategorized')
+                category = app_info.get('category', 'Chưa phân loại')
                 is_cat_match = not selected_categories or category in selected_categories
                 
                 # Kết hợp điều kiện AND
@@ -2933,22 +2933,22 @@ class TekDT_AIS(QMainWindow):
 
     def start_installation(self):
         self._is_stopping = False
-        if self.start_button.text() == "Done":
+        if self.start_button.text() == "Xong":
             self.reset_ui_after_completion()
             return
         if self.install_worker and self.install_worker.isRunning():
-            reply = self.show_styled_message_box(QMessageBox.Icon.Question, "Stop task",
-                                                 "Are you sure you want to stop the installation process?",
+            reply = self.show_styled_message_box(QMessageBox.Icon.Question, "Dừng tác vụ",
+                                                 "Bạn có chắc muốn dừng quá trình cài đặt không?",
                                                  buttons=QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
             if reply == QMessageBox.StandardButton.Yes:
                 self.install_worker.stop()
-                self.start_button.setText("STOPPING...")
+                self.start_button.setText("ĐANG DỪNG...")
                 self.start_button.setDisabled(True)
             return
         
         # Nếu không có gì được chọn, không làm gì cả
         if not self.selected_for_install:
-            self.show_styled_message_box(QMessageBox.Icon.Information, "Notification", "Please add at least one software program to install")
+            self.show_styled_message_box(QMessageBox.Icon.Information, "Thông báo", "Vui lòng thêm ít nhất một phần mềm để cài đặt.")
             return
         
         self.is_processing = True
@@ -2957,7 +2957,7 @@ class TekDT_AIS(QMainWindow):
         self.batch_install_queue = list(self.selected_for_install)
         
         # Nếu nút đang ở trạng thái "Xong"
-        if self.start_button.text() == "Done":
+        if self.start_button.text() == "Xong":
             self.reset_ui_after_completion()
             return
 
@@ -2981,14 +2981,14 @@ class TekDT_AIS(QMainWindow):
             if hasattr(widget, 'action_button'):
                 widget.action_button.hide() # Ẩn nút "Bỏ"
                 widget.set_status("processing") # Hiển thị trạng thái chờ
-        self.start_button.setText("STOP")
+        self.start_button.setText("DỪNG")
         self.start_button.setEnabled(True)
         self.start_button.setStyleSheet("background-color: #e74c3c; color: white; border: none; padding: 8px 16px; border-radius: 4px; font-weight: bold;")
 
         self.install_worker = InstallWorker(apps_to_process)
         self.install_worker.progress.connect(self.update_install_progress)
         self.install_worker.progress_percentage.connect(self.update_download_progress_anywhere)
-        self.install_worker.error.connect(lambda e: self.show_styled_message_box(QMessageBox.Icon.Critical, "Error Worker", str(e)))
+        self.install_worker.error.connect(lambda e: self.show_styled_message_box(QMessageBox.Icon.Critical, "Lỗi Worker", str(e)))
         self.install_worker.update_widget_status.connect(self.update_widget_status)
         self.install_worker.tasks_batch_completed.connect(self.handle_single_task_completion)
         self.install_worker.finished.connect(self.on_installation_finished)
@@ -3099,8 +3099,8 @@ class TekDT_AIS(QMainWindow):
 
         # Trường hợp 1: Worker hoàn thành tự nhiên (không bị người dùng dừng)
         if not self._is_stopping:
-            self.status_label.setText("Done! Press 'Done' to continue.")
-            self.start_button.setText("Done")
+            self.status_label.setText("Hoàn tất! Nhấn 'Xong' để tiếp tục.")
+            self.start_button.setText("Xong")
             self.start_button.setEnabled(True)
             self.start_button.setStyleSheet("background-color: #4CAF50; color: white;")
         
@@ -3125,7 +3125,7 @@ class TekDT_AIS(QMainWindow):
                 widget = self.available_list_widget.itemWidget(self.available_list_widget.item(i))
                 if hasattr(widget, 'set_status'):
                     widget.set_status("success")
-                    widget.action_button.setText("Add")
+                    widget.action_button.setText("Thêm")
                     widget.action_button.setStyleSheet("background-color: #4CAF50; color: white;")
                     # Reconnect nếu cần
 
@@ -3137,9 +3137,9 @@ class TekDT_AIS(QMainWindow):
         self.is_processing = False
         if not self.embed_mode:
             self.set_ui_interactive(True) # Bật lại tương tác
-            self.start_button.setText("START INSTALLATION")
+            self.start_button.setText("BẮT ĐẦU CÀI ĐẶT")
             self.start_button.setStyleSheet("background-color: #3498db; color: white;")
-            self.status_label.setText("Status: Ready")
+            self.status_label.setText("Trạng thái: Sẵn sàng.")
             
             # Lặp qua các widget và reset trạng thái của chúng
             for i in range(self.selected_list_widget.count()):
@@ -3154,8 +3154,8 @@ class TekDT_AIS(QMainWindow):
         compatible_count = sum(1 for i in range(self.available_list_widget.count()) if hasattr(self.available_list_widget.itemWidget(self.available_list_widget.item(i)), 'app_key'))
         selected_count = self.selected_list_widget.count()
         
-        self.available_count_label.setText(f"Total number of software programs: {compatible_count}")
-        self.selected_count_label.setText(f"Selected: {selected_count}")
+        self.available_count_label.setText(f"Tổng số phần mềm: {compatible_count}")
+        self.selected_count_label.setText(f"Đã chọn: {selected_count}")
 
     def save_config(self):
         if not self.embed_mode and not self.is_cli_mode:
@@ -3170,9 +3170,9 @@ class TekDT_AIS(QMainWindow):
         if self.is_processing or self.active_workers:
             reply = self.show_styled_message_box(
                 QMessageBox.Icon.Warning,
-                "Confirm exit",
-                "The tasks are still running. Are you sure you want to exit?\n"
-                "This may interrupt the download or installation process.",
+                "Xác nhận thoát",
+                "Các tác vụ vẫn đang chạy. Bạn có chắc chắn muốn thoát không?\n"
+                "Việc này có thể làm gián đoạn quá trình tải hoặc cài đặt.",
                 buttons=QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             )
 
@@ -3322,7 +3322,7 @@ Lưu ý:
 - Sử dụng "|" để ngăn cách nhiều tên ứng dụng trong dấu ngoặc kép.
 - Các hành động chỉ áp dụng cho phần mềm đã được tải về.
 - Chương trình sẽ luôn hiển thị giao diện để theo dõi và tự tắt sau khi hoàn thành."""
-        main_win.show_styled_message_box(QMessageBox.Icon.Information, "Command-line help - TekDT AIS", help_text)
+        main_win.show_styled_message_box(QMessageBox.Icon.Information, "Trợ giúp dòng lệnh - TekDT AIS", help_text)
         sys.exit(0)
     
     # Các lệnh như /auto_install có thể được xử lý ở đây nếu cần, nhưng hiện tại tập trung vào /install và /update
