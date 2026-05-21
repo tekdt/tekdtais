@@ -286,14 +286,14 @@
     },
     "K-Lite_Standard": {
       "display_name": "K-Lite Codec Pack Standard",
-      "version": "19.1.0",
+      "version": "19.7.0",
       "category": "Multimedia",
       "description": "K-Lite Codec Pack là gói phần mềm miễn phí giúp phát lại mọi tệp nhạc và video chất lượng cao.",
       "type": "installer",
       "architecture": "32bit",
       "compatible_os_arch": "both",
-      "download_url": "https://files2.codecguide.com/K-Lite_Codec_Pack_1910_Standard.exe",
-      "output_filename": "K-Lite_Codec_Pack_1910_Standard.exe",
+      "download_url": "https://files2.codecguide.com/K-Lite_Codec_Pack_1970_Standard.exe",
+      "output_filename": "K-Lite_Codec_Pack_1970_Standard.exe",
       "install_params": "/verysilent /norestart",
       "icon_url": "https://codecguide.com/mpc_logo.png"
     },
@@ -318,7 +318,7 @@
       "type": "installer",
       "architecture": "64bit",
       "compatible_os_arch": "64bit",
-      "download_url": "https://vpn.protondownload.com/download/ProtonVPN_v4.3.5_x64.exe",
+      "download_url": "https://vpn.protondownload.com/download/ProtonVPN_v4.4.0_x64.exe",
       "output_filename": "ProtonVPN64.exe",
       "install_params": "/verysilent /norestart",
       "icon_url": "https://protonvpn.com/favicons/apple-touch-icon.png"
