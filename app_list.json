@@ -156,7 +156,7 @@
     },
     "fdm64": {
       "display_name": "Free Download Manager 64Bit",
-      "version": "6.29.1",
+      "version": "6.34.0",
       "category": "Download management",
       "description": "Đây là trình tăng tốc và sắp xếp tải xuống hiện đại mạnh mẽ dành cho Windows, macOS, Android và Linux.",
       "type": "installer",
@@ -169,7 +169,7 @@
     },
     "fdm32": {
       "display_name": "Free Download Manager 32Bit",
-      "version": "6.29.1",
+      "version": "6.34.0",
       "category": "Download management",
       "description": "Đây là trình tăng tốc và sắp xếp tải xuống hiện đại mạnh mẽ dành cho Windows, macOS, Android và Linux.",
       "type": "installer",
