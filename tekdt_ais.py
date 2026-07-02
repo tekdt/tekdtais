@@ -100,7 +100,7 @@ else:
 
 # --- CÁC HẰNG SỐ VÀ CẤU HÌNH ---
 APP_NAME = "TekDT AIS"
-APP_VERSION = "1.0.6"
+APP_VERSION = "1.0.7"
 GITHUB_REPO_URL = "https://github.com/tekdt/tekdtais"
 REMOTE_APP_LIST_URL = "https://raw.githubusercontent.com/tekdt/tekdtais/refs/heads/main/app_list.json"
     
@@ -127,7 +127,8 @@ ARIA2_EXEC = ARIA2_DIR / "aria2c.exe"
 SEVENZ_EXEC = SEVENZ_DIR / "7z.exe"
 ARIA2_API_URL = "https://api.github.com/repos/aria2/aria2/releases/latest"
 SEVENZIP_API_URL = "https://api.github.com/repos/ip7z/7zip/releases/latest"
-ODT_SETUP_URL = "https://download.microsoft.com/download/6c1eeb25-cf8b-41d9-8d0d-cc1dbc032140/officedeploymenttool_19628-20046.exe"
+# ODT_SETUP_URL = "https://download.microsoft.com/download/6c1eeb25-cf8b-41d9-8d0d-cc1dbc032140/officedeploymenttool_19628-20046.exe"
+ODT_SETUP_URL = "https://download.microsoft.com/download/6c1eeb25-cf8b-41d9-8d0d-cc1dbc032140/officedeploymenttool_20026-20112.exe"
 ODT_DIR = TOOLS_DIR / "ODT"
 ODT_EXEC = ODT_DIR / "setup.exe"
 EXTRACTION_BASE_DIR = Path("C:/TEKDT_AIS")
