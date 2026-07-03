@@ -45,7 +45,7 @@ We welcome and appreciate any feedback to help improve this software/script. You
 
 - **Zalo:** 0944.095.092  
 - **Email:** dinhtrungtek@gmail.com  
-- **Facebook:** [@tekdtcom](https://facebook.com/tekdtcom)
+- **Facebook:** [@tekdtxyz](https://facebook.com/tekdtxyz)
 
 ---
 
@@ -54,7 +54,7 @@ We welcome and appreciate any feedback to help improve this software/script. You
 To help make the software/script more complete and feature‑rich, TekDT needs motivation to maintain it. If this software/script is useful for your work, please consider a small contribution. Your sincere support is greatly appreciated.
 
 - **MOMO:** [https://me.momo.vn/TekDT1152](https://me.momo.vn/TekDT1152)  
-- **Biance ID:** 877691831  
+- **Biance ID:** `877691831`
 - **USDT (BEP20):** `0x53a4f3c22de1caf465ee7b5b6ef26aed9749c721`
 
 ---
